@@ -1,0 +1,2 @@
+[workspace]
+members = ["croncat", "croncatd"]

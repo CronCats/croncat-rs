@@ -43,6 +43,14 @@ FLAGS:
 
 -   `cargo doc --no-deps`
 
+## Contributing:
+
+-   Please see [CONTRIBUTING.md](./CONTRIBUTING.md)
+
+## Code of Conduct:
+
+-   Please see [CODE_OF_CONDUCT.md](./CODE_OF_CONDUCT.md)
+
 ## Contributors ✨
 
 Thanks goes to these wonderful people ([emoji key](https://allcontributors.org/docs/en/emoji-key)):

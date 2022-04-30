@@ -1,6 +1,0 @@
-[submodule "external/cosmos-sdk"]
-	path = external/cosmos-sdk
-	url = git@github.com:cosmos/cosmos-sdk.git
-[submodule "external/tendermint"]
-	path = external/tendermint
-	url = git@github.com:tendermint/tendermint.git

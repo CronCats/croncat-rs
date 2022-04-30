@@ -1,0 +1,15 @@
+[package]
+name = "croncat"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+color-eyre = "0.6.1"
+cosmos-sdk-proto = { version = "0.11.0", features = ["grpc", "cosmwasm"] }
+tokio = { version = "1.18.0", features = ["macros", "rt-multi-thread", "sync"] }
+tonic = "0.6"
+tracing = "0.1.34"
+tracing-subscriber = { version = "0.3.11", features = ["fmt", "env-filter"] }
+
+[dev-dependencies]
+tracing-test = "0.2.1"

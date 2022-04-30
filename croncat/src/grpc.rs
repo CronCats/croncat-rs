@@ -1,3 +1,7 @@
+//!
+//! Use the `cosmos_sdk_proto` library to create clients for GRPC node requests.
+//!
+
 use cosmos_sdk_proto::cosmwasm::wasm::v1::msg_client::MsgClient;
 use cosmos_sdk_proto::cosmwasm::wasm::v1::query_client::QueryClient;
 use tonic::transport::Channel;

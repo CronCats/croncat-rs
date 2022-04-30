@@ -1,3 +1,7 @@
+//!
+//! The building blocks for a service that needs to interact with croncat.
+//!
+
 // Features
 #![feature(no_coverage)]
 

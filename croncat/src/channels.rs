@@ -1,3 +1,7 @@
+//!
+//! Various channel types for croncat.
+//!
+
 use tokio::sync::mpsc;
 
 ///

@@ -1,59 +1,37 @@
-use std::collections::HashMap;
+use futures_util::StreamExt;
+use tendermint_rpc::query::EventType;
+use tendermint_rpc::{SubscriptionClient, WebSocketClient};
+use url::Url;
 
-use futures_util::{SinkExt, StreamExt};
-use tokio_tungstenite::connect_async;
-use tungstenite::Message;
-
-use crate::{
-    logging::{debug, error, info},
-    ShutdownRx,
-};
-
-const RPC_SUBSCRIPTION_MSG: &'static str = "{ \"jsonrpc\": \"2.0\", \"method\": \"subscribe\", \"params\": [\"tm.event='NewBlock'\"], \"id\": 1 }";
+use crate::{logging::info, ShutdownRx};
 
 ///
 /// Connect to the RPC websocket endpoint and subscribe for incoming blocks.
 ///
-pub async fn stream_blocks(url: String, shutdown_rx: &mut ShutdownRx) -> tungstenite::Result<()> {
+pub async fn stream_blocks(
+    url: String,
+    shutdown_rx: &mut ShutdownRx,
+) -> Result<(), Box<dyn std::error::Error>> {
+    // Parse url
+    let url = Url::parse(&url).unwrap();
+
+    info!("Connecting to WS RPC server @ {}", url);
+
     // Connect to the WS RPC url
-    let (mut socket, _) = connect_async(url.clone()).await?;
+    let (client, driver) = WebSocketClient::new(url.as_str()).await?;
+    let driver_handle = tokio::task::spawn(driver.run());
+
     info!("Connected to WS RPC server @ {}", url);
 
     info!("Subscribing to NewBlock event");
     // Subscribe to the NewBlock event stream
-    socket.send(RPC_SUBSCRIPTION_MSG.into()).await?;
+    let mut subscriptions = client.subscribe(EventType::NewBlock.into()).await?;
     info!("Successfully subscribed to NewBlock event");
-
-    // Ignore the first message, this is the response.
-    // Probably should handle errors here, but not now.
-    let _ = socket.next().await;
 
     // Handle inbound blocks
     let inbound = tokio::task::spawn(async move {
-        while let Some(msg) = socket.next().await {
-            let msg = msg.expect("Failed to parse WS message");
-
-            match msg {
-                Message::Text(block_string) => {
-                    let block: HashMap<String, serde_json::Value> =
-                        serde_json::from_str(&block_string).expect("Failed to parse block JSON");
-                    info!(
-                        "Received block (#{}) from WS RPC server for timestamp: {}",
-                        block["result"]["data"]["value"]["block"]["header"]["height"].to_string(),
-                        block["result"]["data"]["value"]["block"]["header"]["time"].to_string(),
-                    );
-                }
-                Message::Ping(_) => {
-                    debug!("Received ping from WS RPC server");
-                    socket
-                        .send(Message::Pong(vec![]))
-                        .await
-                        .expect("Failed to send pong to WS RPC server");
-                }
-                message => {
-                    error!("Invalid message type received: {:?}", message);
-                }
-            }
+        while let Some(msg) = subscriptions.next().await {
+            info!("{:#?}", msg);
         }
     });
 
@@ -64,6 +42,10 @@ pub async fn stream_blocks(url: String, shutdown_rx: &mut ShutdownRx) -> tungste
         info!("WS RPC shutting down");
       }
     }
+
+    // Clean up
+    client.close().unwrap();
+    let _ = driver_handle.await.unwrap();
 
     Ok(())
 }

@@ -28,8 +28,10 @@ pub async fn stream_blocks(
     info!("Connected to WS RPC server @ {}", url);
 
     info!("Subscribing to NewBlock event");
+
     // Subscribe to the NewBlock event stream
     let mut subscriptions = client.subscribe(EventType::NewBlock.into()).await?;
+
     info!("Successfully subscribed to NewBlock event");
 
     // Handle inbound blocks
@@ -37,14 +39,16 @@ pub async fn stream_blocks(
         while let Some(msg) = subscriptions.next().await {
             let msg = msg.expect("Failed to receive event");
             match msg.data {
+                // Handle blocks
                 EventData::NewBlock {
                     block: Some(block), ..
                 } => {
                     info!(
-                        "Received block (height: {}) for {}",
+                        "Received block (height: {}) from {}",
                         block.header.height, block.header.time
                     );
                 }
+                // Warn about all events for now
                 message => {
                     warn!("Unexpected message type: {:?}", message);
                 }
@@ -55,9 +59,7 @@ pub async fn stream_blocks(
     // Handle shutdown
     tokio::select! {
       _ = block_stream_handle => {}
-      _ = shutdown_rx.recv() => {
-        info!("WS RPC shutting down");
-      }
+      _ = shutdown_rx.recv() => {}
     }
 
     // Clean up

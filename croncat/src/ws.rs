@@ -5,7 +5,7 @@ use tokio_tungstenite::connect_async;
 use tungstenite::Message;
 
 use crate::{
-    logging::{error, info},
+    logging::{debug, error, info},
     ShutdownRx,
 };
 
@@ -16,9 +16,11 @@ const RPC_SUBSCRIPTION_MSG: &'static str = "{ \"jsonrpc\": \"2.0\", \"method\": 
 ///
 pub async fn stream_blocks(url: String, shutdown_rx: &mut ShutdownRx) -> tungstenite::Result<()> {
     // Connect to the WS RPC url
-    let (mut socket, _) = connect_async(url).await?;
+    let (mut socket, _) = connect_async(url.clone()).await?;
+    info!("Connected to WS RPC server @ {}", url);
 
     info!("Subscribing to NewBlock event");
+    // Subscribe to the NewBlock event stream
     socket.send(RPC_SUBSCRIPTION_MSG.into()).await?;
     info!("Successfully subscribed to NewBlock event");
 
@@ -42,7 +44,7 @@ pub async fn stream_blocks(url: String, shutdown_rx: &mut ShutdownRx) -> tungste
                     );
                 }
                 Message::Ping(_) => {
-                    info!("Received ping from WS RPC server");
+                    debug!("Received ping from WS RPC server");
                     socket
                         .send(Message::Pong(vec![]))
                         .await

@@ -20,7 +20,7 @@ pub async fn stream_blocks(url: String, shutdown_rx: &mut ShutdownRx) -> tungste
 
     info!("Subscribing to NewBlock event");
     socket.send(RPC_SUBSCRIPTION_MSG.into()).await?;
-    info!("Sucessfully subscribed to NewBlock event");
+    info!("Successfully subscribed to NewBlock event");
 
     // Ignore the first message, this is the response.
     // Probably should handle errors here, but not now.
@@ -36,12 +36,20 @@ pub async fn stream_blocks(url: String, shutdown_rx: &mut ShutdownRx) -> tungste
                     let block: HashMap<String, serde_json::Value> =
                         serde_json::from_str(&block_string).expect("Failed to parse block JSON");
                     info!(
-                        "Received block: {:#?}",
-                        block["result"]["data"]["value"]["block"]
+                        "Received block (#{}) from WS RPC server for timestamp: {}",
+                        block["result"]["data"]["value"]["block"]["header"]["height"].to_string(),
+                        block["result"]["data"]["value"]["block"]["header"]["time"].to_string(),
                     );
                 }
-                _ => {
-                    error!("Invalid message type received")
+                Message::Ping(_) => {
+                    info!("Received ping from WS RPC server");
+                    socket
+                        .send(Message::Pong(vec![]))
+                        .await
+                        .expect("Failed to send pong to WS RPC server");
+                }
+                message => {
+                    error!("Invalid message type received: {:?}", message);
                 }
             }
         }

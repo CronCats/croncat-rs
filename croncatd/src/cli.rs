@@ -1,4 +1,4 @@
-use croncat::{errors::Report, tokio::sync::mpsc::{self}};
+use croncat::{errors::Report, tokio::sync::mpsc::{self}, ShutdownTx, ShutdownRx};
 use structopt::StructOpt;
 
 use crate::opts::Opts;
@@ -18,16 +18,6 @@ pub fn print_banner() {
 pub fn get_opts() -> Result<Opts, Report> {
   Ok(Opts::from_args_safe()?)
 }
-
-///
-/// Shutdown channel Sender.
-/// 
-pub type ShutdownTx = mpsc::Sender<()>;
-
-///
-/// Shutdown channel Receiver.
-/// 
-pub type ShutdownRx = mpsc::Receiver<()>;
 
 ///
 /// Create a shutdown channel.

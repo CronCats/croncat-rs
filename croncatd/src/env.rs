@@ -9,12 +9,21 @@ fn default_grpc_url() -> String {
 }
 
 ///
+/// Default url for WS RPC locally.
+/// 
+fn default_wsrpc_url() -> String {
+  String::from("ws://[::1]:26657/websocket")
+}
+
+///
 /// The environment variables struct.
 /// 
 #[derive(Debug, Deserialize)]
 pub struct Env {
   #[serde(default="default_grpc_url")]
   pub grpc_url: String,
+  #[serde(default="default_wsrpc_url")]
+  pub wsrpc_url: String,
 }
 
 ///

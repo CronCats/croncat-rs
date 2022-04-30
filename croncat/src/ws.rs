@@ -11,12 +11,16 @@ use crate::{
 
 const RPC_SUBSCRIPTION_MSG: &'static str = "{ \"jsonrpc\": \"2.0\", \"method\": \"subscribe\", \"params\": [\"tm.event='NewBlock'\"], \"id\": 1 }";
 
+///
+/// Connect to the RPC websocket endpoint and subscribe for incoming blocks.
+///
 pub async fn stream_blocks(url: String, shutdown_rx: &mut ShutdownRx) -> tungstenite::Result<()> {
+    // Connect to the WS RPC url
     let (mut socket, _) = connect_async(url).await?;
 
-    // TODO: Replace me
     info!("Subscribing to NewBlock event");
     socket.send(RPC_SUBSCRIPTION_MSG.into()).await?;
+    info!("Sucessfully subscribed to NewBlock event");
 
     // Ignore the first message, this is the response.
     // Probably should handle errors here, but not now.
@@ -31,7 +35,10 @@ pub async fn stream_blocks(url: String, shutdown_rx: &mut ShutdownRx) -> tungste
                 Message::Text(block_string) => {
                     let block: HashMap<String, serde_json::Value> =
                         serde_json::from_str(&block_string).expect("Failed to parse block JSON");
-                    info!("{}", block["result"]["data"]["value"]["block"]);
+                    info!(
+                        "Received block: {:#?}",
+                        block["result"]["data"]["value"]["block"]
+                    );
                 }
                 _ => {
                     error!("Invalid message type received")
@@ -40,6 +47,7 @@ pub async fn stream_blocks(url: String, shutdown_rx: &mut ShutdownRx) -> tungste
         }
     });
 
+    // Handle shutdown
     tokio::select! {
       _ = inbound => {}
       _ = shutdown_rx.recv() => {

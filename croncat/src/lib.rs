@@ -1,3 +1,6 @@
+// Features
+#![feature(no_coverage)]
+
 // Export tokio for convenience
 pub use tokio;
 

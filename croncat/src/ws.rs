@@ -33,7 +33,7 @@ pub async fn stream_blocks(
     info!("Successfully subscribed to NewBlock event");
 
     // Handle inbound blocks
-    let inbound = tokio::task::spawn(async move {
+    let block_stream_handle = tokio::task::spawn(async move {
         while let Some(msg) = subscriptions.next().await {
             let msg = msg.expect("Failed to receive event");
             match msg.data {
@@ -54,7 +54,7 @@ pub async fn stream_blocks(
 
     // Handle shutdown
     tokio::select! {
-      _ = inbound => {}
+      _ = block_stream_handle => {}
       _ = shutdown_rx.recv() => {
         info!("WS RPC shutting down");
       }

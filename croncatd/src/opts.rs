@@ -12,5 +12,5 @@ pub struct Opts {
 
     /// Wether to show the banner or not
     #[structopt(short, long)]
-    pub no_banner: bool,
+    pub no_frills: bool,
 }

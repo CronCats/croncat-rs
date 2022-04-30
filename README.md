@@ -12,16 +12,16 @@
 
 `croncat-rs` is the brand new version of the croncat agent, written in Rust.
 
-## Modules:
+## Modules
 
 -   `croncatd` This is the executable agent daemon.
 -   `croncat` This is all the pieces to build an agent daemon, this will probably become it's own repo so keep it DRY and clean.
 
-## Run:
+## Run
 
 -   `cargo run`
 
-## Help:
+## Help
 
 ```
 $ cargo run -- --help
@@ -39,15 +39,15 @@ FLAGS:
     -V, --version      Prints version information
 ```
 
-## Generate Docs:
+## Generate Docs
 
 -   `cargo doc --no-deps`
 
-## Contributing:
+## Contributing
 
 -   Please see [CONTRIBUTING.md](./CONTRIBUTING.md)
 
-## Code of Conduct:
+## Code of Conduct
 
 -   Please see [CODE_OF_CONDUCT.md](./CODE_OF_CONDUCT.md)
 

@@ -31,7 +31,7 @@ USAGE:
 FLAGS:
     -d, --debug        Debug mode
     -h, --help         Prints help information
-        --no-frills    Wether to print nice little things like the banner and a goodbye
+        --no-frills    Whether to print nice little things like the banner and a goodbye
     -V, --version      Prints version information
 ```
 

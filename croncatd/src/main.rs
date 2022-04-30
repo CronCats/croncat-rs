@@ -1,6 +1,6 @@
-use std::{time::Duration, process::exit};
+use std::{process::exit};
 
-use croncat::{logging::{self, info}, errors::Report, tokio, grpc};
+use croncat::{logging::{self, info}, errors::Report, tokio, grpc, ws};
 
 mod cli;
 mod opts;
@@ -8,11 +8,11 @@ mod env;
 
 #[tokio::main]
 async fn main() -> Result<(), Report> {
-    // Setup tracing and error reporting
-    logging::setup()?;
-
     // Get environment variables
     let env = env::load()?;
+
+    // Setup tracing and error reporting
+    logging::setup()?;
     
     // Get the CLI options, handle argument errors nicely
     let opts = cli::get_opts().map_err(|e| {
@@ -31,7 +31,12 @@ async fn main() -> Result<(), Report> {
     let (shutdown_tx, mut shutdown_rx) = cli::create_shutdown_channel();
     
     // Connect to GRPC
-    let (_msg_client, _query_client) = grpc::connect(&env.grpc_url).await?;
+    let (_msg_client, _query_client) = grpc::connect(env.grpc_url.clone()).await?;
+
+    // Stream new blocks from the WS RPC subscription
+    let block_stream = tokio::task::spawn(async move {
+        ws::stream_blocks(env.wsrpc_url.clone(), &mut shutdown_rx).await.expect("Failed");
+    });
 
     // Handle SIGINT AKA Ctrl-C
     let ctrl_c = tokio::task::spawn( async move {
@@ -41,28 +46,8 @@ async fn main() -> Result<(), Report> {
         info!("Shutting down croncatd...");
     });
 
-    // TODO: Implement actual work
-    let main_loop = tokio::task::spawn(async move {
-        // Main test loop for now...
-        let task = tokio::spawn(async move {
-            loop {
-                tokio::time::sleep(Duration::from_millis(1000)).await;
-                info!("🔄 Looping... 🔁");
-            }
-        });
-        let handle_shutdown = tokio::spawn(async move { shutdown_rx.recv().await });
-
-        tokio::select! {
-            _ = task => {},
-            _ = handle_shutdown => {
-                info!("Task loop shutdown...");
-                // TODO: Handle shutdown
-            }
-        }
-    });
-
     // TODO: Do something with the main_loop return value
-    let (_, _main_result) = tokio::join!(ctrl_c, main_loop);
+    let (_, _) = tokio::join!(ctrl_c, block_stream);
 
     // Say goodbye if no no-banner
     if !opts.no_frills {

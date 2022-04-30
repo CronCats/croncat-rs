@@ -3,33 +3,33 @@ use serde::Deserialize;
 
 ///
 /// Default url for GRPC locally.
-/// 
+///
 fn default_grpc_url() -> String {
-  String::from("http://[::1]:9090")
+    String::from("http://[::1]:9090")
 }
 
 ///
 /// Default url for WS RPC locally.
-/// 
+///
 fn default_wsrpc_url() -> String {
-  String::from("ws://[::1]:26657/websocket")
+    String::from("ws://[::1]:26657/websocket")
 }
 
 ///
 /// The environment variables struct.
-/// 
+///
 #[derive(Debug, Deserialize)]
 pub struct Env {
-  #[serde(default="default_grpc_url")]
-  pub grpc_url: String,
-  #[serde(default="default_wsrpc_url")]
-  pub wsrpc_url: String,
+    #[serde(default = "default_grpc_url")]
+    pub grpc_url: String,
+    #[serde(default = "default_wsrpc_url")]
+    pub wsrpc_url: String,
 }
 
 ///
-/// Load our environment variables from a .env and chuck em in an `Env`. 
-/// 
+/// Load our environment variables from a .env and chuck em in an `Env`.
+///
 pub fn load() -> Result<Env, Report> {
-  dotenv::dotenv()?;
-  Ok(envy::from_env::<Env>()?)
+    dotenv::dotenv()?;
+    Ok(envy::from_env::<Env>()?)
 }

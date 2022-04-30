@@ -11,7 +11,7 @@
 ## Modules:
 
 -   `croncatd` This is the executable agent daemon.
--   `croncat` This is all the pieces to build an agent daemon.
+-   `croncat` This is all the pieces to build an agent daemon, this will probably become it's own repo so keep it DRY and clean.
 
 ## Run:
 

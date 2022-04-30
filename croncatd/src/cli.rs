@@ -11,6 +11,7 @@ use structopt::StructOpt;
 
 use crate::opts::Opts;
 
+/// Load the banner ascii art as a `&'static str`.
 const BANNER_STR: &'static str = include_str!("../banner.txt");
 
 ///

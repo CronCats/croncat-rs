@@ -34,3 +34,7 @@ FLAGS:
     -n, --no-frills    Wether to print nice little things like the banner and a goodbye
     -V, --version      Prints version information
 ```
+
+## Generate Docs:
+
+-   `cargo doc --no-deps`

@@ -10,7 +10,7 @@ pub struct Opts {
     #[structopt(short, long)]
     pub debug: bool,
 
-    /// Wether to print nice little things like the banner and a goodbye
-    #[structopt(short, long)]
+    /// Whether to print nice little things like the banner and a goodbye
+    #[structopt(long)]
     pub no_frills: bool,
 }

@@ -4,11 +4,15 @@ use croncat::{logging::{self, info}, errors::Report, tokio, grpc};
 
 mod cli;
 mod opts;
+mod env;
 
 #[tokio::main]
 async fn main() -> Result<(), Report> {
     // Setup tracing and error reporting
     logging::setup()?;
+
+    // Get environment variables
+    let env = env::load()?;
     
     // Get the CLI options, handle argument errors nicely
     let opts = cli::get_opts().map_err(|e| {
@@ -27,7 +31,7 @@ async fn main() -> Result<(), Report> {
     let (shutdown_tx, mut shutdown_rx) = cli::create_shutdown_channel();
     
     // Connect to GRPC
-    let (_msg_client, _query_client) = grpc::connect().await?;
+    let (_msg_client, _query_client) = grpc::connect(&env.grpc_url).await?;
 
     // Handle SIGINT AKA Ctrl-C
     let ctrl_c = tokio::task::spawn( async move {

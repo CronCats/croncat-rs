@@ -8,3 +8,6 @@ edition = "2021"
 [dependencies]
 structopt = "0.3.26"
 croncat = { path = "../croncat" }
+envy = "0.4.2"
+serde = { version = "1.0.136", features = ["derive"] } 
+dotenv = "0.15.0"

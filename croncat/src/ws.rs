@@ -1,9 +1,13 @@
 use futures_util::StreamExt;
+use tendermint_rpc::event::EventData;
 use tendermint_rpc::query::EventType;
 use tendermint_rpc::{SubscriptionClient, WebSocketClient};
 use url::Url;
 
-use crate::{logging::info, ShutdownRx};
+use crate::{
+    logging::{info, warn},
+    ShutdownRx,
+};
 
 ///
 /// Connect to the RPC websocket endpoint and subscribe for incoming blocks.
@@ -31,7 +35,20 @@ pub async fn stream_blocks(
     // Handle inbound blocks
     let inbound = tokio::task::spawn(async move {
         while let Some(msg) = subscriptions.next().await {
-            info!("{:#?}", msg);
+            let msg = msg.expect("Failed to receive event");
+            match msg.data {
+                EventData::NewBlock {
+                    block: Some(block), ..
+                } => {
+                    info!(
+                        "Received block (height: {}) for {}",
+                        block.header.height, block.header.time
+                    );
+                }
+                message => {
+                    warn!("Unexpected message type: {:?}", message);
+                }
+            }
         }
     });
 

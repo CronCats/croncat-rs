@@ -1,3 +1,7 @@
+//!
+//! Subscribe and stream blocks from the tendermint WS RPC client.
+//!
+
 use futures_util::StreamExt;
 use tendermint_rpc::event::EventData;
 use tendermint_rpc::query::EventType;

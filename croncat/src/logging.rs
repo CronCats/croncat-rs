@@ -1,3 +1,7 @@
+//!
+//! Setup tracing/logging/backtraces and re-export tracing log macros.
+//!
+
 use crate::errors::Report;
 use tracing_subscriber::EnvFilter;
 

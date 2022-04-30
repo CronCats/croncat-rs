@@ -1,3 +1,7 @@
+//!
+//! `croncatd` CLI option builder.
+//!
+
 use structopt::StructOpt;
 
 ///

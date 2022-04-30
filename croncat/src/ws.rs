@@ -5,8 +5,8 @@ use tendermint_rpc::{SubscriptionClient, WebSocketClient};
 use url::Url;
 
 use crate::{
+    channels::ShutdownRx,
     logging::{info, warn},
-    ShutdownRx,
 };
 
 ///

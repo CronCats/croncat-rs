@@ -3,7 +3,10 @@
 //!
 //! ## Example Agent:
 //!
-//! Taken from `croncatd/src/main.rs`.
+//! Taken from [croncatd/src/main.rs](../croncatd/fn.main.html).
+//!
+//! There are bunch of other agent daemon specific things that need to be setup first,
+//! look at the source code for how it's done ATM.
 //!
 //! ```
 //! use std::process::exit;

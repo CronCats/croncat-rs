@@ -1,5 +1,5 @@
 //!
-//! Use the `cosmos_sdk_proto` library to create clients for GRPC node requests.
+//! Use the [cosmos_sdk_proto](https://crates.io/crates/cosmos-sdk-proto) library to create clients for GRPC node requests.
 //!
 
 use cosmos_sdk_proto::cosmwasm::wasm::v1::msg_client::MsgClient;

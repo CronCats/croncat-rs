@@ -1,7 +1,7 @@
 use croncat::{
+    channels::{ShutdownRx, ShutdownTx},
     errors::Report,
     tokio::sync::mpsc::{self},
-    ShutdownRx, ShutdownTx,
 };
 use structopt::StructOpt;
 

@@ -5,14 +5,14 @@ use serde::Deserialize;
 /// Default url for GRPC locally.
 ///
 fn default_grpc_url() -> String {
-    String::from("http://[::1]:9090")
+    String::from("http://localhost:9090")
 }
 
 ///
 /// Default url for WS RPC locally.
 ///
 fn default_wsrpc_url() -> String {
-    String::from("ws://[::1]:26657/websocket")
+    String::from("ws://localhost:26657/websocket")
 }
 
 ///

@@ -1,0 +1,30 @@
+{
+  "files": [
+    "README.md"
+  ],
+  "imageSize": 100,
+  "commit": false,
+  "contributors": [
+    {
+      "login": "SeedyROM",
+      "name": "Zack Kollar",
+      "avatar_url": "https://avatars.githubusercontent.com/u/11783357?v=4",
+      "profile": "http://seedyrom.io",
+      "contributions": [
+        "code",
+        "bug",
+        "example",
+        "ideas",
+        "question",
+        "talk",
+        "review"
+      ]
+    }
+  ],
+  "contributorsPerLine": 7,
+  "projectName": "croncat-rs",
+  "projectOwner": "SeedyROM",
+  "repoType": "github",
+  "repoHost": "https://github.com",
+  "skipCi": true
+}

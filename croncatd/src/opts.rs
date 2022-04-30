@@ -2,7 +2,7 @@ use structopt::StructOpt;
 
 ///
 /// Command line options.
-/// 
+///
 #[derive(Debug, StructOpt)]
 #[structopt(name = "example", about = "An example of StructOpt usage.")]
 pub struct Opts {

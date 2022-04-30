@@ -1,4 +1,4 @@
-use std::time::Duration;
+use std::{time::Duration, process::exit};
 
 use croncat::{logging::{self, info}, errors::Report, tokio, grpc};
 
@@ -10,11 +10,14 @@ async fn main() -> Result<(), Report> {
     // Setup tracing and error reporting
     logging::setup()?;
     
-    // Get the CLI options
-    let opts = cli::get_opts()?;
+    // Get the CLI options, handle argument errors nicely
+    let opts = cli::get_opts().map_err(|e| {
+        println!("{}", e);
+        exit(1);
+    }).unwrap();
 
-    // If there ain't no no-banner...
-    if !opts.no_banner {
+    // If there ain't no no-frills...
+    if !opts.no_frills {
         cli::print_banner();
     }
 
@@ -57,7 +60,10 @@ async fn main() -> Result<(), Report> {
     // TODO: Do something with the main_loop return value
     let (_, _main_result) = tokio::join!(ctrl_c, main_loop);
 
-    println!("\n🐱 Cron Cat says: Goodbye / さようなら\n");
+    // Say goodbye if no no-banner
+    if !opts.no_frills {
+        println!("\n🐱 Cron Cat says: Goodbye / さようなら\n");
+    }
 
     Ok(())
 }

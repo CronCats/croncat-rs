@@ -51,7 +51,7 @@ Thanks goes to these wonderful people ([emoji key](https://allcontributors.org/d
 <!-- markdownlint-disable -->
 <table>
   <tr>
-    <td align="center"><a href="http://seedyrom.io"><img src="https://avatars.githubusercontent.com/u/11783357?v=4?s=100" width="100px;" alt=""/><br /><sub><b>Zack Kollar</b></sub></a><br /><a href="https://github.com/SeedyROM/croncat-rs/commits?author=SeedyROM" title="Code">💻</a></td>
+    <td align="center"><a href="http://seedyrom.io"><img src="https://avatars.githubusercontent.com/u/11783357?v=4?s=100" width="100px;" alt=""/><br /><sub><b>Zack Kollar</b></sub></a><br /><a href="https://github.com/SeedyROM/croncat-rs/commits?author=SeedyROM" title="Code">💻</a> <a href="https://github.com/SeedyROM/croncat-rs/issues?q=author%3ASeedyROM" title="Bug reports">🐛</a> <a href="#example-SeedyROM" title="Examples">💡</a> <a href="#ideas-SeedyROM" title="Ideas, Planning, & Feedback">🤔</a> <a href="#question-SeedyROM" title="Answering Questions">💬</a> <a href="#talk-SeedyROM" title="Talks">📢</a> <a href="https://github.com/SeedyROM/croncat-rs/pulls?q=is%3Apr+reviewed-by%3ASeedyROM" title="Reviewed Pull Requests">👀</a></td>
   </tr>
 </table>
 

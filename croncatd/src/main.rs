@@ -15,6 +15,9 @@ mod cli;
 mod env;
 mod opts;
 
+///
+/// Start the `croncatd` agent.
+///
 #[tokio::main]
 async fn main() -> Result<(), Report> {
     // Get environment variables

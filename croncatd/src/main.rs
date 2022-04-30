@@ -1,3 +1,7 @@
+//!
+//! The `croncatd` agent.
+//!
+
 use std::process::exit;
 
 use croncat::{

@@ -1,3 +1,7 @@
+//!
+//! `croncatd` CLI functionality
+//!
+
 use croncat::{
     channels::{ShutdownRx, ShutdownTx},
     errors::Report,

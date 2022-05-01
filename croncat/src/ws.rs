@@ -63,7 +63,7 @@ pub async fn stream_blocks(
     // Handle shutdown
     tokio::select! {
       _ = block_stream_handle => {}
-      _ = shutdown_rx.recv() => {}
+      _ = shutdown_rx.changed() => {}
     }
 
     // Clean up

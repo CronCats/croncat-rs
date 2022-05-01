@@ -5,7 +5,7 @@
 use croncat::{
     channels::{ShutdownRx, ShutdownTx},
     errors::Report,
-    tokio::sync::mpsc::{self},
+    tokio::sync::watch,
 };
 use structopt::StructOpt;
 
@@ -32,5 +32,5 @@ pub fn get_opts() -> Result<Opts, Report> {
 /// Create a shutdown channel.
 ///
 pub fn create_shutdown_channel() -> (ShutdownTx, ShutdownRx) {
-    mpsc::channel(1)
+    watch::channel(())
 }

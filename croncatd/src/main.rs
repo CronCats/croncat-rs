@@ -61,7 +61,6 @@ async fn main() -> Result<(), Report> {
             .expect("Failed to wait for Ctrl-C");
         shutdown_tx
             .send(())
-            .await
             .expect("Failed to send shutdown signal");
         println!("");
         info!("Shutting down croncatd...");

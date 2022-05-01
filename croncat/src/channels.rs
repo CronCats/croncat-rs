@@ -2,14 +2,14 @@
 //! Various channel types for croncat.
 //!
 
-use tokio::sync::mpsc;
+use tokio::sync::watch;
 
 ///
 /// Shutdown channel Sender.
 ///
-pub type ShutdownTx = mpsc::Sender<()>;
+pub type ShutdownTx = watch::Sender<()>;
 
 ///
 /// Shutdown channel Receiver.
 ///
-pub type ShutdownRx = mpsc::Receiver<()>;
+pub type ShutdownRx = watch::Receiver<()>;

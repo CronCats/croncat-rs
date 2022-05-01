@@ -95,6 +95,7 @@ pub use tokio;
 
 // Our modules
 pub mod channels;
+pub mod consumers;
 pub mod errors;
 pub mod grpc;
 pub mod logging;

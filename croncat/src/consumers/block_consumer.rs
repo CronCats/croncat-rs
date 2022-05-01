@@ -8,12 +8,15 @@ pub async fn consume(
     block_stream_rx: BlockStreamRx,
     shutdown_rx: ShutdownRx,
 ) -> Result<(), Report> {
-    while let Ok(block) = block_stream_rx.recv().await {
-        if shutdown_rx.try_recv().is_ok() {
-            break;
+    let block_consumer_stream = tokio::task::spawn(async move {
+        while let Ok(block) = block_stream_rx.recv().await {
+            info!("{:#?}", block.header.time);
         }
+    });
 
-        info!("{:#?}", block.header.time);
+    tokio::select! {
+        _ = block_consumer_stream => {}
+        _ = shutdown_rx.recv() => {}
     }
 
     Ok(())

@@ -8,6 +8,7 @@ use tendermint_rpc::query::EventType;
 use tendermint_rpc::{SubscriptionClient, WebSocketClient};
 use url::Url;
 
+use crate::channels::BlockStreamTx;
 use crate::{
     channels::ShutdownRx,
     logging::{info, warn},
@@ -18,6 +19,7 @@ use crate::{
 ///
 pub async fn stream_blocks(
     url: String,
+    block_stream_tx: BlockStreamTx,
     shutdown_rx: &mut ShutdownRx,
 ) -> Result<(), Box<dyn std::error::Error>> {
     // Parse url
@@ -51,6 +53,10 @@ pub async fn stream_blocks(
                         "Received block (height: {}) from {}",
                         block.header.height, block.header.time
                     );
+                    block_stream_tx
+                        .send(block)
+                        .await
+                        .expect("Failed to send block from ws to block stream");
                 }
                 // Warn about all events for now
                 message => {

@@ -3,9 +3,9 @@
 //!
 
 use croncat::{
-    channels::{ShutdownRx, ShutdownTx},
+    channels::{BlockStreamRx, BlockStreamTx, ShutdownRx, ShutdownTx},
     errors::Report,
-    tokio::sync::watch,
+    tokio::sync::{mpsc, watch},
 };
 use structopt::StructOpt;
 
@@ -33,4 +33,11 @@ pub fn get_opts() -> Result<Opts, Report> {
 ///
 pub fn create_shutdown_channel() -> (ShutdownTx, ShutdownRx) {
     watch::channel(())
+}
+
+///
+/// Create a block stream channel of a specified size, used to create back pressure.
+///
+pub fn create_block_stream_channel(channel_size: usize) -> (BlockStreamTx, BlockStreamRx) {
+    mpsc::channel(channel_size)
 }

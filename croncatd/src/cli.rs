@@ -3,9 +3,9 @@
 //!
 
 use croncat::{
+    async_channel,
     channels::{ShutdownRx, ShutdownTx},
     errors::Report,
-    tokio::sync::watch,
 };
 use structopt::StructOpt;
 
@@ -32,5 +32,5 @@ pub fn get_opts() -> Result<Opts, Report> {
 /// Create a shutdown channel.
 ///
 pub fn create_shutdown_channel() -> (ShutdownTx, ShutdownRx) {
-    watch::channel(())
+    async_channel::bounded(1)
 }

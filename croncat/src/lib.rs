@@ -90,7 +90,8 @@
 // Features
 #![feature(no_coverage)]
 
-// Export tokio for convenience and version management
+// Export tokio and async-channel for convenience and version management
+pub use async_channel;
 pub use tokio;
 
 // Our modules

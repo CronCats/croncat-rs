@@ -41,32 +41,34 @@ pub async fn stream_blocks(
     info!("Successfully subscribed to NewBlock event");
 
     // Handle inbound blocks
-    while let Some(msg) = subscriptions.next().await {
-        // Handle a shutdown message
-        if shutdown_rx.try_recv().is_ok() {
-            break;
+    let block_stream_handle = tokio::task::spawn(async move {
+        while let Some(msg) = subscriptions.next().await {
+            let msg = msg.expect("Failed to receive event");
+            match msg.data {
+                // Handle blocks
+                EventData::NewBlock {
+                    block: Some(block), ..
+                } => {
+                    info!(
+                        "Received block (height: {}) from {}",
+                        block.header.height, block.header.time
+                    );
+                    block_stream_tx
+                        .send(block)
+                        .await
+                        .expect("Failed to send block from ws to block stream");
+                }
+                // Warn about all events for now
+                message => {
+                    warn!("Unexpected message type: {:?}", message);
+                }
+            }
         }
+    });
 
-        let msg = msg.expect("Failed to receive event");
-        match msg.data {
-            // Handle blocks
-            EventData::NewBlock {
-                block: Some(block), ..
-            } => {
-                info!(
-                    "Received block (height: {}) from {}",
-                    block.header.height, block.header.time
-                );
-                block_stream_tx
-                    .send(block)
-                    .await
-                    .expect("Failed to send block from ws to block stream");
-            }
-            // Warn about all events for now
-            message => {
-                warn!("Unexpected message type: {:?}", message);
-            }
-        }
+    tokio::select! {
+        _ = block_stream_handle => {}
+        _ = shutdown_rx.recv() => {}
     }
 
     // Clean up

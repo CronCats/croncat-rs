@@ -95,8 +95,10 @@ pub use async_channel;
 pub use tokio;
 
 // Our modules
+pub mod agent;
 pub mod channels;
 pub mod consumers;
+pub mod env;
 pub mod errors;
 pub mod grpc;
 pub mod logging;

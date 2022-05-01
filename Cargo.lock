@@ -259,7 +259,10 @@ dependencies = [
  "async-channel",
  "color-eyre",
  "cosmos-sdk-proto",
+ "dotenv",
+ "envy",
  "futures-util",
+ "serde",
  "serde_json",
  "tendermint",
  "tendermint-rpc",
@@ -277,8 +280,6 @@ version = "0.1.0"
 dependencies = [
  "croncat",
  "dotenv",
- "envy",
- "serde",
  "structopt",
 ]
 

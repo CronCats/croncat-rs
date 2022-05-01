@@ -48,14 +48,14 @@ async fn main() -> Result<(), Report> {
     let (_msg_client, _query_client) = grpc::connect(env.grpc_url.clone()).await?;
 
     // Stream new blocks from the WS RPC subscription
-    let block_stream = tokio::task::spawn(async move {
+    let block_stream_handle = tokio::task::spawn(async move {
         ws::stream_blocks(env.wsrpc_url.clone(), &mut shutdown_rx)
             .await
             .expect("Failed");
     });
 
     // Handle SIGINT AKA Ctrl-C
-    let ctrl_c = tokio::task::spawn(async move {
+    let ctrl_c_handle = tokio::task::spawn(async move {
         tokio::signal::ctrl_c()
             .await
             .expect("Failed to wait for Ctrl-C");
@@ -68,7 +68,7 @@ async fn main() -> Result<(), Report> {
     });
 
     // TODO: Do something with the second return value
-    let (_, _) = tokio::join!(ctrl_c, block_stream);
+    let (_, _) = tokio::join!(ctrl_c_handle, block_stream_handle);
 
     // Say goodbye if no no-frills
     if !opts.no_frills {

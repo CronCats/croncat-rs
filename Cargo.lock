@@ -234,6 +234,7 @@ dependencies = [
  "cosmos-sdk-proto",
  "futures-util",
  "serde_json",
+ "tendermint",
  "tendermint-rpc",
  "tokio",
  "tonic",

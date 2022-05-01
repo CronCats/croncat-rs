@@ -20,7 +20,7 @@ use crate::{
 pub async fn stream_blocks(
     url: String,
     block_stream_tx: BlockStreamTx,
-    shutdown_rx: &mut ShutdownRx,
+    shutdown_rx: ShutdownRx,
 ) -> Result<(), Box<dyn std::error::Error>> {
     // Parse url
     let url = Url::parse(&url).unwrap();
@@ -69,7 +69,7 @@ pub async fn stream_blocks(
     // Handle shutdown
     tokio::select! {
       _ = block_stream_handle => {}
-      _ = shutdown_rx.changed() => {}
+      _ = shutdown_rx.recv() => {}
     }
 
     // Clean up

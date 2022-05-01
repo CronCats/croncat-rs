@@ -2,7 +2,7 @@
 //! `croncatd` environment variable loading and parsing.
 //!
 
-use croncat::errors::Report;
+use crate::errors::Report;
 use serde::Deserialize;
 
 ///

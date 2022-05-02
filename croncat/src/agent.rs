@@ -1,6 +1,6 @@
 use crate::{
     channels::{ShutdownRx, ShutdownTx},
-    consumers::block_consumer,
+    consumers,
     env::Env,
     errors::Report,
     grpc,
@@ -9,9 +9,9 @@ use crate::{
 };
 
 pub async fn run(env: Env, shutdown_tx: ShutdownTx, shutdown_rx: ShutdownRx) -> Result<(), Report> {
-    // Create a block stream channel and wrap receiver for cloning
+    // Create a block stream channel
     // TODO (SeedyROM): Remove 128 hardcoded limit
-    let (block_stream_tx, block_stream_rx) = block_consumer::create_stream(128);
+    let (block_stream_tx, block_stream_rx) = consumers::create_block_stream(128);
 
     // Connect to GRPC
     let (_msg_client, _query_client) = grpc::connect(env.grpc_url.clone()).await?;
@@ -21,7 +21,7 @@ pub async fn run(env: Env, shutdown_tx: ShutdownTx, shutdown_rx: ShutdownRx) -> 
     let block_stream_handle = tokio::task::spawn(async move {
         ws::stream_blocks(
             env.wsrpc_url.clone(),
-            block_stream_tx.clone(),
+            block_stream_tx,
             block_stream_shutdown_rx,
         )
         .await
@@ -31,7 +31,7 @@ pub async fn run(env: Env, shutdown_tx: ShutdownTx, shutdown_rx: ShutdownRx) -> 
     // Process blocks coming in from the blockchain
     let block_process_shutdown_rx = shutdown_rx.clone();
     let block_process_stream_handle = tokio::task::spawn(async move {
-        block_consumer::consume(block_stream_rx.clone(), block_process_shutdown_rx)
+        consumers::consume_blocks(block_stream_rx, block_process_shutdown_rx)
             .await
             .expect("Failed to process streamed blocks")
     });

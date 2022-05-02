@@ -8,4 +8,3 @@ edition = "2021"
 [dependencies]
 structopt = "0.3.26"
 croncat = { path = "../croncat" }
-dotenv = "0.15.0"

@@ -17,4 +17,5 @@ pub mod env;
 pub mod errors;
 pub mod grpc;
 pub mod logging;
+pub mod scheduler;
 pub mod ws;

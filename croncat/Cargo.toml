@@ -19,6 +19,8 @@ url = "2.2.2"
 envy = "0.4.2"
 serde = { version = "1.0.136", features = ["derive"] } 
 dotenv = "0.15.0"
+chrono = "0.4.19"
+cron_schedule = "0.2.0"
 
 [dev-dependencies]
 tracing-test = "0.2.1"

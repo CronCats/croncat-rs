@@ -1,3 +1,7 @@
+//!
+//! Listen for blocks coming from WS RPC, stream them to the scheduler and run tasks appropriately.
+//!
+
 use crate::{
     channels::{ShutdownRx, ShutdownTx},
     consumers,
@@ -8,6 +12,9 @@ use crate::{
     tokio, ws,
 };
 
+///
+/// Kick off the croncat agent!
+///
 pub async fn run(env: Env, shutdown_tx: ShutdownTx, shutdown_rx: ShutdownRx) -> Result<(), Report> {
     // Create a block stream channel
     // TODO (SeedyROM): Remove 128 hardcoded limit

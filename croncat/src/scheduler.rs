@@ -1,3 +1,7 @@
+//!
+//! Store and run tasks according to scheduled jobs.
+//!
+
 use std::str::FromStr;
 use std::{fmt::Debug, ops::Deref};
 
@@ -123,7 +127,7 @@ pub struct Action {
 }
 
 ///
-/// A task
+/// A task to be run at a specified schedule.
 ///
 #[derive(Serialize, Deserialize, Debug)]
 pub struct Task {
@@ -140,7 +144,7 @@ impl PartialEq for Task {
 }
 
 ///
-/// The scheduler itself
+/// Keeps track of the tasks an agent has.
 ///
 #[derive(Serialize, Deserialize, Debug)]
 pub struct Scheduler {

@@ -1,67 +1,59 @@
-//!
-//! Listen for blocks coming from WS RPC, stream them to the scheduler and run tasks appropriately.
-//!
-
-use crate::{
-    channels::{ShutdownRx, ShutdownTx},
-    consumers,
-    env::Env,
-    errors::Report,
-    grpc,
-    logging::info,
-    tokio, ws,
+use std::sync::{
+    atomic::{AtomicU64, Ordering},
+    Arc,
 };
 
-///
-/// Kick off the croncat agent!
-///
-pub async fn run(env: Env, shutdown_tx: ShutdownTx, shutdown_rx: ShutdownRx) -> Result<(), Report> {
-    // Create a block stream channel
-    // TODO (SeedyROM): Remove 128 hardcoded limit
-    let (block_stream_tx, block_stream_rx) = consumers::create_block_stream(128);
+use color_eyre::Report;
+use tracing::info;
 
-    // Connect to GRPC
-    let (_msg_client, _query_client) = grpc::connect(env.grpc_url.clone()).await?;
+use crate::channels::{BlockStreamRx, ShutdownRx};
 
-    // Stream new blocks from the WS RPC subscription
-    let block_stream_shutdown_rx = shutdown_rx.clone();
-    let block_stream_handle = tokio::task::spawn(async move {
-        ws::stream_blocks(
-            env.wsrpc_url.clone(),
-            block_stream_tx,
-            block_stream_shutdown_rx,
-        )
-        .await
-        .expect("Failed stream blocks")
+pub struct BlockCounter {
+    count: Arc<AtomicU64>,
+    check_interval: u64,
+}
+
+impl BlockCounter {
+    pub fn new() -> Self {
+        Self {
+            count: Arc::new(AtomicU64::default()),
+            check_interval: 10,
+        }
+    }
+
+    pub fn tick(&self) {
+        self.count.fetch_add(1, Ordering::SeqCst);
+    }
+
+    pub fn is_at_interval(&self) -> bool {
+        let current_count = self.count.load(Ordering::Relaxed);
+
+        current_count == 0 || current_count % self.check_interval == 0
+    }
+}
+
+pub async fn check_account_status_loop(
+    mut block_stream_rx: BlockStreamRx,
+    mut shutdown_rx: ShutdownRx,
+) -> Result<(), Report> {
+    let block_counter = BlockCounter::new();
+    let task_handle = tokio::task::spawn(async move {
+        while let Ok(block) = block_stream_rx.recv().await {
+            if block_counter.is_at_interval() {
+                info!(
+                    "Checking agent status for block (height: {})",
+                    block.header.height
+                );
+            }
+
+            block_counter.tick()
+        }
     });
 
-    // Process blocks coming in from the blockchain
-    let block_process_shutdown_rx = shutdown_rx.clone();
-    let block_process_stream_handle = tokio::task::spawn(async move {
-        consumers::consume_blocks(block_stream_rx, block_process_shutdown_rx)
-            .await
-            .expect("Failed to process streamed blocks")
-    });
-
-    // Handle SIGINT AKA Ctrl-C
-    let ctrl_c_handle = tokio::task::spawn(async move {
-        tokio::signal::ctrl_c()
-            .await
-            .expect("Failed to wait for Ctrl-C");
-        shutdown_tx
-            .send(())
-            .await
-            .expect("Failed to send shutdown signal");
-        println!("");
-        info!("Shutting down croncatd...");
-    });
-
-    // TODO: Do something with the return values
-    let _ = tokio::join!(
-        ctrl_c_handle,
-        block_stream_handle,
-        block_process_stream_handle
-    );
+    tokio::select! {
+        _ = task_handle => {}
+        _ = shutdown_rx.recv() => {}
+    }
 
     Ok(())
 }

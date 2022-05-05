@@ -20,7 +20,7 @@ use crate::{
 pub async fn stream_blocks(
     url: String,
     block_stream_tx: BlockStreamTx,
-    shutdown_rx: ShutdownRx,
+    mut shutdown_rx: ShutdownRx,
 ) -> Result<(), Box<dyn std::error::Error>> {
     // Parse url
     let url = Url::parse(&url).unwrap();
@@ -54,7 +54,7 @@ pub async fn stream_blocks(
                         block.header.height, block.header.time
                     );
                     block_stream_tx
-                        .send(block)
+                        .broadcast(block)
                         .await
                         .expect("Failed to send block from ws to block stream");
                 }

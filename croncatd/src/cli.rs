@@ -3,7 +3,7 @@
 //!
 
 use croncat::{
-    async_channel,
+    async_broadcast,
     channels::{ShutdownRx, ShutdownTx},
     errors::Report,
 };
@@ -32,5 +32,5 @@ pub fn get_opts() -> Result<Opts, Report> {
 /// Create a shutdown channel.
 ///
 pub fn create_shutdown_channel() -> (ShutdownTx, ShutdownRx) {
-    async_channel::bounded(1)
+    async_broadcast::broadcast(1)
 }

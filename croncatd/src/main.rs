@@ -5,10 +5,10 @@
 use std::process::exit;
 
 use croncat::{
-    agent, env,
+    env,
     errors::Report,
     logging::{self, info},
-    tokio,
+    system, tokio,
 };
 
 mod cli;
@@ -44,7 +44,7 @@ async fn main() -> Result<(), Report> {
     let (shutdown_tx, shutdown_rx) = cli::create_shutdown_channel();
 
     // Start the agent
-    agent::run(env, shutdown_tx, shutdown_rx).await?;
+    system::run(env, shutdown_tx, shutdown_rx).await?;
 
     // Say goodbye if no no-frills
     if !opts.no_frills {

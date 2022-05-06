@@ -22,8 +22,8 @@ dotenv = "0.15.0"
 cosmrs = "0.7.0"
 cw-croncat-core = { path = "../cw-croncat/packages/cw-croncat-core" }
 async-broadcast = "0.4.0"
-ed25519-dalek = { version = "1.0.1", features = ["serde"] }
 rand = "0.7.0"
+secp256k1 = { version = "0.22.1", features = ["serde", "global-context", "rand-std"] }
 
 [dev-dependencies]
 tracing-test = "0.2.1"

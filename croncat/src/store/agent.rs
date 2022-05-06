@@ -3,7 +3,7 @@
 //! this will be user later to verify on chain.
 //!
 
-use ed25519_dalek::Keypair;
+use secp256k1::KeyPair;
 use serde::{Deserialize, Serialize};
 use std::{collections::HashMap, fs, path::PathBuf};
 
@@ -24,7 +24,8 @@ type LocalAgentStorageData = HashMap<AccountId, LocalAgentStorageEntry>;
 #[derive(Debug, Serialize, Deserialize)]
 pub struct LocalAgentStorageEntry {
     pub account_id: AccountId,
-    pub keypair: Keypair, // TODO (SeedyROM): This should probably point to a file, not store in memory
+    #[serde(with = "secp256k1::serde_keypair")]
+    pub keypair: KeyPair, // TODO (SeedyROM): This should probably point to a file, not store in memory
     pub payable_account_id: Option<AccountId>,
 }
 

@@ -24,7 +24,7 @@ type LocalAgentStorageData = HashMap<AccountId, LocalAgentStorageEntry>;
 #[derive(Debug, Serialize, Deserialize)]
 pub struct LocalAgentStorageEntry {
     pub account_id: AccountId,
-    pub keypair: Keypair,
+    pub keypair: Keypair, // TODO (SeedyROM): This should probably point to a file, not store in memory
     pub payable_account_id: Option<AccountId>,
 }
 
@@ -92,18 +92,38 @@ impl LocalAgentStorage {
         account_id: AccountId,
         payable_account_id: Option<AccountId>,
     ) -> Option<LocalAgentStorageEntry> {
-        self.data.insert(
-            account_id.clone(),
-            LocalAgentStorageEntry {
-                account_id,
-                keypair: utils::generate_keypair(),
-                payable_account_id,
-            },
-        )
+        if self.data.get(&account_id).is_some() {
+            None
+        } else {
+            self.data.insert(
+                account_id.clone(),
+                LocalAgentStorageEntry {
+                    account_id,
+                    keypair: utils::generate_keypair(),
+                    payable_account_id,
+                },
+            )
+        }
+    }
+
+    /// Register a new account_id to the croncat agent.
+    pub fn register(
+        &mut self,
+        account_id: AccountId,
+        payable_account_id: Option<AccountId>,
+    ) -> Result<(), Report> {
+        match self.get(&account_id) {
+            Some(_) => todo!(), // TODO (SeedyROM): Return a custom error
+            None => {
+                self.insert(account_id, payable_account_id);
+                self.write_to_disk()?;
+                Ok(())
+            }
+        }
     }
 
     /// Retrieve an agent based on the key
-    pub fn get(&self, account_id: AccountId) -> Option<&LocalAgentStorageEntry> {
-        self.data.get(&account_id)
+    pub fn get(&self, account_id: &AccountId) -> Option<&LocalAgentStorageEntry> {
+        self.data.get(account_id)
     }
 }

@@ -17,7 +17,7 @@ use crate::{
 ///
 /// Connect to the RPC websocket endpoint and subscribe for incoming blocks.
 ///
-pub async fn stream_blocks(
+pub async fn stream_blocks_loop(
     url: String,
     block_stream_tx: BlockStreamTx,
     mut shutdown_rx: ShutdownRx,

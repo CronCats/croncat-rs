@@ -20,3 +20,10 @@ pub type BlockStreamRx = async_broadcast::Receiver<tendermint::Block>;
 pub fn create_block_stream(channel_size: usize) -> (BlockStreamTx, BlockStreamRx) {
     async_broadcast::broadcast(channel_size)
 }
+
+///
+/// Create a shutdown channel.
+///
+pub fn create_shutdown_channel() -> (ShutdownTx, ShutdownRx) {
+    async_broadcast::broadcast(1)
+}

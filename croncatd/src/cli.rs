@@ -2,11 +2,7 @@
 //! `croncatd` CLI functionality
 //!
 
-use croncat::{
-    async_broadcast,
-    channels::{ShutdownRx, ShutdownTx},
-    errors::Report,
-};
+use croncat::errors::Report;
 use structopt::StructOpt;
 
 use crate::opts::Opts;
@@ -26,11 +22,4 @@ pub fn print_banner() {
 ///
 pub fn get_opts() -> Result<Opts, Report> {
     Ok(Opts::from_args_safe()?)
-}
-
-///
-/// Create a shutdown channel.
-///
-pub fn create_shutdown_channel() -> (ShutdownTx, ShutdownRx) {
-    async_broadcast::broadcast(1)
 }

@@ -5,7 +5,7 @@
 use std::process::exit;
 
 use croncat::{
-    env,
+    channels, env,
     errors::Report,
     logging::{self, info},
     system, tokio,
@@ -41,7 +41,7 @@ async fn main() -> Result<(), Report> {
     info!("Starting croncatd...");
 
     // Create a channel to handle graceful shutdown and wrap receiver for cloning
-    let (shutdown_tx, shutdown_rx) = cli::create_shutdown_channel();
+    let (shutdown_tx, shutdown_rx) = channels::create_shutdown_channel();
 
     // Start the agent
     system::run(env, shutdown_tx, shutdown_rx).await?;

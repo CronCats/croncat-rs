@@ -8,7 +8,7 @@ async-channel = "1.6.1"
 color-eyre = "0.6.1"
 cosmos-sdk-proto = { version = "0.12.0", features = ["grpc", "cosmwasm"] }
 futures-util = "0.3.21"
-serde_json = "1.0.79"
+serde_json = "1.0.81"
 tendermint = "0.23.7"
 tendermint-rpc = { version = "0.23.7", features = ["websocket-client"] }
 tokio = { version = "1.18.0", features = ["macros", "rt-multi-thread", "sync", "signal", "time"] }
@@ -19,9 +19,11 @@ url = "2.2.2"
 envy = "0.4.2"
 serde = { version = "1.0.136", features = ["derive"] } 
 dotenv = "0.15.0"
-cw-croncat = { git = "https://github.com/CronCats/cw-croncat", branch = "main" }
 cosmrs = "0.7.0"
+cw-croncat-core = { path = "../cw-croncat/packages/cw-croncat-core" }
 async-broadcast = "0.4.0"
+ed25519-dalek = { version = "1.0.1", features = ["serde"] }
+rand = "0.7.0"
 
 [dev-dependencies]
 tracing-test = "0.2.1"

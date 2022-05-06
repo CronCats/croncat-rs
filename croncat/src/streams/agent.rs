@@ -28,7 +28,7 @@ impl BlockCounter {
     pub fn is_at_interval(&self) -> bool {
         let current_count = self.count.load(Ordering::Relaxed);
 
-        current_count == 0 || current_count % self.check_interval == 0
+        current_count > 0 && current_count % self.check_interval == 0
     }
 }
 

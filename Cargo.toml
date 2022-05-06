@@ -1,2 +1,3 @@
 [workspace]
 members = ["croncat", "croncatd"]
+exclude = ["cw-croncat"]

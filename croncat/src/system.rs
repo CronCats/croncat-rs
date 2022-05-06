@@ -3,13 +3,13 @@
 //!
 
 use crate::{
-    agent,
     channels::{self, ShutdownRx, ShutdownTx},
     env::Env,
     errors::Report,
     grpc,
     logging::info,
-    tasks, tokio, ws,
+    streams::{agent, tasks, ws},
+    tokio,
 };
 
 ///
@@ -35,14 +35,7 @@ pub async fn run(env: Env, shutdown_tx: ShutdownTx, shutdown_rx: ShutdownRx) -> 
         .expect("Failed to stream blocks")
     });
 
-    // Process blocks coming in from the blockchain
-    let task_runner_shutdown_rx = shutdown_rx.clone();
-    let task_runner_block_stream_rx = block_stream_rx.clone();
-    let task_runner_handle = tokio::task::spawn(async move {
-        tasks::run_tasks(task_runner_block_stream_rx, task_runner_shutdown_rx)
-            .await
-            .expect("Failed to process streamed blocks")
-    });
+    // TODO (SeedyROM): For each agent check the status before beginning the loop.
 
     // Account status checks
     let account_status_check_shutdown_rx = shutdown_rx.clone();
@@ -54,6 +47,15 @@ pub async fn run(env: Env, shutdown_tx: ShutdownTx, shutdown_rx: ShutdownRx) -> 
         )
         .await
         .expect("Failed to check account statuses")
+    });
+
+    // Process blocks coming in from the blockchain
+    let task_runner_shutdown_rx = shutdown_rx.clone();
+    let task_runner_block_stream_rx = block_stream_rx.clone();
+    let task_runner_handle = tokio::task::spawn(async move {
+        tasks::run_tasks(task_runner_block_stream_rx, task_runner_shutdown_rx)
+            .await
+            .expect("Failed to process streamed blocks")
     });
 
     // Handle SIGINT AKA Ctrl-C
@@ -70,7 +72,7 @@ pub async fn run(env: Env, shutdown_tx: ShutdownTx, shutdown_rx: ShutdownRx) -> 
         info!("Shutting down croncatd...");
     });
 
-    // TODO: Do something with the return values
+    // TODO (SeedyROM): Maybe do something with the return values?
     let _ = tokio::join!(
         ctrl_c_handle,
         block_stream_handle,

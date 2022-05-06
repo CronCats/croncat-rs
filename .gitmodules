@@ -1,0 +1,3 @@
+[submodule "cw-croncat"]
+	path = cw-croncat
+	url = git@github.com:CronCats/cw-croncat.git

@@ -26,7 +26,7 @@ pub async fn run(env: Env, shutdown_tx: ShutdownTx, shutdown_rx: ShutdownRx) -> 
     // Stream new blocks from the WS RPC subscription
     let block_stream_shutdown_rx = shutdown_rx.clone();
     let block_stream_handle = tokio::task::spawn(async move {
-        ws::stream_blocks(
+        ws::stream_blocks_loop(
             env.wsrpc_url.clone(),
             block_stream_tx,
             block_stream_shutdown_rx,
@@ -53,7 +53,7 @@ pub async fn run(env: Env, shutdown_tx: ShutdownTx, shutdown_rx: ShutdownRx) -> 
     let task_runner_shutdown_rx = shutdown_rx.clone();
     let task_runner_block_stream_rx = block_stream_rx.clone();
     let task_runner_handle = tokio::task::spawn(async move {
-        tasks::run_tasks(task_runner_block_stream_rx, task_runner_shutdown_rx)
+        tasks::tasks_loop(task_runner_block_stream_rx, task_runner_shutdown_rx)
             .await
             .expect("Failed to process streamed blocks")
     });

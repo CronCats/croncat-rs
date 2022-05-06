@@ -10,7 +10,7 @@ use crate::{
 ///
 /// Do work on blocks that are sent from the ws stream.
 ///
-pub async fn run_tasks(
+pub async fn tasks_loop(
     mut block_stream_rx: BlockStreamRx,
     mut shutdown_rx: ShutdownRx,
 ) -> Result<(), Report> {

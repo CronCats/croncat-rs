@@ -2,18 +2,17 @@
 //! Helpers for dealing with local agents.
 //!
 
-use ed25519_dalek::Keypair;
-use rand::rngs::OsRng;
+use secp256k1::{rand, KeyPair, Secp256k1};
 
 use std::sync::{
     atomic::{AtomicU64, Ordering},
     Arc,
 };
 
-/// Generate a ed25519 keypair from a random input
-pub fn generate_keypair() -> Keypair {
-    let mut csprng = OsRng {};
-    Keypair::generate(&mut csprng)
+/// Generate a secp256k1 keypair from a random OS rng input
+pub fn generate_keypair() -> KeyPair {
+    let secp = Secp256k1::new();
+    KeyPair::new(&secp, &mut rand::thread_rng())
 }
 
 ///

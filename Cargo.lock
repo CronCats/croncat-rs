@@ -551,6 +551,7 @@ dependencies = [
 [[package]]
 name = "cw-croncat-core"
 version = "0.1.0"
+source = "git+https://github.com/CronCats/cw-croncat#847fcad0c191820c76ac03f19eccebc369498188"
 dependencies = [
  "cosmwasm-std",
  "cosmwasm-storage",

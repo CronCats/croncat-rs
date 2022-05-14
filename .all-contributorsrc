@@ -21,11 +21,20 @@
         "review",
         "content"
       ]
+    },
+    {
+      "login": "TrevorJTClarke",
+      "name": "Trevor Clarke",
+      "avatar_url": "https://avatars.githubusercontent.com/u/2633184?v=4",
+      "profile": "http://gitlab.com/TrevorJTClarke",
+      "contributions": [
+        "code"
+      ]
     }
   ],
   "contributorsPerLine": 7,
   "projectName": "croncat-rs",
-  "projectOwner": "SeedyROM",
+  "projectOwner": "CronCats",
   "repoType": "github",
   "repoHost": "https://github.com",
   "skipCi": true

@@ -19,3 +19,5 @@ pub mod store;
 pub mod streams;
 pub mod system;
 pub mod utils;
+pub mod agent;
+pub mod contract;

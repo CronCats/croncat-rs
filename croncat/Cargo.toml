@@ -24,6 +24,7 @@ cw-croncat-core = { version = "0.1.0", git = "https://github.com/CronCats/cw-cro
 async-broadcast = "0.4.0"
 rand = "0.7.0"
 secp256k1 = { version = "0.22.1", features = ["serde", "global-context", "rand-std"] }
+anyhow = "1.0"
 
 [dev-dependencies]
 tracing-test = "0.2.1"

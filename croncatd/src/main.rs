@@ -40,11 +40,21 @@ async fn main() -> Result<(), Report> {
 
     info!("Starting croncatd...");
 
-    // Create a channel to handle graceful shutdown and wrap receiver for cloning
-    let (shutdown_tx, shutdown_rx) = channels::create_shutdown_channel();
+    match opts.cmd {
+        opts::Command::RegisterAgent { .. } => {
+            info!("Register agent...");
+        }
+        opts::Command::UnregisterAgent { .. } => {
+            info!("Unregister agent...");
+        }
+        _ => {
+            // Create a channel to handle graceful shutdown and wrap receiver for cloning
+            let (shutdown_tx, shutdown_rx) = channels::create_shutdown_channel();
 
-    // Start the agent
-    system::run(env, shutdown_tx, shutdown_rx).await?;
+            // Start the agent
+            system::run(env, shutdown_tx, shutdown_rx).await?;
+        }
+    }
 
     // Say goodbye if no no-frills
     if !opts.no_frills {

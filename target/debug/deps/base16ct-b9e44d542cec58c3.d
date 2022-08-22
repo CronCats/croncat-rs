@@ -1,0 +1,12 @@
+/Volumes/Data/Cosmos/croncat-rs/target/debug/deps/base16ct-b9e44d542cec58c3.rmeta: /Users/deveus/.cargo/registry/src/github.com-1ecc6299db9ec823/base16ct-0.1.1/src/lib.rs /Users/deveus/.cargo/registry/src/github.com-1ecc6299db9ec823/base16ct-0.1.1/src/lower.rs /Users/deveus/.cargo/registry/src/github.com-1ecc6299db9ec823/base16ct-0.1.1/src/mixed.rs /Users/deveus/.cargo/registry/src/github.com-1ecc6299db9ec823/base16ct-0.1.1/src/upper.rs /Users/deveus/.cargo/registry/src/github.com-1ecc6299db9ec823/base16ct-0.1.1/src/display.rs /Users/deveus/.cargo/registry/src/github.com-1ecc6299db9ec823/base16ct-0.1.1/src/error.rs
+
+/Volumes/Data/Cosmos/croncat-rs/target/debug/deps/libbase16ct-b9e44d542cec58c3.rlib: /Users/deveus/.cargo/registry/src/github.com-1ecc6299db9ec823/base16ct-0.1.1/src/lib.rs /Users/deveus/.cargo/registry/src/github.com-1ecc6299db9ec823/base16ct-0.1.1/src/lower.rs /Users/deveus/.cargo/registry/src/github.com-1ecc6299db9ec823/base16ct-0.1.1/src/mixed.rs /Users/deveus/.cargo/registry/src/github.com-1ecc6299db9ec823/base16ct-0.1.1/src/upper.rs /Users/deveus/.cargo/registry/src/github.com-1ecc6299db9ec823/base16ct-0.1.1/src/display.rs /Users/deveus/.cargo/registry/src/github.com-1ecc6299db9ec823/base16ct-0.1.1/src/error.rs
+
+/Volumes/Data/Cosmos/croncat-rs/target/debug/deps/base16ct-b9e44d542cec58c3.d: /Users/deveus/.cargo/registry/src/github.com-1ecc6299db9ec823/base16ct-0.1.1/src/lib.rs /Users/deveus/.cargo/registry/src/github.com-1ecc6299db9ec823/base16ct-0.1.1/src/lower.rs /Users/deveus/.cargo/registry/src/github.com-1ecc6299db9ec823/base16ct-0.1.1/src/mixed.rs /Users/deveus/.cargo/registry/src/github.com-1ecc6299db9ec823/base16ct-0.1.1/src/upper.rs /Users/deveus/.cargo/registry/src/github.com-1ecc6299db9ec823/base16ct-0.1.1/src/display.rs /Users/deveus/.cargo/registry/src/github.com-1ecc6299db9ec823/base16ct-0.1.1/src/error.rs
+
+/Users/deveus/.cargo/registry/src/github.com-1ecc6299db9ec823/base16ct-0.1.1/src/lib.rs:
+/Users/deveus/.cargo/registry/src/github.com-1ecc6299db9ec823/base16ct-0.1.1/src/lower.rs:
+/Users/deveus/.cargo/registry/src/github.com-1ecc6299db9ec823/base16ct-0.1.1/src/mixed.rs:
+/Users/deveus/.cargo/registry/src/github.com-1ecc6299db9ec823/base16ct-0.1.1/src/upper.rs:
+/Users/deveus/.cargo/registry/src/github.com-1ecc6299db9ec823/base16ct-0.1.1/src/display.rs:
+/Users/deveus/.cargo/registry/src/github.com-1ecc6299db9ec823/base16ct-0.1.1/src/error.rs:

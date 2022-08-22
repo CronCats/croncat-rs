@@ -1,0 +1,11 @@
+/Volumes/Data/Cosmos/croncat-rs/target/debug/deps/unicode_segmentation-289452a51a9a4ccd.rmeta: /Users/deveus/.cargo/registry/src/github.com-1ecc6299db9ec823/unicode-segmentation-1.9.0/src/lib.rs /Users/deveus/.cargo/registry/src/github.com-1ecc6299db9ec823/unicode-segmentation-1.9.0/src/grapheme.rs /Users/deveus/.cargo/registry/src/github.com-1ecc6299db9ec823/unicode-segmentation-1.9.0/src/sentence.rs /Users/deveus/.cargo/registry/src/github.com-1ecc6299db9ec823/unicode-segmentation-1.9.0/src/word.rs /Users/deveus/.cargo/registry/src/github.com-1ecc6299db9ec823/unicode-segmentation-1.9.0/src/tables.rs
+
+/Volumes/Data/Cosmos/croncat-rs/target/debug/deps/libunicode_segmentation-289452a51a9a4ccd.rlib: /Users/deveus/.cargo/registry/src/github.com-1ecc6299db9ec823/unicode-segmentation-1.9.0/src/lib.rs /Users/deveus/.cargo/registry/src/github.com-1ecc6299db9ec823/unicode-segmentation-1.9.0/src/grapheme.rs /Users/deveus/.cargo/registry/src/github.com-1ecc6299db9ec823/unicode-segmentation-1.9.0/src/sentence.rs /Users/deveus/.cargo/registry/src/github.com-1ecc6299db9ec823/unicode-segmentation-1.9.0/src/word.rs /Users/deveus/.cargo/registry/src/github.com-1ecc6299db9ec823/unicode-segmentation-1.9.0/src/tables.rs
+
+/Volumes/Data/Cosmos/croncat-rs/target/debug/deps/unicode_segmentation-289452a51a9a4ccd.d: /Users/deveus/.cargo/registry/src/github.com-1ecc6299db9ec823/unicode-segmentation-1.9.0/src/lib.rs /Users/deveus/.cargo/registry/src/github.com-1ecc6299db9ec823/unicode-segmentation-1.9.0/src/grapheme.rs /Users/deveus/.cargo/registry/src/github.com-1ecc6299db9ec823/unicode-segmentation-1.9.0/src/sentence.rs /Users/deveus/.cargo/registry/src/github.com-1ecc6299db9ec823/unicode-segmentation-1.9.0/src/word.rs /Users/deveus/.cargo/registry/src/github.com-1ecc6299db9ec823/unicode-segmentation-1.9.0/src/tables.rs
+
+/Users/deveus/.cargo/registry/src/github.com-1ecc6299db9ec823/unicode-segmentation-1.9.0/src/lib.rs:
+/Users/deveus/.cargo/registry/src/github.com-1ecc6299db9ec823/unicode-segmentation-1.9.0/src/grapheme.rs:
+/Users/deveus/.cargo/registry/src/github.com-1ecc6299db9ec823/unicode-segmentation-1.9.0/src/sentence.rs:
+/Users/deveus/.cargo/registry/src/github.com-1ecc6299db9ec823/unicode-segmentation-1.9.0/src/word.rs:
+/Users/deveus/.cargo/registry/src/github.com-1ecc6299db9ec823/unicode-segmentation-1.9.0/src/tables.rs:

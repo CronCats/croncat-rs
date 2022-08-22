@@ -1,0 +1,2 @@
+cargo:rustc-env=TYPENUM_BUILD_CONSTS=/Volumes/Data/Cosmos/croncat-rs/target/rls/debug/build/typenum-752424536c07b4b3/out/consts.rs
+cargo:rustc-env=TYPENUM_BUILD_OP=/Volumes/Data/Cosmos/croncat-rs/target/rls/debug/build/typenum-752424536c07b4b3/out/op.rs

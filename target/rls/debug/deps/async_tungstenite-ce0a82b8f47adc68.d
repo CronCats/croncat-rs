@@ -1,0 +1,10 @@
+/Volumes/Data/Cosmos/croncat-rs/target/rls/debug/deps/async_tungstenite-ce0a82b8f47adc68.rmeta: /Users/deveus/.cargo/registry/src/github.com-1ecc6299db9ec823/async-tungstenite-0.12.0/src/lib.rs /Users/deveus/.cargo/registry/src/github.com-1ecc6299db9ec823/async-tungstenite-0.12.0/src/compat.rs /Users/deveus/.cargo/registry/src/github.com-1ecc6299db9ec823/async-tungstenite-0.12.0/src/handshake.rs /Users/deveus/.cargo/registry/src/github.com-1ecc6299db9ec823/async-tungstenite-0.12.0/src/stream.rs /Users/deveus/.cargo/registry/src/github.com-1ecc6299db9ec823/async-tungstenite-0.12.0/src/tokio.rs /Users/deveus/.cargo/registry/src/github.com-1ecc6299db9ec823/async-tungstenite-0.12.0/src/tokio/rustls.rs
+
+/Volumes/Data/Cosmos/croncat-rs/target/rls/debug/deps/async_tungstenite-ce0a82b8f47adc68.d: /Users/deveus/.cargo/registry/src/github.com-1ecc6299db9ec823/async-tungstenite-0.12.0/src/lib.rs /Users/deveus/.cargo/registry/src/github.com-1ecc6299db9ec823/async-tungstenite-0.12.0/src/compat.rs /Users/deveus/.cargo/registry/src/github.com-1ecc6299db9ec823/async-tungstenite-0.12.0/src/handshake.rs /Users/deveus/.cargo/registry/src/github.com-1ecc6299db9ec823/async-tungstenite-0.12.0/src/stream.rs /Users/deveus/.cargo/registry/src/github.com-1ecc6299db9ec823/async-tungstenite-0.12.0/src/tokio.rs /Users/deveus/.cargo/registry/src/github.com-1ecc6299db9ec823/async-tungstenite-0.12.0/src/tokio/rustls.rs
+
+/Users/deveus/.cargo/registry/src/github.com-1ecc6299db9ec823/async-tungstenite-0.12.0/src/lib.rs:
+/Users/deveus/.cargo/registry/src/github.com-1ecc6299db9ec823/async-tungstenite-0.12.0/src/compat.rs:
+/Users/deveus/.cargo/registry/src/github.com-1ecc6299db9ec823/async-tungstenite-0.12.0/src/handshake.rs:
+/Users/deveus/.cargo/registry/src/github.com-1ecc6299db9ec823/async-tungstenite-0.12.0/src/stream.rs:
+/Users/deveus/.cargo/registry/src/github.com-1ecc6299db9ec823/async-tungstenite-0.12.0/src/tokio.rs:
+/Users/deveus/.cargo/registry/src/github.com-1ecc6299db9ec823/async-tungstenite-0.12.0/src/tokio/rustls.rs:

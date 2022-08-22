@@ -1,0 +1,12 @@
+/Volumes/Data/Cosmos/croncat-rs/target/debug/deps/color_eyre-599eda9cc9996cdc.rmeta: /Users/deveus/.cargo/registry/src/github.com-1ecc6299db9ec823/color-eyre-0.6.1/src/lib.rs /Users/deveus/.cargo/registry/src/github.com-1ecc6299db9ec823/color-eyre-0.6.1/src/config.rs /Users/deveus/.cargo/registry/src/github.com-1ecc6299db9ec823/color-eyre-0.6.1/src/fmt.rs /Users/deveus/.cargo/registry/src/github.com-1ecc6299db9ec823/color-eyre-0.6.1/src/handler.rs /Users/deveus/.cargo/registry/src/github.com-1ecc6299db9ec823/color-eyre-0.6.1/src/private.rs /Users/deveus/.cargo/registry/src/github.com-1ecc6299db9ec823/color-eyre-0.6.1/src/section/mod.rs /Users/deveus/.cargo/registry/src/github.com-1ecc6299db9ec823/color-eyre-0.6.1/src/section/help.rs /Users/deveus/.cargo/registry/src/github.com-1ecc6299db9ec823/color-eyre-0.6.1/src/writers.rs
+
+/Volumes/Data/Cosmos/croncat-rs/target/debug/deps/color_eyre-599eda9cc9996cdc.d: /Users/deveus/.cargo/registry/src/github.com-1ecc6299db9ec823/color-eyre-0.6.1/src/lib.rs /Users/deveus/.cargo/registry/src/github.com-1ecc6299db9ec823/color-eyre-0.6.1/src/config.rs /Users/deveus/.cargo/registry/src/github.com-1ecc6299db9ec823/color-eyre-0.6.1/src/fmt.rs /Users/deveus/.cargo/registry/src/github.com-1ecc6299db9ec823/color-eyre-0.6.1/src/handler.rs /Users/deveus/.cargo/registry/src/github.com-1ecc6299db9ec823/color-eyre-0.6.1/src/private.rs /Users/deveus/.cargo/registry/src/github.com-1ecc6299db9ec823/color-eyre-0.6.1/src/section/mod.rs /Users/deveus/.cargo/registry/src/github.com-1ecc6299db9ec823/color-eyre-0.6.1/src/section/help.rs /Users/deveus/.cargo/registry/src/github.com-1ecc6299db9ec823/color-eyre-0.6.1/src/writers.rs
+
+/Users/deveus/.cargo/registry/src/github.com-1ecc6299db9ec823/color-eyre-0.6.1/src/lib.rs:
+/Users/deveus/.cargo/registry/src/github.com-1ecc6299db9ec823/color-eyre-0.6.1/src/config.rs:
+/Users/deveus/.cargo/registry/src/github.com-1ecc6299db9ec823/color-eyre-0.6.1/src/fmt.rs:
+/Users/deveus/.cargo/registry/src/github.com-1ecc6299db9ec823/color-eyre-0.6.1/src/handler.rs:
+/Users/deveus/.cargo/registry/src/github.com-1ecc6299db9ec823/color-eyre-0.6.1/src/private.rs:
+/Users/deveus/.cargo/registry/src/github.com-1ecc6299db9ec823/color-eyre-0.6.1/src/section/mod.rs:
+/Users/deveus/.cargo/registry/src/github.com-1ecc6299db9ec823/color-eyre-0.6.1/src/section/help.rs:
+/Users/deveus/.cargo/registry/src/github.com-1ecc6299db9ec823/color-eyre-0.6.1/src/writers.rs:

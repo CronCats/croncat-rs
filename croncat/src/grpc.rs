@@ -41,13 +41,14 @@ pub async fn connect(url: String) -> Result<(MsgClient<Channel>, QueryClient<Cha
 
 const AGENT_REGISTER_OPERTATION: &str = "register_agent";
 const AGENT_UNREGISTER_OPERTATION: &str = "unregister_agent";
+const CONFIG_FILE: &str = "config.yaml";
 
 pub async fn register_agent(
     address: String,
     payable_account_id: String,
     key: &SigningKey,
 ) -> Result<ChainResponse, ProcessError> {
-    let mut cosm_orc = CosmOrc::new(Config::from_yaml("config.yaml").unwrap())
+    let mut cosm_orc = CosmOrc::new(Config::from_yaml(CONFIG_FILE).unwrap())
         .unwrap()
         .add_profiler(Box::new(GasProfiler::new()));
 
@@ -66,7 +67,7 @@ pub async fn unregister_agent(
     address: String,
     key: &SigningKey,
 ) -> Result<ChainResponse, ProcessError> {
-    let mut cosm_orc = CosmOrc::new(Config::from_yaml("config.yaml").unwrap())
+    let mut cosm_orc = CosmOrc::new(Config::from_yaml(CONFIG_FILE).unwrap())
         .unwrap()
         .add_profiler(Box::new(GasProfiler::new()));
 

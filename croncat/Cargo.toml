@@ -20,11 +20,24 @@ envy = "0.4.2"
 serde = { version = "1.0.136", features = ["derive"] } 
 dotenv = "0.15.0"
 cosmrs = "0.7.0"
+cosm-orc = "1.3.4"
+cosmwasm-std = { version = "1.0.0" }
+
+cw20-base = "0.13"
+cw20 = "0.13"
 cw-croncat-core = { version = "0.1.0", git = "https://github.com/CronCats/cw-croncat" }
 async-broadcast = "0.4.0"
 rand = "0.7.0"
 secp256k1 = { version = "0.22.1", features = ["serde", "global-context", "rand-std"] }
 anyhow = "1.0"
+[dependencies.prost]
+version = "0.10"
+[dependencies.prost-types]
+version = "0.10"
+
+[dependencies.tendermint-proto]
+version = "=0.23.7"
+
 
 [dev-dependencies]
 tracing-test = "0.2.1"

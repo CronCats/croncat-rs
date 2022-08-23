@@ -30,6 +30,7 @@ pub struct Env {
     pub wsrpc_url: String,
 }
 
+
 ///
 /// Load our environment variables from a .env and chuck em in an `Env`.
 ///

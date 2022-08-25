@@ -4,14 +4,6 @@
 
 use std::process::exit;
 
-use cosm_orc::{
-    config::{
-        cfg::Config,
-        key::{Key, SigningKey},
-    },
-    orchestrator::cosm_orc::CosmOrc,
-    profilers::gas_profiler::GasProfiler,
-};
 use croncat::{
     channels, env,
     errors::Report,
@@ -51,16 +43,16 @@ async fn main() -> Result<(), Report> {
     info!("Starting croncatd...");
 
     match opts.cmd {
-        opts::Command::RegisterAgent { payable_account_id } => {
-            let key = SigningKey {
-            name: "validator".to_string(),
-            key: Key::Mnemonic("siren window salt bullet cream letter huge satoshi fade shiver permit offer happy immense wage fitness goose usual aim hammer clap about super trend".to_string()),
-        };
-
+        opts::Command::RegisterAgent {mut payable_account_id } => {
+            let key = get_agent_signing_key()?;
+            if payable_account_id.is_none() {
+                payable_account_id = Some(key.to_account("juno").unwrap().to_string());
+            }
+            print!("Account Id {}",payable_account_id.clone().unwrap());
             let result = croncat::grpc::register_agent(
                 env.croncat_addr,
                 payable_account_id.expect("Invalid payable_account_id!"),
-                key,
+                get_agent_signing_key()?,
             )
             .await?;
             println!("{result:?}");

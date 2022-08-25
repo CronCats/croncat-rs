@@ -17,8 +17,8 @@ use croncat::{
     errors::Report,
     grpc::update_agent,
     logging::{self, info},
-    seed_generator::{generate_save_mnemonic, get_agent_signing_key},
     system, tokio,
+    utils::{generate_save_mnemonic, get_agent_signing_key},
 };
 
 mod cli;
@@ -51,13 +51,16 @@ async fn main() -> Result<(), Report> {
     info!("Starting croncatd...");
 
     match opts.cmd {
-        opts::Command::RegisterAgent { .. } => {
-     let key = SigningKey {
-        name: "validator".to_string(),
-        key: Key::Mnemonic("siren window salt bullet cream letter huge satoshi fade shiver permit offer happy immense wage fitness goose usual aim hammer clap about super trend".to_string()),
-    };
-    let address="juno12z4hh9r3j9aurjn6ppkgyjrkuu4ugrdectsh792w8feyj56dhlssvntdls".to_string();
-    //let result= croncat::grpc::register_agent(address, &key).await?;
+        opts::Command::RegisterAgent { payable_account_id } => {
+            let key = SigningKey {
+            name: "validator".to_string(),
+            key: Key::Mnemonic("siren window salt bullet cream letter huge satoshi fade shiver permit offer happy immense wage fitness goose usual aim hammer clap about super trend".to_string()),
+        };
+
+            let result =
+                croncat::grpc::register_agent(env.croncat_addr, payable_account_id.unwrap(), &key)
+                    .await?;
+            println!("{result:?}");
         }
         opts::Command::UnregisterAgent { .. } => {
             info!("Unregister agent...");

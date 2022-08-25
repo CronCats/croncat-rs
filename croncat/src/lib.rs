@@ -15,6 +15,7 @@ pub mod env;
 pub mod errors;
 pub mod grpc;
 pub mod logging;
+pub mod seed_generator;
 pub mod store;
 pub mod streams;
 pub mod system;

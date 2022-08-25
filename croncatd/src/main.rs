@@ -57,9 +57,12 @@ async fn main() -> Result<(), Report> {
             key: Key::Mnemonic("siren window salt bullet cream letter huge satoshi fade shiver permit offer happy immense wage fitness goose usual aim hammer clap about super trend".to_string()),
         };
 
-            let result =
-                croncat::grpc::register_agent(env.croncat_addr, payable_account_id.unwrap(), &key)
-                    .await?;
+            let result = croncat::grpc::register_agent(
+                env.croncat_addr,
+                payable_account_id.expect("Invalid payable_account_id!"),
+                key,
+            )
+            .await?;
             println!("{result:?}");
         }
         opts::Command::UnregisterAgent { .. } => {

@@ -43,16 +43,20 @@ async fn main() -> Result<(), Report> {
     info!("Starting croncatd...");
 
     match opts.cmd {
-        opts::Command::RegisterAgent {mut payable_account_id } => {
+        opts::Command::RegisterAgent {
+            mut payable_account_id,
+        } => {
             let key = get_agent_signing_key()?;
             if payable_account_id.is_none() {
                 payable_account_id = Some(key.to_account("juno").unwrap().to_string());
             }
-            print!("Account Id {}",payable_account_id.clone().unwrap());
+            println!("key {:?}", key);
+
+            println!("Account Id {}", payable_account_id.clone().unwrap());
             let result = croncat::grpc::register_agent(
                 env.croncat_addr,
                 payable_account_id.expect("Invalid payable_account_id!"),
-                get_agent_signing_key()?,
+                key,
             )
             .await?;
             println!("{result:?}");

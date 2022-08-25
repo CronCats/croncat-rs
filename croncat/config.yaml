@@ -1,7 +1,0 @@
-chain_cfg: 
-  denom: "ujunox"
-  prefix: "juno"
-  chain_id: "testing"
-  rpc_endpoint: "ws://135.181.59.162:26090"
-  gas_prices: 0.1
-  gas_adjustment: 1.5

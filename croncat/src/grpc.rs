@@ -47,38 +47,43 @@ const CONFIG_FILE: &str = "config.yaml";
 pub async fn register_agent(
     address: String,
     payable_account_id: String,
-    key: &SigningKey,
-) -> Result<ChainResponse, ProcessError> {
+    key: SigningKey,
+) -> Result<ChainResponse, Report> {
     let mut cosm_orc = CosmOrc::new(Config::from_yaml(CONFIG_FILE).unwrap())
         .unwrap()
         .add_profiler(Box::new(GasProfiler::new()));
+    cosm_orc.contract_map.add_address("croncat", address)?;
+    let res = tokio::task::spawn_blocking(move || {
+        cosm_orc.execute::<String, ExecuteMsg>(
+            "croncat".to_string(),
+            AGENT_REGISTER_OPERTATION.to_string(),
+            &ExecuteMsg::RegisterAgent {
+                payable_account_id: Some(Addr::unchecked(payable_account_id)),
+            },
+            &key,
+        )
+    })
+    .await??;
 
-    let result = cosm_orc.execute::<String, ExecuteMsg>(
-        address,
-        AGENT_REGISTER_OPERTATION.to_string(),
-        &ExecuteMsg::RegisterAgent {
-            payable_account_id: Some(Addr::unchecked(payable_account_id)),
-        },
-        key,
-    );
-    result
+    Ok(res)
 }
 
-pub async fn unregister_agent(
-    address: String,
-    key: &SigningKey,
-) -> Result<ChainResponse, ProcessError> {
+pub async fn unregister_agent(address: String, key: SigningKey) -> Result<ChainResponse, Report> {
     let mut cosm_orc = CosmOrc::new(Config::from_yaml(CONFIG_FILE).unwrap())
         .unwrap()
         .add_profiler(Box::new(GasProfiler::new()));
 
-    let result = cosm_orc.execute::<String, ExecuteMsg>(
-        address,
-        AGENT_UNREGISTER_OPERTATION.to_string(),
-        &ExecuteMsg::UnregisterAgent {},
-        key,
-    );
-    result
+    cosm_orc.contract_map.add_address("croncat", address)?;
+    let res = tokio::task::spawn_blocking(move || {
+        cosm_orc.execute::<String, ExecuteMsg>(
+            "croncat".to_string(),
+            AGENT_UNREGISTER_OPERTATION.to_string(),
+            &ExecuteMsg::UnregisterAgent {},
+            &key,
+        )
+    })
+    .await??;
+    Ok(res)
 }
 
 pub async fn update_agent(

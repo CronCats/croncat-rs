@@ -8,6 +8,7 @@ use croncat::{
     channels, env,
     errors::Report,
     logging::{self, info},
+    seed_generator::{generate_save_mnemonic, get_agent_signing_key},
     system, tokio,
 };
 
@@ -47,6 +48,7 @@ async fn main() -> Result<(), Report> {
         opts::Command::UnregisterAgent { .. } => {
             info!("Unregister agent...");
         }
+        opts::Command::GenerateMnemonic => generate_save_mnemonic()?,
         _ => {
             // Create a channel to handle graceful shutdown and wrap receiver for cloning
             let (shutdown_tx, shutdown_rx) = channels::create_shutdown_channel();

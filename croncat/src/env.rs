@@ -28,6 +28,7 @@ pub struct Env {
     pub grpc_url: String,
     #[serde(default = "default_wsrpc_url")]
     pub wsrpc_url: String,
+    pub croncat_addr: String,
 }
 
 

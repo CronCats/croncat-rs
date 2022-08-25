@@ -34,6 +34,7 @@ pub enum Command {
     Status,
     Tasks,
     Go,
+    GenerateMnemonic,
 }
 #[derive(Debug, StructOpt)]
 pub struct MessageInfo {

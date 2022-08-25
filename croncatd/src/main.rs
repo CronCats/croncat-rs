@@ -55,7 +55,8 @@ async fn main() -> Result<(), Report> {
                 env.croncat_addr,
                 get_agent_signing_key()?,
                 payable_account_id,
-            ).await?;
+            )
+            .await?;
             println!("{res:?}");
         }
         _ => {

@@ -4,6 +4,14 @@
 
 use std::process::exit;
 
+use cosm_orc::{
+    config::{
+        cfg::Config,
+        key::{Key, SigningKey},
+    },
+    orchestrator::cosm_orc::CosmOrc,
+    profilers::gas_profiler::GasProfiler,
+};
 use croncat::{
     channels, env,
     errors::Report,
@@ -42,11 +50,14 @@ async fn main() -> Result<(), Report> {
 
     match opts.cmd {
         opts::Command::RegisterAgent { .. } => {
-            info!("Register agent...");
+     let key = SigningKey {
+        name: "validator".to_string(),
+        key: Key::Mnemonic("siren window salt bullet cream letter huge satoshi fade shiver permit offer happy immense wage fitness goose usual aim hammer clap about super trend".to_string()),
+    };
+    let address="juno12z4hh9r3j9aurjn6ppkgyjrkuu4ugrdectsh792w8feyj56dhlssvntdls".to_string();
+    //let result= croncat::grpc::register_agent(address, &key).await?;
         }
-        opts::Command::UnregisterAgent { .. } => {
-            info!("Unregister agent...");
-        }
+        opts::Command::UnregisterAgent { .. } =>{} ,
         _ => {
             // Create a channel to handle graceful shutdown and wrap receiver for cloning
             let (shutdown_tx, shutdown_rx) = channels::create_shutdown_channel();

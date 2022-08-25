@@ -7,7 +7,9 @@ use std::process::exit;
 use croncat::{
     channels, env,
     errors::Report,
+    grpc::update_agent,
     logging::{self, info},
+    seed_generator::{generate_save_mnemonic, get_agent_signing_key},
     system, tokio,
 };
 
@@ -46,6 +48,16 @@ async fn main() -> Result<(), Report> {
         }
         opts::Command::UnregisterAgent { .. } => {
             info!("Unregister agent...");
+        }
+        opts::Command::GenerateMnemonic => generate_save_mnemonic()?,
+        opts::Command::UpdateAgent { payable_account_id } => {
+            let res = update_agent(
+                env.croncat_addr,
+                get_agent_signing_key()?,
+                payable_account_id,
+            )
+            .await?;
+            println!("{res:?}");
         }
         _ => {
             // Create a channel to handle graceful shutdown and wrap receiver for cloning

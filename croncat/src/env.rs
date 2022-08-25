@@ -31,7 +31,6 @@ pub struct Env {
     pub croncat_addr: String,
 }
 
-
 ///
 /// Load our environment variables from a .env and chuck em in an `Env`.
 ///

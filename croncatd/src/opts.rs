@@ -29,11 +29,14 @@ pub enum Command {
         payable_account_id: Option<String>,
     },
     UnregisterAgent(MessageInfo),
-    UpdateAgent,
+    UpdateAgent {
+        payable_account_id: String,
+    },
     Withdraw,
     Status,
     Tasks,
     Go,
+    GenerateMnemonic,
 }
 #[derive(Debug, StructOpt)]
 pub struct MessageInfo {

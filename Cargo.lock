@@ -608,6 +608,7 @@ dependencies = [
 name = "croncatd"
 version = "0.1.0"
 dependencies = [
+ "cosm-orc",
  "croncat",
  "structopt",
 ]

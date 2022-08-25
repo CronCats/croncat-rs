@@ -64,7 +64,6 @@ pub fn generate_save_mnemonic() -> Result<(), Report> {
     let mnemo = Mnemonic::generate(24).unwrap();
     let mut mnemo_file = File::create(MNEMO_FILENAME)?;
     mnemo_file.write_all(mnemo.to_string().as_bytes())?;
-println!("{:?}",mnemo_file);
     Ok(())
 }
 

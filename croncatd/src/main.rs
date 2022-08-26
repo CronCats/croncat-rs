@@ -7,11 +7,11 @@ use std::process::exit;
 use croncat::{
     channels, env,
     errors::Report,
-    grpc::update_agent,
+    grpc::OrcSigner,
     logging::{self, info},
     store::agent::LocalAgentStorage,
-    system, tokio,
-    utils::setup_cosm_orc,
+    system,
+    tokio::runtime::Runtime,
 };
 
 mod cli;
@@ -20,11 +20,9 @@ mod opts;
 ///
 /// Start the `croncatd` agent.
 ///
-#[tokio::main]
-async fn main() -> Result<(), Report> {
+fn main() -> Result<(), Report> {
     // Get environment variables
     let env = env::load()?;
-    let cosm_orc = setup_cosm_orc(&env.croncat_addr)?;
     let mut storage = LocalAgentStorage::new();
 
     // Setup tracing and error reporting
@@ -46,22 +44,13 @@ async fn main() -> Result<(), Report> {
     info!("Starting croncatd...");
 
     match opts.cmd {
-        opts::Command::RegisterAgent {
-            mut payable_account_id,
-        } => {
+        opts::Command::RegisterAgent { payable_account_id } => {
             let key = storage.get_agent_signing_key(&opts.account_id)?;
-            if payable_account_id.is_none() {
-                payable_account_id = Some(key.to_account("juno").unwrap().to_string());
-            }
             println!("key {:?}", key);
 
-            println!("Account Id {}", payable_account_id.clone().unwrap());
-            let result = croncat::grpc::register_agent(
-                cosm_orc,
-                payable_account_id.expect("Invalid payable_account_id!"),
-                key,
-            )
-            .await?;
+            println!("Account Id {:?}", payable_account_id);
+            let mut signer = OrcSigner::new(&env.croncat_addr, key)?;
+            let result = signer.register_agent(payable_account_id)?;
             println!("{result:?}");
         }
         opts::Command::UnregisterAgent { .. } => {
@@ -69,20 +58,19 @@ async fn main() -> Result<(), Report> {
         }
         opts::Command::GenerateMnemonic => storage.generate_account(opts.account_id)?,
         opts::Command::UpdateAgent { payable_account_id } => {
-            let res = update_agent(
-                cosm_orc,
-                storage.get_agent_signing_key(&opts.account_id)?,
-                payable_account_id,
-            )
-            .await?;
-            println!("{res:?}");
+            let key = storage.get_agent_signing_key(&opts.account_id)?;
+            let mut signer = OrcSigner::new(&env.croncat_addr, key)?;
+            let result = signer.update_agent(payable_account_id)?;
+            println!("{result:?}");
         }
         _ => {
             // Create a channel to handle graceful shutdown and wrap receiver for cloning
             let (shutdown_tx, shutdown_rx) = channels::create_shutdown_channel();
 
             // Start the agent
-            system::run(env, shutdown_tx, shutdown_rx).await?;
+            Runtime::new()
+                .unwrap()
+                .block_on(async { system::run(env, shutdown_tx, shutdown_rx).await })?;
         }
     }
 

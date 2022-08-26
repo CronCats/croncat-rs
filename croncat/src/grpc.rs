@@ -19,6 +19,7 @@ use url::Url;
 
 use crate::errors::Report;
 use crate::logging::info;
+use crate::utils::setup_cosm_orc;
 
 ///
 /// Create message and query clients for interacting with the chain.
@@ -42,70 +43,50 @@ pub async fn connect(url: String) -> Result<(MsgClient<Channel>, QueryClient<Cha
 const AGENT_REGISTER_OPERTATION: &str = "register_agent";
 const AGENT_UNREGISTER_OPERTATION: &str = "unregister_agent";
 const AGENT_UPDATE_AGENT_OPERATION: &str = "update_agent";
-const CONFIG_FILE: &str = "config.yaml";
 
-pub async fn register_agent(
-    address: String,
-    payable_account_id: String,
+pub struct OrcSigner {
+    cosm_orc: CosmOrc,
     key: SigningKey,
-) -> Result<ChainResponse, Report> {
-    let mut cosm_orc = CosmOrc::new(Config::from_yaml(CONFIG_FILE).unwrap())
-        .unwrap()
-        .add_profiler(Box::new(GasProfiler::new()));
-    cosm_orc.contract_map.add_address("croncat", address)?;
-    let res = tokio::task::spawn_blocking(move || {
-        cosm_orc.execute::<String, ExecuteMsg>(
+}
+impl OrcSigner {
+    pub fn new(croncat_addr: &str, key: SigningKey) -> Result<Self, Report> {
+        let cosm_orc = setup_cosm_orc(croncat_addr)?;
+        Ok(Self { cosm_orc, key })
+    }
+    pub fn register_agent(
+        &mut self,
+        payable_account_id: Option<String>,
+    ) -> Result<ChainResponse, Report> {
+        let res = self.cosm_orc.execute::<String, ExecuteMsg>(
             "croncat".to_string(),
             AGENT_REGISTER_OPERTATION.to_string(),
             &ExecuteMsg::RegisterAgent {
-                payable_account_id: Some(Addr::unchecked(payable_account_id)),
+                payable_account_id: payable_account_id.map(|id| Addr::unchecked(id)),
             },
-            &key,
-        )
-    })
-    .await??;
+            &self.key,
+        )?;
 
-    Ok(res)
-}
+        Ok(res)
+    }
 
-pub async fn unregister_agent(address: String, key: SigningKey) -> Result<ChainResponse, Report> {
-    let mut cosm_orc = CosmOrc::new(Config::from_yaml(CONFIG_FILE).unwrap())
-        .unwrap()
-        .add_profiler(Box::new(GasProfiler::new()));
-
-    cosm_orc.contract_map.add_address("croncat", address)?;
-    let res = tokio::task::spawn_blocking(move || {
-        cosm_orc.execute::<String, ExecuteMsg>(
+    pub fn unregister_agent(&mut self) -> Result<ChainResponse, Report> {
+        let res = self.cosm_orc.execute::<String, ExecuteMsg>(
             "croncat".to_string(),
             AGENT_UNREGISTER_OPERTATION.to_string(),
             &ExecuteMsg::UnregisterAgent {},
-            &key,
-        )
-    })
-    .await??;
-    Ok(res)
-}
+            &self.key,
+        )?;
+        Ok(res)
+    }
 
-pub async fn update_agent(
-    address: String,
-    key: SigningKey,
-    payable_account_id: String,
-) -> Result<ChainResponse, Report> {
-    let mut cosm_orc = CosmOrc::new(Config::from_yaml(CONFIG_FILE).unwrap())
-        .unwrap()
-        .add_profiler(Box::new(GasProfiler::new()));
-    //cosm_orc.contract_map.register_contract("croncat", 3066);
-    cosm_orc.contract_map.add_address("croncat", address)?;
-
-    let payable_account_id = Addr::unchecked(payable_account_id);
-    let res = tokio::task::spawn_blocking(move || {
-        cosm_orc.execute(
+    pub fn update_agent(&mut self, payable_account_id: String) -> Result<ChainResponse, Report> {
+        let payable_account_id = Addr::unchecked(payable_account_id);
+        let res = self.cosm_orc.execute(
             "croncat".to_string(),
             AGENT_UPDATE_AGENT_OPERATION.to_string(),
             &ExecuteMsg::UpdateAgent { payable_account_id },
-            &key,
-        )
-    })
-    .await??;
-    Ok(res)
+            &self.key,
+        )?;
+        Ok(res)
+    }
 }

@@ -20,6 +20,9 @@ pub struct Opts {
 
     #[structopt(subcommand)] // Note that we mark a field as a subcommand
     pub cmd: Command,
+
+    #[structopt(long, default_value = "agent")]
+    pub account_id: String,
 }
 
 #[derive(Debug, StructOpt)]

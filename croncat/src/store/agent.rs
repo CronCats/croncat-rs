@@ -144,8 +144,8 @@ impl LocalAgentStorage {
         }
     }
 
-    /// Register a new account_id to the croncat agent.
-    pub fn register(&mut self, account_id: AccountId) -> Result<(), Report> {
+    /// Generate a new account_id to the local storage.
+    pub fn generate_account(&mut self, account_id: AccountId) -> Result<(), Report> {
         match self.get(&account_id) {
             Some(_) => Err(eyre!(r#"Agent "{account_id}" already created"#)),
             None => {

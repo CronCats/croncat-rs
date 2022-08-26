@@ -42,17 +42,12 @@ pub async fn connect(url: String) -> Result<(MsgClient<Channel>, QueryClient<Cha
 const AGENT_REGISTER_OPERTATION: &str = "register_agent";
 const AGENT_UNREGISTER_OPERTATION: &str = "unregister_agent";
 const AGENT_UPDATE_AGENT_OPERATION: &str = "update_agent";
-const CONFIG_FILE: &str = "config.yaml";
 
 pub async fn register_agent(
-    address: String,
+    mut cosm_orc: CosmOrc,
     payable_account_id: String,
     key: SigningKey,
 ) -> Result<ChainResponse, Report> {
-    let mut cosm_orc = CosmOrc::new(Config::from_yaml(CONFIG_FILE).unwrap())
-        .unwrap()
-        .add_profiler(Box::new(GasProfiler::new()));
-    cosm_orc.contract_map.add_address("croncat", address)?;
     let res = tokio::task::spawn_blocking(move || {
         cosm_orc.execute::<String, ExecuteMsg>(
             "croncat".to_string(),
@@ -68,12 +63,10 @@ pub async fn register_agent(
     Ok(res)
 }
 
-pub async fn unregister_agent(address: String, key: SigningKey) -> Result<ChainResponse, Report> {
-    let mut cosm_orc = CosmOrc::new(Config::from_yaml(CONFIG_FILE).unwrap())
-        .unwrap()
-        .add_profiler(Box::new(GasProfiler::new()));
-
-    cosm_orc.contract_map.add_address("croncat", address)?;
+pub async fn unregister_agent(
+    mut cosm_orc: CosmOrc,
+    key: SigningKey,
+) -> Result<ChainResponse, Report> {
     let res = tokio::task::spawn_blocking(move || {
         cosm_orc.execute::<String, ExecuteMsg>(
             "croncat".to_string(),
@@ -87,16 +80,10 @@ pub async fn unregister_agent(address: String, key: SigningKey) -> Result<ChainR
 }
 
 pub async fn update_agent(
-    address: String,
+    mut cosm_orc: CosmOrc,
     key: SigningKey,
     payable_account_id: String,
 ) -> Result<ChainResponse, Report> {
-    let mut cosm_orc = CosmOrc::new(Config::from_yaml(CONFIG_FILE).unwrap())
-        .unwrap()
-        .add_profiler(Box::new(GasProfiler::new()));
-    //cosm_orc.contract_map.register_contract("croncat", 3066);
-    cosm_orc.contract_map.add_address("croncat", address)?;
-
     let payable_account_id = Addr::unchecked(payable_account_id);
     let res = tokio::task::spawn_blocking(move || {
         cosm_orc.execute(

@@ -9,8 +9,9 @@ use croncat::{
     errors::Report,
     grpc::update_agent,
     logging::{self, info},
+    store::agent::LocalAgentStorage,
     system, tokio,
-    utils::{generate_save_mnemonic, get_agent_signing_key},
+    utils::setup_cosm_orc,
 };
 
 mod cli;
@@ -23,6 +24,8 @@ mod opts;
 async fn main() -> Result<(), Report> {
     // Get environment variables
     let env = env::load()?;
+    let cosm_orc = setup_cosm_orc(&env.croncat_addr)?;
+    let mut storage = LocalAgentStorage::new();
 
     // Setup tracing and error reporting
     logging::setup()?;
@@ -46,7 +49,7 @@ async fn main() -> Result<(), Report> {
         opts::Command::RegisterAgent {
             mut payable_account_id,
         } => {
-            let key = get_agent_signing_key()?;
+            let key = storage.get_agent_signing_key(&opts.account_id)?;
             if payable_account_id.is_none() {
                 payable_account_id = Some(key.to_account("juno").unwrap().to_string());
             }
@@ -54,7 +57,7 @@ async fn main() -> Result<(), Report> {
 
             println!("Account Id {}", payable_account_id.clone().unwrap());
             let result = croncat::grpc::register_agent(
-                env.croncat_addr,
+                cosm_orc,
                 payable_account_id.expect("Invalid payable_account_id!"),
                 key,
             )
@@ -64,11 +67,11 @@ async fn main() -> Result<(), Report> {
         opts::Command::UnregisterAgent { .. } => {
             info!("Unregister agent...");
         }
-        opts::Command::GenerateMnemonic => generate_save_mnemonic()?,
+        opts::Command::GenerateMnemonic => storage.register(opts.account_id)?,
         opts::Command::UpdateAgent { payable_account_id } => {
             let res = update_agent(
-                env.croncat_addr,
-                get_agent_signing_key()?,
+                cosm_orc,
+                storage.get_agent_signing_key(&opts.account_id)?,
                 payable_account_id,
             )
             .await?;

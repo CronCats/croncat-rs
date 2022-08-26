@@ -18,6 +18,9 @@ pub struct Opts {
     #[structopt(long)]
     pub no_frills: bool,
 
+    #[structopt(long, default_value = "agent")]
+    pub account_id: String,
+
     #[structopt(subcommand)] // Note that we mark a field as a subcommand
     pub cmd: Command,
 }

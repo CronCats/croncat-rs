@@ -2,6 +2,9 @@
 //! Helpers for dealing with local agents.
 //!
 
+use cosm_orc::{
+    config::cfg::Config, orchestrator::cosm_orc::CosmOrc, profilers::gas_profiler::GasProfiler,
+};
 use secp256k1::{rand, KeyPair, Secp256k1};
 
 use std::sync::{
@@ -14,16 +17,10 @@ pub fn generate_keypair() -> KeyPair {
     let secp = Secp256k1::new();
     KeyPair::new(&secp, &mut rand::thread_rng())
 }
-use std::{
-    fs::{self, File},
-    io::Write,
-};
 
-use bip39::Mnemonic;
-use color_eyre::{eyre::eyre, Report};
-use cosm_orc::config::key::{Key, SigningKey};
-
-
+const CONFIG_FILE: &str = "config.yaml";
+pub const DEFAULT_AGENT_ID: &str = "agent";
+pub const DERVIATION_PATH: &str = "m/44'/118'/0'/0/0";
 
 ///
 /// Count block received from the stream.
@@ -55,24 +52,10 @@ impl AtomicIntervalCounter {
     }
 }
 
-
-pub const MNEMO_FILENAME: &str = "agent-mnemo";
-
-
-// TODO: make interactive ask to continue if file already exist
-pub fn generate_save_mnemonic() -> Result<(), Report> {
-    let mnemo = Mnemonic::generate(24).unwrap();
-    let mut mnemo_file = File::create(MNEMO_FILENAME)?;
-    mnemo_file.write_all(mnemo.to_string().as_bytes())?;
-    Ok(())
-}
-
-pub fn get_agent_signing_key() -> Result<SigningKey, Report> {
-    let mnemo = fs::read_to_string(MNEMO_FILENAME)
-        .map_err(|err| eyre!("Generate mnemonic first: {err}"))?;
-    let key = SigningKey {
-        name: "agent".to_string(),
-        key: Key::Mnemonic(mnemo),
-    };
-    Ok(key)
+pub fn setup_cosm_orc(croncat_addr: &str) -> Result<CosmOrc, color_eyre::Report> {
+    let mut cosm_orc = CosmOrc::new(Config::from_yaml(CONFIG_FILE).unwrap())
+        .unwrap()
+        .add_profiler(Box::new(GasProfiler::new()));
+    cosm_orc.contract_map.add_address("croncat", croncat_addr)?;
+    Ok(cosm_orc)
 }

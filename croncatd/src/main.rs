@@ -7,10 +7,11 @@ use std::process::exit;
 use croncat::{
     channels, env,
     errors::Report,
-    grpc::update_agent,
+    grpc::OrcSigner,
     logging::{self, info},
-    system, tokio,
-    utils::{generate_save_mnemonic, get_agent_signing_key},
+    store::agent::LocalAgentStorage,
+    system,
+    tokio::runtime::Runtime,
 };
 
 mod cli;
@@ -19,10 +20,10 @@ mod opts;
 ///
 /// Start the `croncatd` agent.
 ///
-#[tokio::main]
-async fn main() -> Result<(), Report> {
+fn main() -> Result<(), Report> {
     // Get environment variables
     let env = env::load()?;
+    let mut storage = LocalAgentStorage::new();
 
     // Setup tracing and error reporting
     logging::setup()?;
@@ -43,43 +44,35 @@ async fn main() -> Result<(), Report> {
     info!("Starting croncatd...");
 
     match opts.cmd {
-        opts::Command::RegisterAgent {
-            mut payable_account_id,
-        } => {
-            let key = get_agent_signing_key()?;
-            if payable_account_id.is_none() {
-                payable_account_id = Some(key.to_account("juno").unwrap().to_string());
-            }
+        opts::Command::RegisterAgent { payable_account_id } => {
+            let key = storage.get_agent_signing_key(&opts.account_id)?;
             println!("key {:?}", key);
 
-            println!("Account Id {}", payable_account_id.clone().unwrap());
-            let result = croncat::grpc::register_agent(
-                env.croncat_addr,
-                payable_account_id.expect("Invalid payable_account_id!"),
-                key,
-            )
-            .await?;
-            println!("{result:?}");
+            println!("Account Id {:?}", payable_account_id);
+            let mut signer = OrcSigner::new(&env.croncat_addr, key)?;
+            let result = signer.register_agent(payable_account_id)?;
+            let log = result.log;
+            println!("{log}");
         }
         opts::Command::UnregisterAgent { .. } => {
             info!("Unregister agent...");
         }
-        opts::Command::GenerateMnemonic => generate_save_mnemonic()?,
+        opts::Command::GenerateMnemonic => storage.generate_account(opts.account_id)?,
         opts::Command::UpdateAgent { payable_account_id } => {
-            let res = update_agent(
-                env.croncat_addr,
-                get_agent_signing_key()?,
-                payable_account_id,
-            )
-            .await?;
-            println!("{res:?}");
+            let key = storage.get_agent_signing_key(&opts.account_id)?;
+            let mut signer = OrcSigner::new(&env.croncat_addr, key)?;
+            let result = signer.update_agent(payable_account_id)?;
+            let log = result.log;
+            println!("{log}");
         }
         _ => {
             // Create a channel to handle graceful shutdown and wrap receiver for cloning
             let (shutdown_tx, shutdown_rx) = channels::create_shutdown_channel();
 
             // Start the agent
-            system::run(env, shutdown_tx, shutdown_rx).await?;
+            Runtime::new()
+                .unwrap()
+                .block_on(async { system::run(env, shutdown_tx, shutdown_rx).await })?;
         }
     }
 

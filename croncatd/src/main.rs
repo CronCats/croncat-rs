@@ -51,7 +51,8 @@ fn main() -> Result<(), Report> {
             println!("Account Id {:?}", payable_account_id);
             let mut signer = OrcSigner::new(&env.croncat_addr, key)?;
             let result = signer.register_agent(payable_account_id)?;
-            println!("{result:?}");
+            let log = result.log;
+            println!("{log}");
         }
         opts::Command::UnregisterAgent { .. } => {
             info!("Unregister agent...");
@@ -61,7 +62,8 @@ fn main() -> Result<(), Report> {
             let key = storage.get_agent_signing_key(&opts.account_id)?;
             let mut signer = OrcSigner::new(&env.croncat_addr, key)?;
             let result = signer.update_agent(payable_account_id)?;
-            println!("{result:?}");
+            let log = result.log;
+            println!("{log}");
         }
         _ => {
             // Create a channel to handle graceful shutdown and wrap receiver for cloning

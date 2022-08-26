@@ -7,7 +7,7 @@ use std::process::exit;
 use croncat::{
     channels, env,
     errors::Report,
-    grpc::OrcSigner,
+    grpc::{OrcQuerier, OrcSigner},
     logging::{self, info},
     store::agent::LocalAgentStorage,
     system,
@@ -57,6 +57,18 @@ fn main() -> Result<(), Report> {
         opts::Command::UnregisterAgent { .. } => {
             info!("Unregister agent...");
         }
+        opts::Command::Withdraw => {
+            let key = storage.get_agent_signing_key(&opts.account_id)?;
+            let mut signer = OrcSigner::new(&env.croncat_addr, key)?;
+            let result = signer.withdraw_reward()?;
+            let log = result.log;
+            println!("{log}");
+        }
+        opts::Command::Info => {
+            let mut querier = OrcQuerier::new(&env.croncat_addr)?;
+            let config = querier.query_config()?;
+            println!("{config}")
+        }
         opts::Command::GenerateMnemonic => storage.generate_account(opts.account_id)?,
         opts::Command::UpdateAgent { payable_account_id } => {
             let key = storage.get_agent_signing_key(&opts.account_id)?;
@@ -65,6 +77,7 @@ fn main() -> Result<(), Report> {
             let log = result.log;
             println!("{log}");
         }
+        opts::Command::GetAgent => storage.display_account(&opts.account_id),
         _ => {
             // Create a channel to handle graceful shutdown and wrap receiver for cloning
             let (shutdown_tx, shutdown_rx) = channels::create_shutdown_channel();

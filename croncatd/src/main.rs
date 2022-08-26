@@ -67,7 +67,7 @@ async fn main() -> Result<(), Report> {
         opts::Command::UnregisterAgent { .. } => {
             info!("Unregister agent...");
         }
-        opts::Command::GenerateMnemonic => storage.register(opts.account_id)?,
+        opts::Command::GenerateMnemonic => storage.generate_account(opts.account_id)?,
         opts::Command::UpdateAgent { payable_account_id } => {
             let res = update_agent(
                 cosm_orc,

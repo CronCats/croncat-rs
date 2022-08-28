@@ -3,13 +3,19 @@
 //!
 
 use std::process::exit;
+use tokio_compat::prelude::*;
 
 use croncat::{
     channels, env,
     errors::Report,
+    grpc::OrcSigner,
     logging::{self, info},
-    system, tokio,
+    store::agent::LocalAgentStorage,
+    system,
+    tokio::runtime::Runtime,
 };
+
+use crate::cli::deposit_junox;
 
 mod cli;
 mod opts;
@@ -17,10 +23,12 @@ mod opts;
 ///
 /// Start the `croncatd` agent.
 ///
-#[tokio::main]
-async fn main() -> Result<(), Report> {
+
+
+fn main() -> Result<(), Report> {
     // Get environment variables
     let env = env::load()?;
+    let mut storage = LocalAgentStorage::new();
 
     // Setup tracing and error reporting
     logging::setup()?;
@@ -40,11 +48,48 @@ async fn main() -> Result<(), Report> {
 
     info!("Starting croncatd...");
 
-    // Create a channel to handle graceful shutdown and wrap receiver for cloning
-    let (shutdown_tx, shutdown_rx) = channels::create_shutdown_channel();
+    match opts.cmd {
+        opts::Command::RegisterAgent { payable_account_id } => {
+            let key = storage.get_agent_signing_key(&opts.account_id)?;
+            println!("key {:?}", key);
 
-    // Start the agent
-    system::run(env, shutdown_tx, shutdown_rx).await?;
+            println!("Account Id {:?}", payable_account_id);
+            let mut signer = OrcSigner::new(&env.croncat_addr, key)?;
+            let result = signer.register_agent(payable_account_id)?;
+            let log = result.log;
+            println!("{log}");
+        }
+        opts::Command::UnregisterAgent { .. } => {
+            info!("Unregister agent...");
+        }
+        opts::Command::GenerateMnemonic => storage.generate_account(opts.account_id)?,
+        opts::Command::UpdateAgent { payable_account_id } => {
+            let key = storage.get_agent_signing_key(&opts.account_id)?;
+            let mut signer = OrcSigner::new(&env.croncat_addr, key)?;
+            let result = signer.update_agent(payable_account_id)?;
+            let log = result.log;
+            println!("{log}");
+        }
+         opts::Command::DepositUjunox { account_id } =>{
+            //let result=task.await;
+            tokio_compat::run_std(async move {
+                let result=deposit_junox(account_id.as_ref().unwrap()).await;
+                println!(" {:?}", result);
+
+            });
+            //let result= futures::executor::block_on(Compat::new(task));
+        }
+        _ => {
+            // Create a channel to handle graceful shutdown and wrap receiver for cloning
+            let (shutdown_tx, shutdown_rx) = channels::create_shutdown_channel();
+
+            // Start the agent
+            Runtime::new()
+                .unwrap()
+                .block_on(async { system::run(env, shutdown_tx, shutdown_rx).await })?;
+        }
+       
+    }
 
     // Say goodbye if no no-frills
     if !opts.no_frills {

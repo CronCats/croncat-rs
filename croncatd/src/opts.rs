@@ -40,6 +40,9 @@ pub enum Command {
     Tasks,
     Go,
     GenerateMnemonic,
+    DepositUjunox {
+        account_id: Option<String>,
+    },
 }
 #[derive(Debug, StructOpt)]
 pub struct MessageInfo {

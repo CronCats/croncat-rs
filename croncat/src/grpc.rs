@@ -1,6 +1,8 @@
 //!
 //! Use the [cosmos_sdk_proto](https://crates.io/crates/cosmos-sdk-proto) library to create clients for GRPC node requests.
 //!
+use cw_croncat_core::msg::TaskResponse;
+use cw_croncat_core::types::AgentResponse;
 use cosm_orc::client::error::ClientError;
 use cosm_orc::client::ChainResponse;
 use cosm_orc::config::cfg::Config;
@@ -45,6 +47,7 @@ const AGENT_UNREGISTER_OPERTATION: &str = "unregister_agent";
 const AGENT_UPDATE_AGENT_OPERATION: &str = "update_agent";
 const AGENT_WITHDRAW_OPERATION: &str = "withdraw";
 const CRONCAT_CONFIG_QUERY: &str = "config";
+const CRONCAT_AGENT_QUERY: &str = "query_get_agent";
 
 pub struct OrcSigner {
     cosm_orc: CosmOrc,
@@ -120,5 +123,21 @@ impl OrcQuerier {
         let config: GetConfigResponse = res.data()?;
         let config_json = serde_json::to_string_pretty(&config)?;
         Ok(config_json)
+    }
+    pub fn get_agent(&mut self,account_id:String) -> Result<String, Report> {
+        let res = self
+            .cosm_orc
+            .query("croncat", CRONCAT_AGENT_QUERY, &QueryMsg::GetAgent { account_id:Addr::unchecked(account_id )})?;
+        let response: AgentResponse = res.data()?;
+        let json = serde_json::to_string_pretty(&response)?;
+        Ok(json)
+    }
+    pub fn get_tasks(&mut self,from_index: Option<u64>, limit: Option<u64>) -> Result<String, Report> {
+        let res = self
+            .cosm_orc
+            .query("croncat", CRONCAT_CONFIG_QUERY, &QueryMsg::GetTasks { from_index,limit})?;
+        let response: Vec<TaskResponse> = res.data()?;
+        let json = serde_json::to_string_pretty(&response)?;
+        Ok(json)
     }
 }

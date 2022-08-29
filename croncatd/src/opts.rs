@@ -41,6 +41,9 @@ pub enum Command {
     Go,
     Info,
     GenerateMnemonic,
+    DepositUjunox {
+        account_id: Option<String>,
+    },
     GetAgent,
 }
 #[derive(Debug, StructOpt)]

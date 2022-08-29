@@ -3,6 +3,7 @@
 //!
 
 use std::process::exit;
+use tokio_compat::prelude::*;
 
 use croncat::{
     channels, env,
@@ -14,12 +15,16 @@ use croncat::{
     tokio::runtime::Runtime,
 };
 
+use crate::cli::deposit_junox;
+
 mod cli;
 mod opts;
 
 ///
 /// Start the `croncatd` agent.
 ///
+
+
 fn main() -> Result<(), Report> {
     // Get environment variables
     let env = env::load()?;
@@ -77,6 +82,15 @@ fn main() -> Result<(), Report> {
             let log = result.log;
             println!("{log}");
         }
+         opts::Command::DepositUjunox { account_id } =>{
+            //let result=task.await;
+            tokio_compat::run_std(async move {
+                let result=deposit_junox(account_id.as_ref().unwrap()).await;
+                println!(" {:?}", result);
+
+            });
+            //let result= futures::executor::block_on(Compat::new(task));
+        }
         opts::Command::GetAgent => storage.display_account(&opts.account_id),
         _ => {
             // Create a channel to handle graceful shutdown and wrap receiver for cloning
@@ -87,6 +101,7 @@ fn main() -> Result<(), Report> {
                 .unwrap()
                 .block_on(async { system::run(env, shutdown_tx, shutdown_rx).await })?;
         }
+       
     }
 
     // Say goodbye if no no-frills

@@ -150,20 +150,23 @@ impl LocalAgentStorage {
             Some(_) => Err(eyre!(r#"Agent "{account_id}" already created"#)),
             None => {
                 self.insert(account_id.clone(), Mnemonic::generate(24).unwrap());
-                let new_account = self.get(&account_id);
-                println!(
-                    "{}",
-                    serde_json::to_string_pretty(&serde_json::json!({ account_id: new_account }))
-                        .unwrap()
-                );
+                self.display_account(&account_id);
                 self.write_to_disk()?;
                 Ok(())
             }
         }
     }
 
+    pub fn display_account(&self, account_id: &str) {
+        let new_account = self.get(account_id);
+        println!(
+            "{}",
+            serde_json::to_string_pretty(&serde_json::json!({ account_id: new_account })).unwrap()
+        );
+    }
+
     /// Retrieve an agent based on the key
-    pub fn get(&self, account_id: &AccountId) -> Option<&LocalAgentStorageEntry> {
+    pub fn get(&self, account_id: &str) -> Option<&LocalAgentStorageEntry> {
         self.data.get(account_id)
     }
 

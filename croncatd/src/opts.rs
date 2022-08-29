@@ -34,6 +34,9 @@ pub enum Command {
     GetAgentStatus {
         account_id: String,
     },
+    GetAgentTasks {
+        account_id: String,
+    },
     UnregisterAgent(MessageInfo),
     UpdateAgent {
         payable_account_id: String,

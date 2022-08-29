@@ -39,10 +39,12 @@ pub enum Command {
     Status,
     Tasks,
     Go,
+    Info,
     GenerateMnemonic,
     DepositUjunox {
         account_id: Option<String>,
     },
+    GetAgent,
 }
 #[derive(Debug, StructOpt)]
 pub struct MessageInfo {

@@ -74,6 +74,16 @@ fn main() -> Result<(), Report> {
             let config = querier.query_config()?;
             println!("{config}")
         }
+        opts::Command::GetAgentStatus { account_id } => {
+            let mut querier = OrcQuerier::new(&env.croncat_addr)?;
+            let status = querier.get_agent(account_id)?;
+            println!("{status}")
+        }
+        opts::Command::Tasks {from_index, limit} => {
+            let mut querier = OrcQuerier::new(&env.croncat_addr)?;
+            let tasks = querier.get_tasks(from_index,limit)?;
+            println!("{tasks}")
+        }
         opts::Command::GenerateMnemonic => storage.generate_account(opts.account_id)?,
         opts::Command::UpdateAgent { payable_account_id } => {
             let key = storage.get_agent_signing_key(&opts.account_id)?;

@@ -31,13 +31,16 @@ pub enum Command {
     RegisterAgent {
         payable_account_id: Option<String>,
     },
+    GetAgentStatus {
+        account_id: String,
+    },
     UnregisterAgent(MessageInfo),
     UpdateAgent {
         payable_account_id: String,
     },
     Withdraw,
     Status,
-    Tasks,
+    Tasks{from_index: Option<u64>, limit: Option<u64>},
     Go,
     Info,
     GenerateMnemonic,

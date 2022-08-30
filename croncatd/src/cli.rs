@@ -2,13 +2,13 @@
 //! `croncatd` CLI functionality
 //!
 
+use crate::opts::Opts;
+use anyhow;
 use cosm_orc::orchestrator::error;
 use croncat::errors::Report;
+use reqwest::{self, Response};
 use std::{collections::HashMap, result};
 use structopt::StructOpt;
-use reqwest::{self, Response};
-use anyhow;
-use crate::opts::Opts;
 
 /// Load the banner ascii art as a `&'static str`.
 const BANNER_STR: &'static str = include_str!("../banner.txt");
@@ -27,7 +27,7 @@ pub fn get_opts() -> Result<Opts, Report> {
     Ok(Opts::from_args_safe()?)
 }
 
-pub async fn deposit_junox(address:&str)->anyhow::Result<Response, Report> {
+pub async fn deposit_junox(address: &str) -> anyhow::Result<Response, Report> {
     let mut map = HashMap::new();
     map.insert("denom", "ujunox");
     map.insert("address", address);
@@ -35,7 +35,6 @@ pub async fn deposit_junox(address:&str)->anyhow::Result<Response, Report> {
     let client = reqwest::Client::new();
     let res = client
         .post("https://faucet.uni.juno.deuslabs.fi/credit")
-        
         .json(&map)
         .send()
         .await?;

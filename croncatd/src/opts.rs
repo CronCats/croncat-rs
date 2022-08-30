@@ -43,8 +43,13 @@ pub enum Command {
     },
     Withdraw,
     Status,
-    Tasks{from_index: Option<u64>, limit: Option<u64>},
-    Go,
+    Tasks {
+        from_index: Option<u64>,
+        limit: Option<u64>,
+    },
+    Go {
+        account_id: String,
+    },
     Info,
     GenerateMnemonic,
     DepositUjunox {

@@ -24,7 +24,6 @@ mod opts;
 /// Start the `croncatd` agent.
 ///
 
-
 fn main() -> Result<(), Report> {
     // Get environment variables
     let env = env::load()?;
@@ -79,12 +78,12 @@ fn main() -> Result<(), Report> {
             let status = querier.get_agent(account_id)?;
             println!("{status}")
         }
-        opts::Command::Tasks {from_index, limit} => {
+        opts::Command::Tasks { from_index, limit } => {
             let mut querier = OrcQuerier::new(&env.croncat_addr)?;
-            let tasks = querier.get_tasks(from_index,limit)?;
+            let tasks = querier.get_tasks(from_index, limit)?;
             println!("{tasks}")
         }
-          opts::Command::GetAgentTasks {account_id } => {
+        opts::Command::GetAgentTasks { account_id } => {
             let mut querier = OrcQuerier::new(&env.croncat_addr)?;
             let agent_tasks = querier.get_agent_tasks(account_id)?;
             println!("{agent_tasks}")
@@ -97,14 +96,21 @@ fn main() -> Result<(), Report> {
             let log = result.log;
             println!("{log}");
         }
-         opts::Command::DepositUjunox { account_id } =>{
+        opts::Command::DepositUjunox { account_id } => {
             //let result=task.await;
             tokio_compat::run_std(async move {
-                let result=deposit_junox(account_id.as_ref().unwrap()).await;
+                let result = deposit_junox(account_id.as_ref().unwrap()).await;
                 println!(" {:?}", result);
-
             });
             //let result= futures::executor::block_on(Compat::new(task));
+        }
+        opts::Command::Go { account_id } => {
+            let (shutdown_tx, shutdown_rx) = channels::create_shutdown_channel();
+
+            // Start the agent
+            Runtime::new().unwrap().block_on(async {
+                system::go(env, shutdown_tx, shutdown_rx, account_id, storage).await
+            })?;
         }
         opts::Command::GetAgent => storage.display_account(&opts.account_id),
         _ => {
@@ -116,7 +122,6 @@ fn main() -> Result<(), Report> {
                 .unwrap()
                 .block_on(async { system::run(env, shutdown_tx, shutdown_rx).await })?;
         }
-       
     }
 
     // Say goodbye if no no-frills

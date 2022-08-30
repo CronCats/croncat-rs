@@ -18,7 +18,7 @@ pub fn generate_keypair() -> KeyPair {
     KeyPair::new(&secp, &mut rand::thread_rng())
 }
 
-const CONFIG_FILE: &str = "config.yaml";
+pub const CONFIG_FILE: &str = "config.yaml";
 pub const DEFAULT_AGENT_ID: &str = "agent";
 pub const DERVIATION_PATH: &str = "m/44'/118'/0'/0/0";
 

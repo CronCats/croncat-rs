@@ -11,6 +11,8 @@ pub use tokio;
 
 // Our modules
 pub mod channels;
+pub mod client;
+pub mod config;
 pub mod env;
 pub mod errors;
 pub mod grpc;
@@ -19,3 +21,6 @@ pub mod store;
 pub mod streams;
 pub mod system;
 pub mod utils;
+
+pub use cw_croncat_core::msg::GetConfigResponse;
+pub use cw_croncat_core::msg::QueryMsg;

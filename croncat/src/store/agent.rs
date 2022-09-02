@@ -5,7 +5,7 @@
 
 use bip39::Mnemonic;
 use color_eyre::eyre::eyre;
-use cosm_orc::config::key::{Key, SigningKey};
+use cosmrs::{bip32, crypto::secp256k1::SigningKey};
 use serde::{Deserialize, Serialize};
 use std::{collections::HashMap, fs, path::PathBuf};
 
@@ -22,14 +22,14 @@ type AccountId = String;
 /// The hashmap we intend to store on disk.
 type LocalAgentStorageData = HashMap<AccountId, LocalAgentStorageEntry>;
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Serialize, Deserialize, Clone)]
 struct KeyPair {
     private_key: String,
     public_key: String,
 }
 
 /// Store the keypair and the payable account idea for a stored agent
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct LocalAgentStorageEntry {
     pub account_addr: String,
     keypair: KeyPair, // TODO (SeedyROM): This should probably point to a file, not store in memory
@@ -105,42 +105,37 @@ impl LocalAgentStorage {
         &mut self,
         account_id: AccountId,
         mnemonic: Mnemonic,
-    ) -> Option<LocalAgentStorageEntry> {
+    ) -> Result<Option<LocalAgentStorageEntry>, Report> {
         if self.data.get(&account_id).is_some() {
-            None
+            Ok(None)
         } else {
-            let signing_key = cosmrs::bip32::XPrv::derive_from_path(
+            let key = cosmrs::bip32::XPrv::derive_from_path(
                 mnemonic.to_seed(""),
                 &utils::DERVIATION_PATH.parse().unwrap(),
-            )
-            .unwrap();
-            let public_key = signing_key
-                .public_key()
-                .to_string(cosmrs::bip32::Prefix::XPRV);
-            let private_key = signing_key
-                .to_string(cosmrs::bip32::Prefix::XPRV)
-                .to_string();
+            )?;
+            let public_key = key.public_key().to_string(cosmrs::bip32::Prefix::XPRV);
+            let private_key = key.to_string(cosmrs::bip32::Prefix::XPRV).to_string();
             let keypair = KeyPair {
                 public_key,
                 private_key,
             };
+            let signing_key: SigningKey = key.try_into()?;
 
             let mnemonic = mnemonic.to_string();
-            let signing_key = SigningKey {
-                name: account_id.clone(),
-                key: Key::Mnemonic(mnemonic.clone()),
-            };
-            let account_addr = signing_key.to_account("juno").unwrap().to_string();
 
-            self.data.insert(
-                account_id,
-                LocalAgentStorageEntry {
-                    account_addr,
-                    keypair,
-                    mnemonic,
-                    payable_account_id: None,
-                },
-            )
+            let account_addr = signing_key
+                .public_key()
+                .account_id("juno")
+                .unwrap()
+                .to_string();
+            let new_key = LocalAgentStorageEntry {
+                account_addr,
+                keypair,
+                mnemonic,
+                payable_account_id: None,
+            };
+            self.data.insert(account_id, new_key.clone());
+            Ok(Some(new_key))
         }
     }
 
@@ -149,7 +144,7 @@ impl LocalAgentStorage {
         match self.get(&account_id) {
             Some(_) => Err(eyre!(r#"Agent "{account_id}" already created"#)),
             None => {
-                self.insert(account_id.clone(), Mnemonic::generate(24).unwrap());
+                self.insert(account_id.clone(), Mnemonic::generate(24).unwrap())?;
                 self.display_account(&account_id);
                 self.write_to_disk()?;
                 Ok(())
@@ -170,16 +165,17 @@ impl LocalAgentStorage {
         self.data.get(account_id)
     }
 
-    pub fn get_agent_signing_key(&self, account_id: &AccountId) -> Result<SigningKey, Report> {
+    pub fn get_agent_signing_key(&self, account_id: &AccountId) -> Result<bip32::XPrv, Report> {
         let entry = if let Some(entry) = self.get(account_id) {
             entry
         } else {
             return Err(eyre!("No agent key by this id"));
         };
-        let key = SigningKey {
-            name: account_id.clone(),
-            key: Key::Mnemonic(entry.mnemonic.clone()),
-        };
+        let mnemonic: Mnemonic = entry.mnemonic.parse()?;
+        let key = cosmrs::bip32::XPrv::derive_from_path(
+            mnemonic.to_seed(""),
+            &utils::DERVIATION_PATH.parse().unwrap(),
+        )?;
         Ok(key)
     }
 }

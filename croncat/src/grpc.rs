@@ -1,28 +1,26 @@
 //!
 //! Use the [cosmos_sdk_proto](https://crates.io/crates/cosmos-sdk-proto) library to create clients for GRPC node requests.
 //!
-use cw_croncat_core::msg::AgentTaskResponse;
-use cw_croncat_core::msg::TaskResponse;
-use cw_croncat_core::types::AgentResponse;
-use cosm_orc::client::error::ClientError;
-use cosm_orc::client::ChainResponse;
-use cosm_orc::config::cfg::Config;
-use cosm_orc::config::key::SigningKey;
-use cosm_orc::orchestrator::cosm_orc::CosmOrc;
-use cosm_orc::orchestrator::error::ProcessError;
-use cosm_orc::profilers::gas_profiler::GasProfiler;
-use cosmos_sdk_proto::cosmos::auth::v1beta1::query_client::QueryClient as AuthQueryClient;
-use cosmos_sdk_proto::cosmos::auth::v1beta1::{BaseAccount, QueryAccountRequest};
 use cosmos_sdk_proto::cosmwasm::wasm::v1::msg_client::MsgClient;
 use cosmos_sdk_proto::cosmwasm::wasm::v1::query_client::QueryClient;
+use cosmrs::bip32;
+use cosmrs::crypto::secp256k1::SigningKey;
+use cosmrs::AccountId;
 use cosmwasm_std::Addr;
+use cw_croncat_core::msg::AgentTaskResponse;
+use cw_croncat_core::msg::TaskResponse;
 use cw_croncat_core::msg::{ExecuteMsg, GetConfigResponse, QueryMsg};
+use cw_croncat_core::types::AgentResponse;
+use serde::de::DeserializeOwned;
+use tendermint_rpc::endpoint::broadcast::tx_commit::TxResult;
 use tonic::transport::Channel;
 use url::Url;
 
+use crate::client::full_client::CosmosFullClient;
+use crate::client::query_client::CosmosQueryClient;
+use crate::config::ChainConfig;
 use crate::errors::Report;
 use crate::logging::info;
-use crate::utils::setup_cosm_orc;
 
 ///
 /// Create message and query clients for interacting with the chain.
@@ -43,112 +41,159 @@ pub async fn connect(url: String) -> Result<(MsgClient<Channel>, QueryClient<Cha
     Ok((msg_client, query_client))
 }
 
-const AGENT_REGISTER_OPERTATION: &str = "register_agent";
-const AGENT_UNREGISTER_OPERTATION: &str = "unregister_agent";
-const AGENT_UPDATE_AGENT_OPERATION: &str = "update_agent";
-const AGENT_WITHDRAW_OPERATION: &str = "withdraw";
-const CRONCAT_CONFIG_QUERY: &str = "config";
-const CRONCAT_AGENT_QUERY: &str = "query_get_agent";
-const CRONCAT_QUERY_TASKS: &str = "query_get_tasks";
-const CRONCAT_QUERY_AGENT_TASKS: &str = "query_get_agent_tasks";
-
-
-pub struct OrcSigner {
-    cosm_orc: CosmOrc,
-    key: SigningKey,
+#[derive(Clone)]
+pub struct GrpcSigner {
+    client: CosmosFullClient,
+    croncat_addr: String,
 }
 
-impl OrcSigner {
-    pub fn new(croncat_addr: &str, key: SigningKey) -> Result<Self, Report> {
-        let cosm_orc = setup_cosm_orc(croncat_addr)?;
-        Ok(Self { cosm_orc, key })
+impl GrpcSigner {
+    pub async fn new(
+        cfg: ChainConfig,
+        key: bip32::XPrv,
+        croncat_addr: impl Into<String>,
+    ) -> Result<Self, Report> {
+        Ok(Self {
+            client: CosmosFullClient::new(cfg, key).await?,
+            croncat_addr: croncat_addr.into(),
+        })
     }
-    pub fn register_agent(
-        &mut self,
+
+    pub async fn query_croncat<T>(&self, msg: &QueryMsg) -> Result<T, Report>
+    where
+        T: DeserializeOwned,
+    {
+        let out = self
+            .client
+            .query_client
+            .query_contract(&self.croncat_addr, msg)
+            .await?;
+        Ok(out)
+    }
+
+    pub async fn execute_croncat(&self, msg: &ExecuteMsg) -> Result<TxResult, Report> {
+        let res = self.client.execute_wasm(msg, &self.croncat_addr).await?;
+
+        Ok(res.deliver_tx)
+    }
+
+    pub async fn register_agent(
+        &self,
         payable_account_id: Option<String>,
-    ) -> Result<ChainResponse, Report> {
-        let res = self.cosm_orc.execute::<String, ExecuteMsg>(
-            "croncat".to_string(),
-            AGENT_REGISTER_OPERTATION.to_string(),
-            &ExecuteMsg::RegisterAgent {
-                payable_account_id: payable_account_id.map(|id| Addr::unchecked(id)),
-            },
-            &self.key,
-        )?;
-
-        Ok(res)
+    ) -> Result<TxResult, Report> {
+        self.execute_croncat(&ExecuteMsg::RegisterAgent {
+            payable_account_id: payable_account_id.map(Addr::unchecked),
+        })
+        .await
     }
 
-    pub fn unregister_agent(&mut self) -> Result<ChainResponse, Report> {
-        let res = self.cosm_orc.execute::<String, ExecuteMsg>(
-            "croncat".to_string(),
-            AGENT_UNREGISTER_OPERTATION.to_string(),
-            &ExecuteMsg::UnregisterAgent {},
-            &self.key,
-        )?;
-        Ok(res)
+    pub async fn unregister_agent(&self) -> Result<TxResult, Report> {
+        self.execute_croncat(&ExecuteMsg::UnregisterAgent {}).await
     }
 
-    pub fn update_agent(&mut self, payable_account_id: String) -> Result<ChainResponse, Report> {
+    pub async fn update_agent(&self, payable_account_id: String) -> Result<TxResult, Report> {
         let payable_account_id = Addr::unchecked(payable_account_id);
-        let res = self.cosm_orc.execute(
-            "croncat".to_string(),
-            AGENT_UPDATE_AGENT_OPERATION.to_string(),
-            &ExecuteMsg::UpdateAgent { payable_account_id },
-            &self.key,
-        )?;
+        self.execute_croncat(&ExecuteMsg::UpdateAgent { payable_account_id })
+            .await
+    }
+
+    pub async fn withdraw_reward(&self) -> Result<TxResult, Report> {
+        self.execute_croncat(&ExecuteMsg::WithdrawReward {}).await
+    }
+
+    pub async fn proxy_call(&self) -> Result<TxResult, Report> {
+        self.execute_croncat(&ExecuteMsg::ProxyCall {}).await
+    }
+
+    pub async fn get_agent(&self, account_id: &str) -> Result<Option<AgentResponse>, Report> {
+        let res = self
+            .query_croncat(&QueryMsg::GetAgent {
+                account_id: Addr::unchecked(account_id),
+            })
+            .await?;
         Ok(res)
     }
 
-    pub fn withdraw_reward(&mut self) -> Result<ChainResponse, Report> {
-        let res = self.cosm_orc.execute(
-            "croncat".to_string(),
-            AGENT_WITHDRAW_OPERATION.to_string(),
-            &ExecuteMsg::WithdrawReward {},
-            &self.key,
-        )?;
+    pub fn account_id(&self) -> Result<AccountId, Report> {
+        let id = self
+            .client
+            .key()
+            .public_key()
+            .account_id(&self.client.cfg.prefix)?;
+        Ok(id)
+    }
+
+    pub async fn get_agent_tasks(
+        &self,
+        account_id: &str,
+    ) -> Result<Option<AgentTaskResponse>, Report> {
+        let res: Option<AgentTaskResponse> = self
+            .query_croncat(&QueryMsg::GetAgentTasks {
+                account_id: Addr::unchecked(account_id),
+            })
+            .await?;
         Ok(res)
     }
+
+    pub fn key(&self) -> SigningKey {
+        self.client.key()
+    }
 }
 
-pub struct OrcQuerier {
-    cosm_orc: CosmOrc,
+pub struct GrpcQuerier {
+    client: CosmosQueryClient,
+    croncat_addr: String,
 }
-impl OrcQuerier {
-    pub fn new(croncat_addr: &str) -> Result<Self, Report> {
-        let cosm_orc = setup_cosm_orc(croncat_addr)?;
-        Ok(Self { cosm_orc })
+impl GrpcQuerier {
+    pub async fn new(croncat_addr: impl Into<String>, cfg: &ChainConfig) -> Result<Self, Report> {
+        Ok(Self {
+            client: CosmosQueryClient::new(&cfg.grpc_endpoint, &cfg.denom).await?,
+            croncat_addr: croncat_addr.into(),
+        })
     }
 
-    pub fn query_config(&mut self) -> Result<String, Report> {
-        let res = self
-            .cosm_orc
-            .query("croncat", CRONCAT_CONFIG_QUERY, &QueryMsg::GetConfig {})?;
-        let config: GetConfigResponse = res.data()?;
-        let config_json = serde_json::to_string_pretty(&config)?;
-        Ok(config_json)
+    pub async fn query_croncat<T>(&self, msg: &QueryMsg) -> Result<T, Report>
+    where
+        T: DeserializeOwned,
+    {
+        let out = self.client.query_contract(&self.croncat_addr, msg).await?;
+        Ok(out)
     }
-    pub fn get_agent(&mut self,account_id:String) -> Result<String, Report> {
-        let res = self
-            .cosm_orc
-            .query("croncat", CRONCAT_AGENT_QUERY, &QueryMsg::GetAgent { account_id:Addr::unchecked(account_id )})?;
-        let response: AgentResponse = res.data()?;
+
+    pub async fn query_config(&self) -> Result<String, Report> {
+        let config: GetConfigResponse = self.query_croncat(&QueryMsg::GetConfig {}).await?;
+        let json = serde_json::to_string_pretty(&config)?;
+        Ok(json)
+    }
+
+    pub async fn get_agent(&self, account_id: String) -> Result<String, Report> {
+        let agent: AgentResponse = self
+            .query_croncat(&QueryMsg::GetAgent {
+                account_id: Addr::unchecked(account_id),
+            })
+            .await?;
+        let json = serde_json::to_string_pretty(&agent)?;
+        Ok(json)
+    }
+
+    pub async fn get_tasks(
+        &self,
+        from_index: Option<u64>,
+        limit: Option<u64>,
+    ) -> Result<String, Report> {
+        let response: Vec<TaskResponse> = self
+            .query_croncat(&QueryMsg::GetTasks { from_index, limit })
+            .await?;
         let json = serde_json::to_string_pretty(&response)?;
         Ok(json)
     }
-    pub fn get_tasks(&mut self,from_index: Option<u64>, limit: Option<u64>) -> Result<String, Report> {
-        let res = self
-            .cosm_orc
-            .query("croncat", CRONCAT_QUERY_TASKS, &QueryMsg::GetTasks { from_index,limit})?;
-        let response: Vec<TaskResponse> = res.data()?;
-        let json = serde_json::to_string_pretty(&response)?;
-        Ok(json)
-    }
-     pub fn get_agent_tasks(&mut self,account_id:String) -> Result<String, Report> {
-        let res = self
-            .cosm_orc
-            .query("croncat", CRONCAT_QUERY_AGENT_TASKS, &QueryMsg::GetAgentTasks {account_id: Addr::unchecked(account_id)})?;
-        let response: AgentTaskResponse = res.data()?;
+
+    pub async fn get_agent_tasks(&self, account_id: String) -> Result<String, Report> {
+        let response: AgentTaskResponse = self
+            .query_croncat(&QueryMsg::GetAgentTasks {
+                account_id: Addr::unchecked(account_id),
+            })
+            .await?;
         let json = serde_json::to_string_pretty(&response)?;
         Ok(json)
     }

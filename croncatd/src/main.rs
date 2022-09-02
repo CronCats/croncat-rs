@@ -3,16 +3,16 @@
 //!
 
 use std::process::exit;
-use tokio_compat::prelude::*;
 
 use croncat::{
-    channels, env,
+    channels,
+    config::ChainConfig,
+    env,
     errors::Report,
-    grpc::{OrcQuerier, OrcSigner},
+    grpc::{GrpcQuerier, GrpcSigner},
     logging::{self, info},
     store::agent::LocalAgentStorage,
-    system,
-    tokio::runtime::Runtime,
+    system, tokio,
 };
 
 use crate::cli::deposit_junox;
@@ -24,8 +24,8 @@ mod opts;
 /// Start the `croncatd` agent.
 ///
 
-
-fn main() -> Result<(), Report> {
+#[tokio::main]
+async fn main() -> Result<(), Report> {
     // Get environment variables
     let env = env::load()?;
     let mut storage = LocalAgentStorage::new();
@@ -45,78 +45,85 @@ fn main() -> Result<(), Report> {
     if !opts.no_frills {
         cli::print_banner();
     }
-
     info!("Starting croncatd...");
-
     match opts.cmd {
-        opts::Command::RegisterAgent { payable_account_id } => {
-            let key = storage.get_agent_signing_key(&opts.account_id)?;
-            println!("key {:?}", key);
+        opts::Command::RegisterAgent {
+            payable_account_id,
+            sender_name,
+        } => {
+            let key = storage.get_agent_signing_key(&sender_name)?;
+            let signer = GrpcSigner::new(ChainConfig::new()?, key, env.croncat_addr).await?;
 
-            println!("Account Id {:?}", payable_account_id);
-            let mut signer = OrcSigner::new(&env.croncat_addr, key)?;
-            let result = signer.register_agent(payable_account_id)?;
+            println!("Key: {}", signer.key().public_key().to_json());
+            println!("Payable account Id {:?}", payable_account_id);
+
+            let result = signer.register_agent(payable_account_id).await?;
             let log = result.log;
             println!("{log}");
         }
-        opts::Command::UnregisterAgent { .. } => {
-            info!("Unregister agent...");
+        opts::Command::UnregisterAgent { sender_name } => {
+            let key = storage.get_agent_signing_key(&sender_name)?;
+            let signer = GrpcSigner::new(ChainConfig::new()?, key, env.croncat_addr).await?;
+            let result = signer.unregister_agent().await?;
+            let log = result.log;
+            println!("{log}");
         }
-        opts::Command::Withdraw => {
-            let key = storage.get_agent_signing_key(&opts.account_id)?;
-            let mut signer = OrcSigner::new(&env.croncat_addr, key)?;
-            let result = signer.withdraw_reward()?;
+        opts::Command::Withdraw { sender_name } => {
+            let key = storage.get_agent_signing_key(&sender_name)?;
+            let signer = GrpcSigner::new(ChainConfig::new()?, key, env.croncat_addr).await?;
+            let result = signer.withdraw_reward().await?;
             let log = result.log;
             println!("{log}");
         }
         opts::Command::Info => {
-            let mut querier = OrcQuerier::new(&env.croncat_addr)?;
-            let config = querier.query_config()?;
+            let querier = GrpcQuerier::new(&env.croncat_addr, &ChainConfig::new()?).await?;
+            let config = querier.query_config().await?;
             println!("{config}")
         }
         opts::Command::GetAgentStatus { account_id } => {
-            let mut querier = OrcQuerier::new(&env.croncat_addr)?;
-            let status = querier.get_agent(account_id)?;
+            let querier = GrpcQuerier::new(&env.croncat_addr, &ChainConfig::new()?).await?;
+            let status = querier.get_agent(account_id).await?;
             println!("{status}")
         }
-        opts::Command::Tasks {from_index, limit} => {
-            let mut querier = OrcQuerier::new(&env.croncat_addr)?;
-            let tasks = querier.get_tasks(from_index,limit)?;
+        opts::Command::Tasks { from_index, limit } => {
+            let querier = GrpcQuerier::new(&env.croncat_addr, &ChainConfig::new()?).await?;
+            let tasks = querier.get_tasks(from_index, limit).await?;
             println!("{tasks}")
         }
-          opts::Command::GetAgentTasks {account_id } => {
-            let mut querier = OrcQuerier::new(&env.croncat_addr)?;
-            let agent_tasks = querier.get_agent_tasks(account_id)?;
+        opts::Command::GetAgentTasks { account_addr } => {
+            let querier = GrpcQuerier::new(&env.croncat_addr, &ChainConfig::new()?).await?;
+            let agent_tasks = querier.get_agent_tasks(account_addr).await?;
             println!("{agent_tasks}")
         }
-        opts::Command::GenerateMnemonic => storage.generate_account(opts.account_id)?,
-        opts::Command::UpdateAgent { payable_account_id } => {
-            let key = storage.get_agent_signing_key(&opts.account_id)?;
-            let mut signer = OrcSigner::new(&env.croncat_addr, key)?;
-            let result = signer.update_agent(payable_account_id)?;
+        opts::Command::GenerateMnemonic { new_name } => storage.generate_account(new_name)?,
+        opts::Command::UpdateAgent {
+            payable_account_id,
+            sender_name,
+        } => {
+            let key = storage.get_agent_signing_key(&sender_name)?;
+            let signer = GrpcSigner::new(ChainConfig::new()?, key, env.croncat_addr).await?;
+            let result = signer.update_agent(payable_account_id).await?;
             let log = result.log;
             println!("{log}");
         }
-         opts::Command::DepositUjunox { account_id } =>{
-            //let result=task.await;
-            tokio_compat::run_std(async move {
-                let result=deposit_junox(account_id.as_ref().unwrap()).await;
-                println!(" {:?}", result);
-
-            });
-            //let result= futures::executor::block_on(Compat::new(task));
+        opts::Command::DepositUjunox { account_id } => {
+            let result = deposit_junox(&account_id).await?;
+            println!("{:?}", result);
         }
-        opts::Command::GetAgent => storage.display_account(&opts.account_id),
+        opts::Command::GetAgent { name } => storage.display_account(&name),
+        opts::Command::Go { sender_name } => {
+            let key = storage.get_agent_signing_key(&sender_name)?;
+            let signer = GrpcSigner::new(ChainConfig::new()?, key, &env.croncat_addr).await?;
+            let (shutdown_tx, shutdown_rx) = channels::create_shutdown_channel();
+            system::go(env, shutdown_tx, shutdown_rx, signer).await?;
+        }
         _ => {
             // Create a channel to handle graceful shutdown and wrap receiver for cloning
             let (shutdown_tx, shutdown_rx) = channels::create_shutdown_channel();
 
             // Start the agent
-            Runtime::new()
-                .unwrap()
-                .block_on(async { system::run(env, shutdown_tx, shutdown_rx).await })?;
+            system::run(env, shutdown_tx, shutdown_rx).await?;
         }
-       
     }
 
     // Say goodbye if no no-frills

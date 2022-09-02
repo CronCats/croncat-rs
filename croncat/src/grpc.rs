@@ -3,7 +3,9 @@
 //!
 use cosmos_sdk_proto::cosmwasm::wasm::v1::msg_client::MsgClient;
 use cosmos_sdk_proto::cosmwasm::wasm::v1::query_client::QueryClient;
+use cosmrs::bip32;
 use cosmrs::crypto::secp256k1::SigningKey;
+use cosmrs::AccountId;
 use cosmwasm_std::Addr;
 use cw_croncat_core::msg::AgentTaskResponse;
 use cw_croncat_core::msg::TaskResponse;
@@ -39,6 +41,7 @@ pub async fn connect(url: String) -> Result<(MsgClient<Channel>, QueryClient<Cha
     Ok((msg_client, query_client))
 }
 
+#[derive(Clone)]
 pub struct GrpcSigner {
     client: CosmosFullClient,
     croncat_addr: String,
@@ -47,13 +50,25 @@ pub struct GrpcSigner {
 impl GrpcSigner {
     pub async fn new(
         cfg: ChainConfig,
-        key: SigningKey,
+        key: bip32::XPrv,
         croncat_addr: impl Into<String>,
     ) -> Result<Self, Report> {
         Ok(Self {
             client: CosmosFullClient::new(cfg, key).await?,
             croncat_addr: croncat_addr.into(),
         })
+    }
+
+    pub async fn query_croncat<T>(&self, msg: &QueryMsg) -> Result<T, Report>
+    where
+        T: DeserializeOwned,
+    {
+        let out = self
+            .client
+            .query_client
+            .query_contract(&self.croncat_addr, msg)
+            .await?;
+        Ok(out)
     }
 
     pub async fn execute_croncat(&self, msg: &ExecuteMsg) -> Result<TxResult, Report> {
@@ -84,6 +99,44 @@ impl GrpcSigner {
 
     pub async fn withdraw_reward(&self) -> Result<TxResult, Report> {
         self.execute_croncat(&ExecuteMsg::WithdrawReward {}).await
+    }
+
+    pub async fn proxy_call(&self) -> Result<TxResult, Report> {
+        self.execute_croncat(&ExecuteMsg::ProxyCall {}).await
+    }
+
+    pub async fn get_agent(&self, account_id: &str) -> Result<Option<AgentResponse>, Report> {
+        let res = self
+            .query_croncat(&QueryMsg::GetAgent {
+                account_id: Addr::unchecked(account_id),
+            })
+            .await?;
+        Ok(res)
+    }
+
+    pub fn account_id(&self) -> Result<AccountId, Report> {
+        let id = self
+            .client
+            .key()
+            .public_key()
+            .account_id(&self.client.cfg.prefix)?;
+        Ok(id)
+    }
+
+    pub async fn get_agent_tasks(
+        &self,
+        account_id: &str,
+    ) -> Result<Option<AgentTaskResponse>, Report> {
+        let res: Option<AgentTaskResponse> = self
+            .query_croncat(&QueryMsg::GetAgentTasks {
+                account_id: Addr::unchecked(account_id),
+            })
+            .await?;
+        Ok(res)
+    }
+
+    pub fn key(&self) -> SigningKey {
+        self.client.key()
     }
 }
 
@@ -122,6 +175,7 @@ impl GrpcQuerier {
         let json = serde_json::to_string_pretty(&agent)?;
         Ok(json)
     }
+
     pub async fn get_tasks(
         &self,
         from_index: Option<u64>,
@@ -133,6 +187,7 @@ impl GrpcQuerier {
         let json = serde_json::to_string_pretty(&response)?;
         Ok(json)
     }
+
     pub async fn get_agent_tasks(&self, account_id: String) -> Result<String, Report> {
         let response: AgentTaskResponse = self
             .query_croncat(&QueryMsg::GetAgentTasks {

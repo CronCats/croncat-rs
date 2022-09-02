@@ -20,9 +20,6 @@ pub struct Opts {
 
     #[structopt(subcommand)] // Note that we mark a field as a subcommand
     pub cmd: Command,
-
-    #[structopt(long, default_value = "agent")]
-    pub account_id: String,
 }
 
 #[derive(Debug, StructOpt)]
@@ -30,30 +27,48 @@ pub enum Command {
     /// Pound acorns into flour for cookie dough.
     RegisterAgent {
         payable_account_id: Option<String>,
+
+        #[structopt(long, default_value = "agent")]
+        sender_name: String,
     },
     GetAgentStatus {
         account_id: String,
     },
     GetAgentTasks {
-        account_id: String,
+        account_addr: String,
     },
-    UnregisterAgent(MessageInfo),
+    UnregisterAgent {
+        #[structopt(long, default_value = "agent")]
+        sender_name: String,
+    },
     UpdateAgent {
         payable_account_id: String,
+        #[structopt(long, default_value = "agent")]
+        sender_name: String,
     },
-    Withdraw,
+    Withdraw {
+        #[structopt(long, default_value = "agent")]
+        sender_name: String,
+    },
     Status,
-    Tasks{from_index: Option<u64>, limit: Option<u64>},
-    Go,
-    Info,
-    GenerateMnemonic,
-    DepositUjunox {
-        account_id: Option<String>,
+    Tasks {
+        from_index: Option<u64>,
+        limit: Option<u64>,
     },
-    GetAgent,
-}
-#[derive(Debug, StructOpt)]
-pub struct MessageInfo {
-    #[structopt(short)]
-    pub sender: String,
+    Go {
+        #[structopt(long, default_value = "agent")]
+        sender_name: String,
+    },
+    Info,
+    GenerateMnemonic {
+        #[structopt(long, default_value = "agent")]
+        new_name: String,
+    },
+    DepositUjunox {
+        account_id: String,
+    },
+    GetAgent {
+        #[structopt(long, default_value = "agent")]
+        name: String,
+    },
 }

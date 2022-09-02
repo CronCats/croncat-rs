@@ -68,7 +68,7 @@ pub async fn run(env: Env, shutdown_tx: ShutdownTx, shutdown_rx: ShutdownRx) -> 
             .broadcast(())
             .await
             .expect("Failed to send shutdown signal");
-        println!("");
+        println!();
         info!("Shutting down croncatd...");
     });
 

@@ -1,6 +1,7 @@
 use color_eyre::Report;
 use cosmos_sdk_proto::cosmos::tx::v1beta1::service_client::ServiceClient;
 
+use cosmrs::bip32;
 use cosmrs::crypto::secp256k1::SigningKey;
 use cosmrs::rpc::HttpClient;
 
@@ -14,16 +15,17 @@ use super::auth_query::QueryBaseAccount;
 use super::query_client::CosmosQueryClient;
 use super::wasm_execute::{generate_wasm_body, prepare_send, send_tx, simulate_gas_fee};
 
+#[derive(Clone)]
 pub struct CosmosFullClient {
     http_client: HttpClient,
-    key: SigningKey,
+    key: bip32::XPrv,
     service_client: ServiceClient<Channel>,
-    query_client: CosmosQueryClient,
-    cfg: ChainConfig,
+    pub query_client: CosmosQueryClient,
+    pub cfg: ChainConfig,
 }
 
 impl CosmosFullClient {
-    pub async fn new(cfg: ChainConfig, key: SigningKey) -> Result<Self, Report> {
+    pub async fn new(cfg: ChainConfig, key: bip32::XPrv) -> Result<Self, Report> {
         Ok(Self {
             http_client: HttpClient::new(cfg.rpc_endpoint.as_ref())?,
             key,
@@ -38,7 +40,7 @@ impl CosmosFullClient {
         msg: &impl Serialize,
         contract_name: &str,
     ) -> Result<Response, Report> {
-        let sender = self.key.public_key().account_id(&self.cfg.prefix)?;
+        let sender = self.key().public_key().account_id(&self.cfg.prefix)?;
         let tx_body = generate_wasm_body(sender.as_ref(), contract_name, msg)?;
         let base_account = self
             .query_client
@@ -49,12 +51,16 @@ impl CosmosFullClient {
             self.service_client.clone(),
             &tx_body,
             &self.cfg,
-            &self.key,
+            self.key(),
             &base_account,
         )
         .await?;
-        let raw = prepare_send(&tx_body, &self.cfg, &self.key, &base_account, fee)?;
+        let raw = prepare_send(&tx_body, &self.cfg, &self.key(), &base_account, fee)?;
         let tx_result = send_tx(&self.http_client, raw).await?;
         Ok(tx_result)
+    }
+
+    pub fn key(&self) -> SigningKey {
+        (&self.key).try_into().unwrap()
     }
 }

@@ -13,7 +13,6 @@ use croncat::{
     logging::{self, info},
     store::agent::LocalAgentStorage,
     system, tokio,
-    tokio::runtime::Runtime,
 };
 
 use crate::cli::deposit_junox;
@@ -53,10 +52,11 @@ async fn main() -> Result<(), Report> {
             sender_name,
         } => {
             let key = storage.get_agent_signing_key(&sender_name)?;
-            println!("key {:?}", key.public_key());
-
-            println!("Account Id {:?}", payable_account_id);
             let signer = GrpcSigner::new(ChainConfig::new()?, key, env.croncat_addr).await?;
+
+            println!("Key: {}", signer.key().public_key().to_json());
+            println!("Payable account Id {:?}", payable_account_id);
+
             let result = signer.register_agent(payable_account_id).await?;
             let log = result.log;
             println!("{log}");
@@ -111,14 +111,18 @@ async fn main() -> Result<(), Report> {
             println!("{:?}", result);
         }
         opts::Command::GetAgent { name } => storage.display_account(&name),
+        opts::Command::Go { sender_name } => {
+            let key = storage.get_agent_signing_key(&sender_name)?;
+            let signer = GrpcSigner::new(ChainConfig::new()?, key, &env.croncat_addr).await?;
+            let (shutdown_tx, shutdown_rx) = channels::create_shutdown_channel();
+            system::go(env, shutdown_tx, shutdown_rx, signer).await?;
+        }
         _ => {
             // Create a channel to handle graceful shutdown and wrap receiver for cloning
             let (shutdown_tx, shutdown_rx) = channels::create_shutdown_channel();
 
             // Start the agent
-            Runtime::new()
-                .unwrap()
-                .block_on(async { system::run(env, shutdown_tx, shutdown_rx).await })?;
+            system::run(env, shutdown_tx, shutdown_rx).await?;
         }
     }
 

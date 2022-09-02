@@ -55,7 +55,10 @@ pub enum Command {
         from_index: Option<u64>,
         limit: Option<u64>,
     },
-    Go,
+    Go {
+        #[structopt(long, default_value = "agent")]
+        sender_name: String,
+    },
     Info,
     GenerateMnemonic {
         #[structopt(long, default_value = "agent")]

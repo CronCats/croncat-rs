@@ -5,7 +5,7 @@
 
 use bip39::Mnemonic;
 use color_eyre::eyre::eyre;
-use cosmrs::crypto::secp256k1::SigningKey;
+use cosmrs::{bip32, crypto::secp256k1::SigningKey};
 use serde::{Deserialize, Serialize};
 use std::{collections::HashMap, fs, path::PathBuf};
 
@@ -165,7 +165,7 @@ impl LocalAgentStorage {
         self.data.get(account_id)
     }
 
-    pub fn get_agent_signing_key(&self, account_id: &AccountId) -> Result<SigningKey, Report> {
+    pub fn get_agent_signing_key(&self, account_id: &AccountId) -> Result<bip32::XPrv, Report> {
         let entry = if let Some(entry) = self.get(account_id) {
             entry
         } else {
@@ -175,8 +175,7 @@ impl LocalAgentStorage {
         let key = cosmrs::bip32::XPrv::derive_from_path(
             mnemonic.to_seed(""),
             &utils::DERVIATION_PATH.parse().unwrap(),
-        )?
-        .try_into()?;
+        )?;
         Ok(key)
     }
 }

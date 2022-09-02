@@ -59,11 +59,10 @@ pub async fn simulate_gas_fee(
     mut client: ServiceClient<Channel>,
     tx: &tx::Body,
     cfg: &ChainConfig,
-    key: &SigningKey,
+    key: SigningKey,
     base_account: &BaseAccount,
 ) -> Result<Fee, Report> {
     let denom: Denom = cfg.denom.parse()?;
-
     let auth_info = SignerInfo::single_direct(Some(key.public_key()), base_account.sequence)
         .auth_info(Fee::from_amount_and_gas(
             Coin {
@@ -80,7 +79,7 @@ pub async fn simulate_gas_fee(
         base_account.account_number,
     )?;
 
-    let tx_raw = sign_doc.sign(key)?;
+    let tx_raw = sign_doc.sign(&key)?;
 
     let gas_info = client
         .simulate(SimulateRequest {

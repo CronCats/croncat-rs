@@ -10,6 +10,7 @@ use super::{
     wasm_query::{GetWasmQueryClient, QuerySmartContract},
 };
 
+#[derive(Clone)]
 pub struct CosmosQueryClient {
     wasm_query_client: WasmQueryClient<Channel>,
     auth_query_client: AuthQueryClient<Channel>,

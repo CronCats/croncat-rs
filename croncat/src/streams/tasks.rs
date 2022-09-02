@@ -37,31 +37,31 @@ pub async fn do_task_if_any(
     let block_consumer_stream = tokio::task::spawn(async move {
         while (block_stream_rx.recv().await).is_ok() {
             let signer = signer.clone();
-            tokio::task::spawn_blocking(move || {
-                tokio::runtime::Runtime::new().unwrap().block_on(async {
-                    let account_id = signer.account_id().unwrap();
-                    let account_addr = account_id.as_ref();
-                    let agent_active = signer
-                        .get_agent(account_addr)
-                        .await
-                        .unwrap()
-                        .map_or(false, |ag| ag.status == AgentStatus::Active);
-                    if agent_active {
-                        let tasks = signer.get_agent_tasks(account_addr).await.unwrap();
-                        if tasks.is_some() {
+            let account_id = signer.account_id().unwrap();
+            let account_addr = account_id.as_ref();
+            let agent_active = signer
+                .get_agent(account_addr)
+                .await
+                .unwrap()
+                .map_or(false, |ag| ag.status == AgentStatus::Active);
+            if agent_active {
+                let tasks = signer.get_agent_tasks(account_addr).await.unwrap();
+                if tasks.is_some() {
+                    tokio::task::spawn_blocking(move || {
+                        tokio::runtime::Runtime::new().unwrap().block_on(async {
                             if let Ok(proxy_call_res) = signer.proxy_call().await {
                                 info!("Finished task: {}", proxy_call_res.log);
                             } else {
                                 warn!("Something went wrong during proxy_call");
                             }
-                        } else {
-                            info!("no tasks for this block");
-                        }
-                    } else {
-                        warn!("agent is not registered");
-                    }
-                });
-            });
+                        })
+                    });
+                } else {
+                    info!("no tasks for this block");
+                }
+            } else {
+                warn!("agent is not registered");
+            }
         }
     });
 

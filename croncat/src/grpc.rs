@@ -141,7 +141,7 @@ impl GrpcSigner {
 }
 
 pub struct GrpcQuerier {
-    client: CosmosQueryClient,
+    pub client: CosmosQueryClient,
     croncat_addr: String,
 }
 impl GrpcQuerier {

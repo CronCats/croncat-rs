@@ -71,4 +71,8 @@ pub enum Command {
         #[structopt(long, default_value = "agent")]
         name: String,
     },
+    Daemon {
+        #[structopt(long, default_value = "agent")]
+        sender_name: String,
+    },
 }

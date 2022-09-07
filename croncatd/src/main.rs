@@ -6,6 +6,7 @@ use std::process::exit;
 
 use croncat::{
     channels,
+    client::{BankQueryClient, QueryBank},
     config::ChainConfig,
     env,
     errors::Report,
@@ -109,6 +110,13 @@ async fn main() -> Result<(), Report> {
         opts::Command::DepositUjunox { account_id } => {
             let result = deposit_junox(&account_id).await?;
             println!("{:?}", result);
+            let cfg = ChainConfig::new()?;
+            let bank_q_client =
+                BankQueryClient::new(cfg.grpc_endpoint, "ujunox".to_string()).await?;
+            println!(
+                "new balance: {:?}",
+                bank_q_client.query_native_balance(&account_id).await?
+            );
         }
         opts::Command::GetAgent { name } => storage.display_account(&name),
         opts::Command::Go { sender_name } => {
@@ -117,13 +125,16 @@ async fn main() -> Result<(), Report> {
             let (shutdown_tx, shutdown_rx) = channels::create_shutdown_channel();
             system::go(env, shutdown_tx, shutdown_rx, signer).await?;
         }
-        _ => {
+        opts::Command::Daemon { sender_name } => {
+            let key = storage.get_agent_signing_key(&sender_name)?;
+            let signer = GrpcSigner::new(ChainConfig::new()?, key, &env.croncat_addr).await?;
             // Create a channel to handle graceful shutdown and wrap receiver for cloning
             let (shutdown_tx, shutdown_rx) = channels::create_shutdown_channel();
 
             // Start the agent
-            system::run(env, shutdown_tx, shutdown_rx).await?;
+            system::run(env, shutdown_tx, shutdown_rx, signer).await?;
         }
+        _ => {}
     }
 
     // Say goodbye if no no-frills

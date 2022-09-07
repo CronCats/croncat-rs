@@ -8,3 +8,5 @@ mod wasm_execute;
 pub use auth_query::QueryBaseAccount;
 pub use bank_query::QueryBank;
 pub use wasm_query::QuerySmartContract;
+
+pub use bank_query::BankQueryClient;

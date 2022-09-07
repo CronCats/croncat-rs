@@ -6,6 +6,7 @@ use std::process::exit;
 
 use croncat::{
     channels,
+    client::{BankQueryClient, QueryBank},
     config::ChainConfig,
     env,
     errors::Report,
@@ -109,6 +110,10 @@ async fn main() -> Result<(), Report> {
         opts::Command::DepositUjunox { account_id } => {
             let result = deposit_junox(&account_id).await?;
             println!("{:?}", result);
+
+            let cfg = ChainConfig::new()?;
+            let querier = BankQueryClient::new(cfg.grpc_endpoint, cfg.denom).await?;
+            println!("{:?}", querier.query_native_balance(&account_id).await?);
         }
         opts::Command::GetAgent { name } => storage.display_account(&name),
         opts::Command::Go { sender_name } => {

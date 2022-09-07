@@ -113,7 +113,7 @@ async fn main() -> Result<(), Report> {
 
             let cfg = ChainConfig::new()?;
             let querier = BankQueryClient::new(cfg.grpc_endpoint, cfg.denom).await?;
-            println!("{:?}", querier.query_native_balance(&account_id).await?);
+            println!("new balance: {:?}", querier.query_native_balance(&account_id).await?);
         }
         opts::Command::GetAgent { name } => storage.display_account(&name),
         opts::Command::Go { sender_name } => {

@@ -2,7 +2,10 @@
 //! How to process and consume blocks from the chain.
 //!
 
+use std::sync::Arc;
+
 use cw_croncat_core::types::AgentStatus;
+use tokio::sync::Mutex;
 
 use crate::{
     channels::{BlockStreamRx, ShutdownRx},
@@ -17,9 +20,27 @@ use crate::{
 pub async fn tasks_loop(
     mut block_stream_rx: BlockStreamRx,
     mut shutdown_rx: ShutdownRx,
+    signer: GrpcSigner,
+    block_status: Arc<Mutex<AgentStatus>>,
 ) -> Result<(), Report> {
-    let block_consumer_stream =
-        tokio::task::spawn(async move { while let Ok(_block) = block_stream_rx.recv().await {} });
+    let block_consumer_stream = tokio::task::spawn(async move {
+        while let Ok(_block) = block_stream_rx.recv().await {
+            let locked_status = block_status.lock().await;
+            if *locked_status == AgentStatus::Active {
+                let account_addr = signer.account_id().as_ref();
+                let tasks = signer.get_agent_tasks(account_addr).await.unwrap();
+                if tasks.is_some() {
+                    if let Ok(proxy_call_res) = signer.proxy_call().await {
+                        info!("Finished task: {}", proxy_call_res.log);
+                    } else {
+                        warn!("Something went wrong during proxy_call");
+                    }
+                } else {
+                    info!("no tasks for this block");
+                }
+            }
+        }
+    });
 
     tokio::select! {
         _ = block_consumer_stream => {}
@@ -36,9 +57,7 @@ pub async fn do_task_if_any(
 ) -> Result<(), Report> {
     let block_consumer_stream = tokio::task::spawn(async move {
         while (block_stream_rx.recv().await).is_ok() {
-            let signer = signer.clone();
-            let account_id = signer.account_id().unwrap();
-            let account_addr = account_id.as_ref();
+            let account_addr = signer.account_id().as_ref();
             let agent_active = signer
                 .get_agent(account_addr)
                 .await
@@ -47,15 +66,11 @@ pub async fn do_task_if_any(
             if agent_active {
                 let tasks = signer.get_agent_tasks(account_addr).await.unwrap();
                 if tasks.is_some() {
-                    tokio::task::spawn_blocking(move || {
-                        tokio::runtime::Runtime::new().unwrap().block_on(async {
-                            if let Ok(proxy_call_res) = signer.proxy_call().await {
-                                info!("Finished task: {}", proxy_call_res.log);
-                            } else {
-                                warn!("Something went wrong during proxy_call");
-                            }
-                        })
-                    });
+                    if let Ok(proxy_call_res) = signer.proxy_call().await {
+                        info!("Finished task: {}", proxy_call_res.log);
+                    } else {
+                        warn!("Something went wrong during proxy_call");
+                    }
                 } else {
                     info!("no tasks for this block");
                 }

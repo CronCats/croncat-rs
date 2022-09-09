@@ -9,7 +9,7 @@ use croncat::{
     client::{BankQueryClient, QueryBank},
     config::ChainConfig,
     env,
-    errors::Report,
+    errors::{eyre, Report},
     grpc::{GrpcQuerier, GrpcSigner},
     logging::{self, info},
     store::agent::LocalAgentStorage,
@@ -128,11 +128,16 @@ async fn main() -> Result<(), Report> {
         opts::Command::Daemon { sender_name } => {
             let key = storage.get_agent_signing_key(&sender_name)?;
             let signer = GrpcSigner::new(ChainConfig::new()?, key, &env.croncat_addr).await?;
+            let initial_status = signer
+                .get_agent(signer.account_id().as_ref())
+                .await?
+                .ok_or(eyre!("Agent must be registered to start the loop"))?
+                .status;
             // Create a channel to handle graceful shutdown and wrap receiver for cloning
             let (shutdown_tx, shutdown_rx) = channels::create_shutdown_channel();
 
             // Start the agent
-            system::run(env, shutdown_tx, shutdown_rx, signer).await?;
+            system::run(env, shutdown_tx, shutdown_rx, signer, initial_status).await?;
         }
         _ => {}
     }

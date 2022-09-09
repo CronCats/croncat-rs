@@ -84,7 +84,7 @@ async fn main() -> Result<(), Report> {
         opts::Command::GetAgentStatus { account_id } => {
             let querier = GrpcQuerier::new(&env.croncat_addr, &ChainConfig::new()?).await?;
             let status = querier.get_agent(account_id).await?;
-            println!("{status}")
+            println!("status: {status}")
         }
         opts::Command::Tasks { from_index, limit } => {
             let querier = GrpcQuerier::new(&env.croncat_addr, &ChainConfig::new()?).await?;

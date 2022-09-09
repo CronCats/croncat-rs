@@ -170,7 +170,7 @@ impl GrpcQuerier {
     }
 
     pub async fn get_agent(&self, account_id: String) -> Result<String, Report> {
-        let agent: AgentResponse = self
+        let agent: Option<AgentResponse> = self
             .query_croncat(&QueryMsg::GetAgent {
                 account_id: Addr::unchecked(account_id),
             })

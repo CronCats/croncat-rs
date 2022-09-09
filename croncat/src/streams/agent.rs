@@ -36,18 +36,15 @@ pub async fn check_account_status_loop(
                     block.header.height
                 );
                 let account_addr = signer.account_id().as_ref();
-                let agent = signer.get_agent(account_addr).await.unwrap();
+                let agent = signer.get_agent(account_addr).await?;
                 let mut locked_status = block_status.lock().await;
                 *locked_status = agent
                     .ok_or(eyre!("Agent unregistered during the loop"))?
                     .status;
                 info!("status:{:?}", *locked_status);
                 if *locked_status == AgentStatus::Nominated {
-                    info!(
-                        "Checking in agent: {:?}",
-                        signer.check_in_agent().await.unwrap()
-                    );
-                    let agent = signer.get_agent(account_addr).await.unwrap();
+                    info!("Checking in agent: {}", signer.check_in_agent().await?.log);
+                    let agent = signer.get_agent(account_addr).await?;
                     *locked_status = agent
                         .ok_or(eyre!("Agent unregistered during the loop"))?
                         .status;
@@ -59,7 +56,7 @@ pub async fn check_account_status_loop(
     });
 
     tokio::select! {
-        _ = task_handle => {}
+        Ok(task) = task_handle => {task?}
         _ = shutdown_rx.recv() => {}
     }
 

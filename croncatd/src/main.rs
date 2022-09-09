@@ -56,7 +56,10 @@ async fn main() -> Result<(), Report> {
             let signer = GrpcSigner::new(ChainConfig::new()?, key, env.croncat_addr).await?;
 
             println!("Key: {}", signer.key().public_key().to_json());
-            println!("Payable account Id {:?}", payable_account_id);
+            println!(
+                "Payable account Id: {}",
+                serde_json::to_string_pretty(&payable_account_id)?
+            );
 
             let result = signer.register_agent(payable_account_id).await?;
             let log = result.log;

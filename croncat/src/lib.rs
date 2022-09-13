@@ -13,7 +13,6 @@ pub use tokio;
 pub mod channels;
 pub mod client;
 pub mod config;
-pub mod env;
 pub mod errors;
 pub mod grpc;
 pub mod logging;

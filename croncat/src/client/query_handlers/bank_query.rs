@@ -58,3 +58,9 @@ where
         self.bank_query_client().native_denom
     }
 }
+
+impl GetBankQueryClient for BankQueryClient {
+    fn bank_query_client(&self) -> BankQueryClient {
+        self.clone()
+    }
+}

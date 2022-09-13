@@ -13,7 +13,9 @@ use crate::config::ChainConfig;
 
 use super::auth_query::QueryBaseAccount;
 use super::query_client::CosmosQueryClient;
-use super::wasm_execute::{generate_wasm_body, prepare_send, send_tx, simulate_gas_fee};
+use super::wasm_execute::{
+    generate_wasm_body, prepare_send, prepare_simulate_tx, send_tx, simulate_gas_fee,
+};
 
 #[derive(Clone)]
 pub struct CosmosFullClient {
@@ -46,15 +48,8 @@ impl CosmosFullClient {
             .query_client
             .query_base_account(sender.as_ref().to_owned())
             .await?;
-
-        let fee = simulate_gas_fee(
-            self.service_client.clone(),
-            &tx_body,
-            &self.cfg,
-            self.key(),
-            &base_account,
-        )
-        .await?;
+        let simulate_tx_raw = prepare_simulate_tx(&tx_body, &self.cfg, &self.key(), &base_account)?;
+        let fee = simulate_gas_fee(self.service_client.clone(), simulate_tx_raw, &self.cfg).await?;
         let raw = prepare_send(&tx_body, &self.cfg, &self.key(), &base_account, fee)?;
         let tx_result = send_tx(&self.http_client, raw).await?;
         Ok(tx_result)

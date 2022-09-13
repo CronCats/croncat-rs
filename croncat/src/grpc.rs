@@ -44,6 +44,7 @@ pub async fn connect(url: String) -> Result<(MsgClient<Channel>, QueryClient<Cha
 #[derive(Clone)]
 pub struct GrpcSigner {
     client: CosmosFullClient,
+    account_id: AccountId,
     croncat_addr: String,
 }
 
@@ -53,8 +54,11 @@ impl GrpcSigner {
         key: bip32::XPrv,
         croncat_addr: impl Into<String>,
     ) -> Result<Self, Report> {
+        let client = CosmosFullClient::new(cfg, key).await?;
+        let account_id = client.key().public_key().account_id(&client.cfg.prefix)?;
         Ok(Self {
-            client: CosmosFullClient::new(cfg, key).await?,
+            client,
+            account_id,
             croncat_addr: croncat_addr.into(),
         })
     }
@@ -114,13 +118,12 @@ impl GrpcSigner {
         Ok(res)
     }
 
-    pub fn account_id(&self) -> Result<AccountId, Report> {
-        let id = self
-            .client
-            .key()
-            .public_key()
-            .account_id(&self.client.cfg.prefix)?;
-        Ok(id)
+    pub async fn check_in_agent(&self) -> Result<TxResult, Report> {
+        self.execute_croncat(&ExecuteMsg::CheckInAgent {}).await
+    }
+
+    pub fn account_id(&self) -> &AccountId {
+        &self.account_id
     }
 
     pub async fn get_agent_tasks(
@@ -167,7 +170,7 @@ impl GrpcQuerier {
     }
 
     pub async fn get_agent(&self, account_id: String) -> Result<String, Report> {
-        let agent: AgentResponse = self
+        let agent: Option<AgentResponse> = self
             .query_croncat(&QueryMsg::GetAgent {
                 account_id: Addr::unchecked(account_id),
             })
@@ -189,7 +192,7 @@ impl GrpcQuerier {
     }
 
     pub async fn get_agent_tasks(&self, account_id: String) -> Result<String, Report> {
-        let response: AgentTaskResponse = self
+        let response: Option<AgentTaskResponse> = self
             .query_croncat(&QueryMsg::GetAgentTasks {
                 account_id: Addr::unchecked(account_id),
             })

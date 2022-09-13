@@ -45,22 +45,13 @@ pub async fn connect(url: String) -> Result<(MsgClient<Channel>, QueryClient<Cha
 pub struct GrpcSigner {
     client: CosmosFullClient,
     account_id: AccountId,
-    croncat_addr: String,
 }
 
 impl GrpcSigner {
-    pub async fn new(
-        cfg: ChainConfig,
-        key: bip32::XPrv,
-        croncat_addr: impl Into<String>,
-    ) -> Result<Self, Report> {
+    pub async fn new(cfg: ChainConfig, key: bip32::XPrv) -> Result<Self, Report> {
         let client = CosmosFullClient::new(cfg, key).await?;
         let account_id = client.key().public_key().account_id(&client.cfg.prefix)?;
-        Ok(Self {
-            client,
-            account_id,
-            croncat_addr: croncat_addr.into(),
-        })
+        Ok(Self { client, account_id })
     }
 
     pub async fn query_croncat<T>(&self, msg: &QueryMsg) -> Result<T, Report>
@@ -70,13 +61,16 @@ impl GrpcSigner {
         let out = self
             .client
             .query_client
-            .query_contract(&self.croncat_addr, msg)
+            .query_contract(&self.client.cfg.contract_address, msg)
             .await?;
         Ok(out)
     }
 
     pub async fn execute_croncat(&self, msg: &ExecuteMsg) -> Result<TxResult, Report> {
-        let res = self.client.execute_wasm(msg, &self.croncat_addr).await?;
+        let res = self
+            .client
+            .execute_wasm(msg, &self.client.cfg.contract_address)
+            .await?;
 
         Ok(res.deliver_tx)
     }
@@ -141,6 +135,14 @@ impl GrpcSigner {
     pub fn key(&self) -> SigningKey {
         self.client.key()
     }
+
+    pub fn wsrpc(&self) -> &str {
+        &self.client.cfg.wsrpc_endpoint
+    }
+
+    pub fn grpc(&self) -> &str {
+        &&self.client.cfg.grpc_endpoint
+    }
 }
 
 pub struct GrpcQuerier {
@@ -148,10 +150,10 @@ pub struct GrpcQuerier {
     croncat_addr: String,
 }
 impl GrpcQuerier {
-    pub async fn new(croncat_addr: impl Into<String>, cfg: &ChainConfig) -> Result<Self, Report> {
+    pub async fn new(cfg: ChainConfig) -> Result<Self, Report> {
         Ok(Self {
             client: CosmosQueryClient::new(&cfg.grpc_endpoint, &cfg.denom).await?,
-            croncat_addr: croncat_addr.into(),
+            croncat_addr: cfg.contract_address,
         })
     }
 

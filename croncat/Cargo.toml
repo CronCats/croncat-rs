@@ -32,6 +32,9 @@ rand = "0.8.5"
 anyhow = "1.0"
 bip39 = {version = "1.0.1", features = ["rand"] }
 async-trait = "0.1.57"
+chain-registry = "0.1.0"
+
+
 [dependencies.prost]
 version = "0.10"
 [dependencies.prost-types]

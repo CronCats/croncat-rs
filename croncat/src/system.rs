@@ -2,6 +2,11 @@
 //! The croncat system daemon.
 //!
 
+use std::sync::Arc;
+
+use cw_croncat_core::types::AgentStatus;
+use tokio::sync::Mutex;
+
 use crate::{
     channels::{self, ShutdownRx, ShutdownTx},
     env::Env,
@@ -15,15 +20,18 @@ use crate::{
 ///
 /// Kick off the croncat daemon
 ///
-pub async fn run(env: Env, shutdown_tx: ShutdownTx, shutdown_rx: ShutdownRx) -> Result<(), Report> {
+pub async fn run(
+    env: Env,
+    shutdown_tx: ShutdownTx,
+    shutdown_rx: ShutdownRx,
+    signer: GrpcSigner,
+    initial_status: AgentStatus,
+) -> Result<(), Report> {
     // Create a block stream channel
     // TODO (SeedyROM): Remove 128 hardcoded limit
     let (block_stream_tx, block_stream_rx) = channels::create_block_stream(128);
 
-    // Connect to GRPC
-    let (_msg_client, _query_client) = grpc::connect(env.grpc_url.clone()).await?;
-
-    // Stream new blocks from the WS RPC subscription
+    // Connect to GRPC  Stream new blocks from the WS RPC subscription
     let block_stream_shutdown_rx = shutdown_rx.clone();
     let block_stream_handle = tokio::task::spawn(async move {
         ws::stream_blocks_loop(
@@ -40,10 +48,15 @@ pub async fn run(env: Env, shutdown_tx: ShutdownTx, shutdown_rx: ShutdownRx) -> 
     // Account status checks
     let account_status_check_shutdown_rx = shutdown_rx.clone();
     let account_status_check_block_stream_rx = block_stream_rx.clone();
+    let block_status = Arc::new(Mutex::new(initial_status));
+    let block_status_accounts_loop = block_status.clone();
+    let signer_status = signer.clone();
     let account_status_check_handle = tokio::task::spawn(async move {
         agent::check_account_status_loop(
             account_status_check_block_stream_rx,
             account_status_check_shutdown_rx,
+            block_status_accounts_loop,
+            signer_status,
         )
         .await
         .expect("Failed to check account statuses")
@@ -53,9 +66,14 @@ pub async fn run(env: Env, shutdown_tx: ShutdownTx, shutdown_rx: ShutdownRx) -> 
     let task_runner_shutdown_rx = shutdown_rx.clone();
     let task_runner_block_stream_rx = block_stream_rx.clone();
     let task_runner_handle = tokio::task::spawn(async move {
-        tasks::tasks_loop(task_runner_block_stream_rx, task_runner_shutdown_rx)
-            .await
-            .expect("Failed to process streamed blocks")
+        tasks::tasks_loop(
+            task_runner_block_stream_rx,
+            task_runner_shutdown_rx,
+            signer,
+            block_status,
+        )
+        .await
+        .expect("Failed to process streamed blocks")
     });
 
     // Handle SIGINT AKA Ctrl-C

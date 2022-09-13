@@ -1,6 +1,4 @@
 use color_eyre::Report;
-use cosmos_sdk_proto::cosmos::auth::v1beta1::query_client::QueryClient as AuthQueryClient;
-use cosmos_sdk_proto::cosmwasm::wasm::v1::query_client::QueryClient as WasmQueryClient;
 use serde::{de::DeserializeOwned, Serialize};
 use tonic::transport::Channel;
 
@@ -8,6 +6,7 @@ use super::{
     auth_query::GetAuthQueryClient,
     bank_query::{BankQueryClient, GetBankQueryClient},
     wasm_query::{GetWasmQueryClient, QuerySmartContract},
+    AuthQueryClient, WasmQueryClient,
 };
 
 #[derive(Clone)]

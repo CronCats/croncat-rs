@@ -53,20 +53,17 @@ pub fn prepare_send(
     Ok(tx_raw)
 }
 
-/// Thanks `cosm-orc` author(@de-husk) for this simulate-gas method:
-/// https://github.com/de-husk/cosm-orc/blob/834e681b0e8371e2bae07aff18a0fd79171088b5/src/client/cosm_client.rs#L276
-pub async fn simulate_gas_fee(
-    mut client: ServiceClient<Channel>,
+pub fn prepare_simulate_tx(
     tx: &tx::Body,
     cfg: &ChainConfig,
-    key: SigningKey,
+    key: &SigningKey,
     base_account: &BaseAccount,
-) -> Result<Fee, Report> {
+) -> Result<Raw, Report> {
     let denom: Denom = cfg.denom.parse()?;
     let auth_info = SignerInfo::single_direct(Some(key.public_key()), base_account.sequence)
         .auth_info(Fee::from_amount_and_gas(
             Coin {
-                denom: denom.clone(),
+                denom,
                 amount: 0u64.into(),
             },
             0u64,
@@ -79,8 +76,18 @@ pub async fn simulate_gas_fee(
         base_account.account_number,
     )?;
 
-    let tx_raw = sign_doc.sign(&key)?;
+    let tx_raw = sign_doc.sign(key)?;
+    Ok(tx_raw)
+}
 
+/// Thanks `cosm-orc` author(@de-husk) for this simulate-gas method:
+/// https://github.com/de-husk/cosm-orc/blob/834e681b0e8371e2bae07aff18a0fd79171088b5/src/client/cosm_client.rs#L276
+pub async fn simulate_gas_fee(
+    mut client: ServiceClient<Channel>,
+    tx_raw: Raw,
+    cfg: &ChainConfig,
+) -> Result<Fee, Report> {
+    let denom: Denom = cfg.denom.parse()?;
     let gas_info = client
         .simulate(SimulateRequest {
             tx_bytes: tx_raw.to_bytes()?,

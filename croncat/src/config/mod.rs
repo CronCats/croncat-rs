@@ -9,7 +9,6 @@ const CONFIG_FILE_MAINNET: &str = "config.mainnet.yaml";
 const CONFIG_FILE_MAINNET_OVERRIDE: &str = "config.mainnet.override.yaml";
 const CONFIG_FILE_LOCAL: &str = "config.local.yaml";
 const CONFIG_FILE_LOCAL_OVERRIDE: &str = "config.local.override.yaml";
-use std::fmt::Display;
 use std::path::Path;
 use std::str::FromStr;
 

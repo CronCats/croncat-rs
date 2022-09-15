@@ -2,7 +2,6 @@
 //! `croncatd` CLI option builder.
 //!
 
-use croncat::config::NetworkType;
 use structopt::StructOpt;
 
 ///

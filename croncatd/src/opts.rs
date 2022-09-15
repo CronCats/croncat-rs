@@ -63,6 +63,8 @@ pub enum Command {
     GenerateMnemonic {
         #[structopt(long, default_value = "agent")]
         new_name: String,
+        #[structopt(long)]
+        mnemonic: Option<String>
     },
     DepositUjunox {
         account_id: String,

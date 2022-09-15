@@ -99,7 +99,9 @@ async fn main() -> Result<(), Report> {
             let agent_tasks = querier.get_agent_tasks(account_addr).await?;
             println!("{agent_tasks}")
         }
-        opts::Command::GenerateMnemonic { new_name } => storage.generate_account(new_name)?,
+        opts::Command::GenerateMnemonic { new_name, mnemonic } => {
+            storage.generate_account(new_name, mnemonic)?
+        },
         opts::Command::UpdateAgent {
             payable_account_id,
             sender_name,
@@ -110,6 +112,7 @@ async fn main() -> Result<(), Report> {
             let log = result.log;
             println!("{log}");
         }
+        //@TODO: remember to finish this command, since it's only querying
         opts::Command::DepositUjunox { account_id } => {
             let result = deposit_junox(&account_id).await?;
             println!("{:?}", result);

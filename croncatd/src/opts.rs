@@ -73,6 +73,9 @@ pub enum Command {
     GenerateMnemonic {
         #[structopt(long, default_value = "agent")]
         new_name: String,
+        /// Recover agent from mnemonic phrase. Please do not use your own account!
+        #[structopt(long)]
+        mnemonic: Option<String>
     },
     /// (in progress) Send native tokens to an address
     DepositUjunox {

@@ -18,6 +18,9 @@ pub struct Opts {
     #[structopt(long)]
     pub no_frills: bool,
 
+    #[structopt(long)]
+    pub network: String,
+
     #[structopt(subcommand)] // Note that we mark a field as a subcommand
     pub cmd: Command,
 }
@@ -32,13 +35,9 @@ pub enum Command {
         sender_name: String,
     },
     /// Get the agent's status (pending/active)
-    GetAgentStatus {
-        account_id: String,
-    },
+    GetAgentStatus { account_id: String },
     /// Get the agent's tasks they're assigned to fulfill
-    GetAgentTasks {
-        account_addr: String,
-    },
+    GetAgentTasks { account_addr: String },
     /// Unregisters the agent from being in the queue with other agents
     UnregisterAgent {
         #[structopt(long, default_value = "agent")]
@@ -78,9 +77,7 @@ pub enum Command {
         mnemonic: Option<String>
     },
     /// (in progress) Send native tokens to an address
-    DepositUjunox {
-        account_id: String,
-    },
+    DepositUjunox { account_id: String },
     /// Sensitive. Shows all details about agents on this machine
     GetAgent {
         #[structopt(long, default_value = "agent")]

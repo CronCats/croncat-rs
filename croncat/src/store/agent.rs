@@ -140,11 +140,16 @@ impl LocalAgentStorage {
     }
 
     /// Generate a new account_id to the local storage.
-    pub fn generate_account(&mut self, account_id: AccountId) -> Result<(), Report> {
+    pub fn generate_account(&mut self, account_id: AccountId, mnemonic: Option<String>) -> Result<(), Report> {
         match self.get(&account_id) {
             Some(_) => Err(eyre!(r#"Agent "{account_id}" already created"#)),
             None => {
-                self.insert(account_id.clone(), Mnemonic::generate(24).unwrap())?;
+                let validated_mnemonic = if let Some(phrase) = mnemonic {
+                    Mnemonic::parse_normalized(&phrase)
+                } else {
+                    Mnemonic::generate(24)
+                }?;
+                self.insert(account_id.clone(), validated_mnemonic)?;
                 self.display_account(&account_id);
                 self.write_to_disk()?;
                 Ok(())

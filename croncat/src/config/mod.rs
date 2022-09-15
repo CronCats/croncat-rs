@@ -3,17 +3,36 @@
 use color_eyre::Report;
 use config::Config;
 use serde::{Deserialize, Serialize};
-const CONFIG_FILE: &str = "config.yaml";
-const CONFIG_FILE_OVERRIDE: &str = "config.override.yaml";
+const CONFIG_FILE: &str = "config.testnet.yaml";
+const CONFIG_FILE_OVERRIDE: &str = "config.testnet.override.yaml";
 const CONFIG_FILE_MAINNET: &str = "config.mainnet.yaml";
 const CONFIG_FILE_MAINNET_OVERRIDE: &str = "config.mainnet.override.yaml";
+const CONFIG_FILE_LOCAL: &str = "config.local.yaml";
+const CONFIG_FILE_LOCAL_OVERRIDE: &str = "config.local.override.yaml";
+use std::fmt::Display;
 use std::path::Path;
+use std::str::FromStr;
 
+#[derive(Debug, PartialEq)]
 pub enum NetworkType {
     Local,
     Testnet,
     Mainnet,
 }
+impl FromStr for NetworkType {
+    type Err = ();
+
+    fn from_str(input: &str) -> Result<NetworkType, Self::Err> {
+        match input {
+            "local" => Ok(NetworkType::Local),
+            "testnet" => Ok(NetworkType::Testnet),
+            "mainnet" => Ok(NetworkType::Mainnet),
+            "" => Ok(NetworkType::Local),
+            _ => Err(()),
+        }
+    }
+}
+
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct ChainConfig {
     pub denom: String,
@@ -44,9 +63,15 @@ impl ChainConfig {
                 let config = Self::from_file(CONFIG_FILE)?;
                 return Ok(config);
             }
-            NetworkType::Local => todo!(),
+            NetworkType::Local => {
+                if Path::new(CONFIG_FILE_LOCAL_OVERRIDE).is_file() {
+                    return Self::from_file(CONFIG_FILE_LOCAL_OVERRIDE);
+                }
+                let config = Self::from_file(CONFIG_FILE_LOCAL)?;
+                return Ok(config);
+            }
             NetworkType::Mainnet => {
-                if Path::new(CONFIG_FILE_OVERRIDE).is_file() {
+                if Path::new(CONFIG_FILE_MAINNET_OVERRIDE).is_file() {
                     return Self::from_file(CONFIG_FILE_MAINNET_OVERRIDE);
                 }
                 let config = Self::from_file(CONFIG_FILE_MAINNET)?;

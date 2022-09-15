@@ -1,0 +1,9 @@
+denom: "ujunox"
+prefix: "juno"
+chain_id: "uni-3"
+rpc_endpoint: "https://rpc.uni.juno.deuslabs.fi:443"
+grpc_endpoint: "http://juno-testnet-grpc.polkachu.com:26090"
+wsrpc_endpoint: "ws://135.181.59.162:26657/websocket"
+contract_address: "juno19u4arlvzwmsjp820qkx9ae8p9wyj654uuwlqklsqz7rz2y38an5s9ag6az"
+gas_prices: 0.1
+gas_adjustment: 1.5

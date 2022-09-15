@@ -44,7 +44,7 @@ async fn main() -> Result<(), Report> {
     if !opts.no_frills {
         cli::print_banner();
     }
-    
+
     let network_type: Option<NetworkType> = Some(opts.network.parse().unwrap());
     let cfg = ChainConfig::new(network_type).await?;
     info!("Starting croncatd...");

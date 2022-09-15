@@ -144,13 +144,12 @@ impl LocalAgentStorage {
         match self.get(&account_id) {
             Some(_) => Err(eyre!(r#"Agent "{account_id}" already created"#)),
             None => {
-                let mnemonic2 = if let Some(phrase) = mnemonic {
-                    phrase
+                let validated_mnemonic = if let Some(phrase) = mnemonic {
+                    Mnemonic::parse_normalized(&phrase)
                 } else {
-                    Mnemonic::generate(24).unwrap().to_string()
-                };
-                let parsed = Mnemonic::parse_normalized(&mnemonic2);
-                self.insert(account_id.clone(), parsed.unwrap())?;
+                    Mnemonic::generate(24)
+                }?;
+                self.insert(account_id.clone(), validated_mnemonic)?;
                 self.display_account(&account_id);
                 self.write_to_disk()?;
                 Ok(())

@@ -1,2 +1,0 @@
-rpc_endpoint: 65.108.138.80:9090
-wsrpc_endpoint: ws://65.108.138.80:26657/websocket

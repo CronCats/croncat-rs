@@ -1,0 +1,9 @@
+denom: "junox"
+prefix: "juno"
+chain_id: "juno-1"
+rpc_endpoint: "https://juno-rpc.polkachu.com:443"
+grpc_endpoint: "https://juno-grpc.polkachu.com:12690"
+wsrpc_endpoint: "wss://juno-rpc.polkachu.com/websocket"
+contract_address: "juno12z4hh9r3j9aurjn6ppkgyjrkuu4ugrdectsh792w8feyj56dhlssvntdls"
+gas_prices: 0.1
+gas_adjustment: 1.5

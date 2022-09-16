@@ -8,29 +8,38 @@ async-channel = "1.6.1"
 color-eyre = "0.6.1"
 futures-util = "0.3.21"
 serde_json = "1.0.81"
-tokio = { version = "1.18.0", features = ["macros", "rt-multi-thread", "sync", "signal", "time"] }
+tokio = { version = "1.18.0", features = [
+    "macros",
+    "rt-multi-thread",
+    "sync",
+    "signal",
+    "time",
+] }
 tonic = "0.7"
 tracing = "0.1.34"
 tracing-subscriber = { version = "0.3.11", features = ["fmt", "env-filter"] }
 url = "2.2.2"
 envy = "0.4.2"
-serde = { version = "1.0.136", features = ["derive"] } 
+serde = { version = "1.0.136", features = ["derive"] }
 dotenv = "0.15.0"
-cosmrs = {version = "0.7.1", features = ["bip32", "rpc", "cosmwasm"]}
-cosmos-sdk-proto = {version = "0.12", features = ["grpc", "cosmwasm"]}
+cosmrs = { version = "0.7.1", features = ["bip32", "rpc", "cosmwasm"] }
+cosmos-sdk-proto = { version = "0.12", features = ["grpc", "cosmwasm"] }
 tendermint = "0.23.7"
-tendermint-rpc = {version = "0.23.7", features = ["websocket-client"]}
+tendermint-rpc = { version = "0.23.7", features = ["websocket-client"] }
 cosmwasm-std = { version = "1.0.0" }
 
 config = { version = "0.13.1", features = ["yaml"] }
 
 cw20-base = "0.13"
 cw20 = "0.13"
-cw-croncat-core = { version = "0.1.0", git = "https://github.com/CronCats/cw-croncat" }
+# TODO: cw-croncat-core = { version = "0.1.0", git = "https://github.com/CronCats/cw-croncat" }
+# TODO: cw-rules = { version = "0.0.1", git = "https://github.com/CronCats/cw-croncat" }
+cw-croncat-core = { version = "0.1.0", git = "https://github.com/Buckram123/cw-croncat/", rev = "c5a96f83744a93bf765759fdb97742984bca6580" }
+cw-rules = { version = "0.0.1", git = "https://github.com/Buckram123/cw-croncat/", rev = "c5a96f83744a93bf765759fdb97742984bca6580" }
 async-broadcast = "0.4.0"
 rand = "0.8.5"
 anyhow = "1.0"
-bip39 = {version = "1.0.1", features = ["rand"] }
+bip39 = { version = "1.0.1", features = ["rand"] }
 async-trait = "0.1.57"
 chain-registry = "0.1.0"
 

@@ -24,6 +24,7 @@ pub async fn run(
     shutdown_rx: ShutdownRx,
     signer: GrpcSigner,
     initial_status: AgentStatus,
+    with_rules: bool,
 ) -> Result<(), Report> {
     // Create a block stream channel
     // TODO (SeedyROM): Remove 128 hardcoded limit
@@ -60,17 +61,27 @@ pub async fn run(
     // Process blocks coming in from the blockchain
     let task_runner_shutdown_rx = shutdown_rx.clone();
     let task_runner_block_stream_rx = block_stream_rx.clone();
+    let tasks_signer = signer.clone();
+    let block_status_tasks = block_status.clone();
     let task_runner_handle = tokio::task::spawn(async move {
         tasks::tasks_loop(
             task_runner_block_stream_rx,
             task_runner_shutdown_rx,
-            signer,
-            block_status,
+            tasks_signer,
+            block_status_tasks,
         )
         .await
         .expect("Failed to process streamed blocks")
     });
 
+    // Check rules if enabled
+    let rules_runner_handle = tokio::task::spawn(async move {
+        if with_rules {
+            tasks::rules_loop(block_stream_rx, shutdown_rx, signer, block_status)
+                .await
+                .expect("Failed to process streamed blocks")
+        }
+    });
     // Handle SIGINT AKA Ctrl-C
     let ctrl_c_shutdown_tx = shutdown_tx.clone();
     let ctrl_c_handle = tokio::task::spawn(async move {
@@ -91,6 +102,7 @@ pub async fn run(
         block_stream_handle,
         task_runner_handle,
         account_status_check_handle,
+        rules_runner_handle,
     );
 
     Ok(())

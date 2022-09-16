@@ -3,7 +3,7 @@
 //!
 
 // Features
-#![feature(no_coverage)]
+//#![feature(no_coverage)]
 
 // Export tokio and async-broadcast for convenience and version management
 pub use async_broadcast;

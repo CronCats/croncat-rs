@@ -102,7 +102,7 @@ async fn main() -> Result<(), Report> {
         }
         opts::Command::GenerateMnemonic { new_name, mnemonic } => {
             storage.generate_account(new_name, mnemonic)?
-        },
+        }
         opts::Command::UpdateAgent {
             payable_account_id,
             sender_name,
@@ -131,7 +131,10 @@ async fn main() -> Result<(), Report> {
             let (shutdown_tx, shutdown_rx) = channels::create_shutdown_channel();
             system::go(shutdown_tx, shutdown_rx, signer).await?;
         }
-        opts::Command::Daemon { sender_name } => {
+        opts::Command::Daemon {
+            sender_name,
+            with_rules,
+        } => {
             let key = storage.get_agent_signing_key(&sender_name)?;
             let signer = GrpcSigner::new(cfg, key).await?;
             let initial_status = signer
@@ -141,9 +144,8 @@ async fn main() -> Result<(), Report> {
                 .status;
             // Create a channel to handle graceful shutdown and wrap receiver for cloning
             let (shutdown_tx, shutdown_rx) = channels::create_shutdown_channel();
-
             // Start the agent
-            system::run(shutdown_tx, shutdown_rx, signer, initial_status).await?;
+            system::run(shutdown_tx, shutdown_rx, signer, initial_status, with_rules).await?;
         }
         _ => {}
     }

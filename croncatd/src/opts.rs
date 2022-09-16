@@ -74,7 +74,7 @@ pub enum Command {
         new_name: String,
         /// Recover agent from mnemonic phrase. Please do not use your own account!
         #[structopt(long)]
-        mnemonic: Option<String>
+        mnemonic: Option<String>,
     },
     /// (in progress) Send native tokens to an address
     DepositUjunox { account_id: String },
@@ -87,5 +87,8 @@ pub enum Command {
     Daemon {
         #[structopt(long, default_value = "agent")]
         sender_name: String,
+        /// Allow daemon to do tasks with rules, uses more computer resources
+        #[structopt(long, short = "r")]
+        with_rules: bool,
     },
 }

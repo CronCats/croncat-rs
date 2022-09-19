@@ -33,9 +33,9 @@ config = { version = "0.13.1", features = ["yaml"] }
 cw20-base = "0.13"
 cw20 = "0.13"
 # TODO: cw-croncat-core = { version = "0.1.0", git = "https://github.com/CronCats/cw-croncat" }
-# TODO: cw-rules = { version = "0.0.1", git = "https://github.com/CronCats/cw-croncat" }
-cw-croncat-core = { version = "0.1.0", git = "https://github.com/Buckram123/cw-croncat/", rev = "c5a96f83744a93bf765759fdb97742984bca6580" }
-cw-rules = { version = "0.0.1", git = "https://github.com/Buckram123/cw-croncat/", rev = "c5a96f83744a93bf765759fdb97742984bca6580" }
+# TODO: cw-rules-core = { version = "0.1.0", git = "https://github.com/CronCats/cw-croncat" }
+cw-croncat-core = { version = "0.1.0", git = "https://github.com/Buckram123/cw-croncat/", rev = "2765492a8361cf7e0d39f0997595de94d1ea07ef" }
+cw-rules-core = { version = "0.1.0", git = "https://github.com/Buckram123/cw-croncat/", rev = "2765492a8361cf7e0d39f0997595de94d1ea07ef" }
 async-broadcast = "0.4.0"
 rand = "0.8.5"
 anyhow = "1.0"

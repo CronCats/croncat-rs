@@ -9,12 +9,12 @@ use cosmrs::bip32;
 use cosmrs::crypto::secp256k1::SigningKey;
 use cosmrs::AccountId;
 use cw_croncat_core::msg::AgentTaskResponse;
-use cw_croncat_core::msg::QueryConstruct;
 use cw_croncat_core::msg::TaskResponse;
 use cw_croncat_core::msg::TaskWithRulesResponse;
 use cw_croncat_core::msg::{ExecuteMsg, GetConfigResponse, QueryMsg};
 use cw_croncat_core::types::AgentResponse;
-use cw_croncat_core::types::Rule;
+use cw_rules_core::msg::QueryConstruct;
+use cw_rules_core::types::Rule;
 use serde::de::DeserializeOwned;
 use tendermint_rpc::endpoint::broadcast::tx_commit::TxResult;
 use tonic::transport::Channel;
@@ -149,8 +149,8 @@ impl GrpcSigner {
         Ok(res)
     }
 
-    pub async fn fetch_rules(&self) -> Result<HashMap<String,TaskWithRulesResponse>, Report> {
-        let mut tasks_with_rules: HashMap<String,TaskWithRulesResponse> = HashMap::new();
+    pub async fn fetch_rules(&self) -> Result<HashMap<String, TaskWithRulesResponse>, Report> {
+        let mut tasks_with_rules: HashMap<String, TaskWithRulesResponse> = HashMap::new();
         let mut start_index = 0;
         let limit = 20;
         loop {
@@ -179,7 +179,7 @@ impl GrpcSigner {
             .query_client
             .query_contract(
                 &cw_rules_addr,
-                cw_rules::msg::QueryMsg::QueryConstruct(QueryConstruct { rules }),
+                cw_rules_core::msg::QueryMsg::QueryConstruct(QueryConstruct { rules }),
             )
             .await?;
         Ok(res)

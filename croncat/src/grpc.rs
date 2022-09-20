@@ -1,7 +1,6 @@
 //!
 //! Use the [cosmos_sdk_proto](https://crates.io/crates/cosmos-sdk-proto) library to create clients for GRPC node requests.
 //!
-use std::collections::HashMap;
 
 use cosmos_sdk_proto::cosmwasm::wasm::v1::msg_client::MsgClient;
 use cosmos_sdk_proto::cosmwasm::wasm::v1::query_client::QueryClient;
@@ -149,8 +148,8 @@ impl GrpcSigner {
         Ok(res)
     }
 
-    pub async fn fetch_rules(&self) -> Result<HashMap<String, TaskWithRulesResponse>, Report> {
-        let mut tasks_with_rules: HashMap<String, TaskWithRulesResponse> = HashMap::new();
+    pub async fn fetch_rules(&self) -> Result<Vec<TaskWithRulesResponse>, Report> {
+        let mut tasks_with_rules = Vec::new();
         let mut start_index = 0;
         let limit = 20;
         loop {
@@ -158,9 +157,7 @@ impl GrpcSigner {
                 .query_get_tasks_with_rules(Some(start_index), Some(limit))
                 .await?;
             let last_iteration = current_iteration.len() < limit as usize;
-            for task in current_iteration {
-                tasks_with_rules.insert(task.task_hash.clone(), task);
-            }
+            tasks_with_rules.extend(current_iteration);
             if last_iteration {
                 break;
             }

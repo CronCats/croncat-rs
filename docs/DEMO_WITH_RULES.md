@@ -18,13 +18,13 @@
     --mount type=volume,source="$(basename "$(pwd)")_cache",target=/code/target \
     --mount type=volume,source=registry_cache,target=/usr/local/cargo/registry \
     --platform linux/amd64 \
-    cosmwasm/rust-optimizer:0.12.6
+    cosmwasm/rust-optimizer:0.12.8
 
     # Copy wasms to the docker container
     docker cp artifacts/cw_croncat.wasm juno-node-1:/cw_croncat.wasm
     docker cp artifacts/cw_rules.wasm juno-node-1:/cw_rules.wasm
 
-    # Inside
+    # Back to original terminal
     # Store both contracts
     CODE_ID=$($BINARY tx wasm store "/cw_croncat.wasm" --from validator $TXFLAG --output json | jq -r '.logs[0].events[-1].attributes[0].value')
     RULES_ID=$($BINARY tx wasm store "/cw_rules.wasm" --from validator $TXFLAG --output json | jq -r '.logs[0].events[-1].attributes[0].value')
@@ -41,9 +41,6 @@
     # Get contract address
     CONTRACT_ADDRESS=$($BINARY q wasm list-contract-by-code $CODE_ID --output json | jq -r '.contracts[-1]')
     echo $CONTRACT_ADDRESS
-    # Get Rules address
-    RULES_ADDRESS=$($BINARY q wasm list-contract-by-code $RULES_ID --output json | jq -r '.contracts[-1]')
-    echo $RULES_ADDRESS
     ```
 5. Edit `croncat-rs` for new croncat addr
 6. Create and store new agent addr
@@ -66,7 +63,11 @@
    junod keys add test
    BOB=$(junod keys show test -a)
    ```
-10. Add new task:
+10. Start daemon
+    ```bash
+    cargo run -- --network local daemon -r
+    ``` 
+11. Add new task:
     ```bash
     RULES='{
     "create_task": {
@@ -112,4 +113,8 @@
     }
     }'
     $BINARY tx wasm execute $CONTRACT_ADDRESS "$RULES" --amount 1700004ujunox --from validator $TXFLAG -y
+    ```
+12. Transfer to bob 5ujunox
+    ```bash
+    $BINARY tx bank send validator $BOB 5ujunox $TXFLAG
     ```

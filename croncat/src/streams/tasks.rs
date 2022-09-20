@@ -13,7 +13,7 @@ use crate::{
     errors::Report,
     grpc::GrpcSigner,
     logging::{info, warn},
-    utils::{sum_num_tasks, AtomicIntervalCounter},
+    utils::sum_num_tasks,
 };
 
 ///
@@ -64,15 +64,9 @@ pub async fn rules_loop(
     signer: GrpcSigner,
     block_status: Arc<Mutex<AgentStatus>>,
 ) -> Result<(), Report> {
-    let mut task_with_rules = signer.fetch_rules().await?;
-    let block_counter = AtomicIntervalCounter::new(10);
-
     let block_consumer_stream = tokio::task::spawn(async move {
         while let Ok(block) = block_stream_rx.recv().await {
-            block_counter.tick();
-            if block_counter.is_at_interval() {
-                task_with_rules = signer.fetch_rules().await.expect("Failed to fetch rules");
-            }
+            let tasks_with_rules = signer.fetch_rules().await.expect("Failed to fetch rules");
             let locked_status = block_status.lock().await;
             let is_active = *locked_status == AgentStatus::Active;
             // unlocking it ASAP
@@ -81,8 +75,7 @@ pub async fn rules_loop(
                 let time: Timestamp = block.header.time.into();
                 let time_nanos = time.seconds as u64 * 1_000_000_000 + time.nanos as u64;
 
-                let mut finished_tasks = vec![];
-                for (task_hash, task) in task_with_rules.iter() {
+                for task in tasks_with_rules.iter() {
                     let in_boundary = match task.boundary {
                         Some(Boundary::Height { start, end }) => {
                             let height = block.header.height.value();
@@ -103,17 +96,12 @@ pub async fn rules_loop(
                         if rules_ready {
                             let res = signer.proxy_call(Some(task.task_hash.clone())).await;
                             if let Ok(proxy_call_res) = res {
-                                finished_tasks.push(task_hash.clone());
                                 info!("Finished task: {}", proxy_call_res.log);
                             } else {
                                 warn!("Something went wrong during proxy_call");
                             }
                         }
                     }
-                }
-
-                for finished in finished_tasks {
-                    task_with_rules.remove(&finished);
                 }
             }
         }

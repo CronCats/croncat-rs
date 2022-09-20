@@ -25,10 +25,15 @@
     docker cp artifacts/cw_rules.wasm juno-node-1:/cw_rules.wasm
 
     # Back to original terminal
-    # Store both contracts
+
+    # Copy cw20 to the docker container
+    docker cp docs/cw20_base.wasm juno-node-1:/cw20_base.wasm
+    
+    # Store all contracts
     CODE_ID=$($BINARY tx wasm store "/cw_croncat.wasm" --from validator $TXFLAG --output json | jq -r '.logs[0].events[-1].attributes[0].value')
     RULES_ID=$($BINARY tx wasm store "/cw_rules.wasm" --from validator $TXFLAG --output json | jq -r '.logs[0].events[-1].attributes[0].value')
-    echo -e "CW_CRONCAT: $CODE_ID\nCW_RULES: $RULES_ID"
+    CW20_ID=$($BINARY tx wasm store "/cw20_base.wasm" --from validator $TXFLAG --output json | jq -r '.logs[0].events[-1].attributes[0].value')
+    echo -e "CW_CRONCAT: $CODE_ID\nCW_RULES: $RULES_ID\nCW20: $CW20_ID"
 
     # Instantiate cw_rules
     $BINARY tx wasm instantiate $RULES_ID '{}' --from validator --label "cw_rules" $TXFLAG -y --no-admin
@@ -37,10 +42,15 @@
     # Instantiate cw_croncat
     INIT='{"denom":"ujunox", "cw_rules_addr": "'$CW_RULES_ADDR'"}'
     $BINARY tx wasm instantiate $CODE_ID "$INIT" --from validator --label "croncat" $TXFLAG -y --no-admin
-
+    # Instantiate cw20
+    INIT_CW20='{"name": "memecoin", "symbol": "meme", "decimals": 4, "initial_balances": [{"address": "'$($BINARY keys show validator -a)'", "amount": "100000"}]}'
+    $BINARY tx wasm instantiate $CW20_ID "$INIT_CW20" --from validator --label "memecoin" $TXFLAG -y --no-admin
     # Get contract address
     CONTRACT_ADDRESS=$($BINARY q wasm list-contract-by-code $CODE_ID --output json | jq -r '.contracts[-1]')
     echo $CONTRACT_ADDRESS
+    # Get cw20 addr
+    CW20_ADDR=$($BINARY q wasm list-contract-by-code $CW20_ID --output json | jq -r '.contracts[-1]')
+    echo $CW20_ADDR
     ```
 5. Edit `croncat-rs` for new croncat addr
 6. Create and store new agent addr
@@ -60,61 +70,76 @@
    ```
 9. Generate some random wallet and save address
    ```bash
-   junod keys add test
-   BOB=$(junod keys show test -a)
+   $BINARY keys add test
+   BOB=$($BINARY keys show test -a)
    ```
-10. Start daemon
+10. Create bob on-chain
+    ```bash
+    $BINARY tx bank send validator $BOB 1ujunox $TXFLAG
+    ```
+11. Transfer cw20 to create task with cw20 transfer
+    ```bash
+    CW20_SEND='{"send": {"contract": "'$CONTRACT_ADDRESS'", "amount": "5", "msg": ""}}'
+    $BINARY tx wasm execute $CW20_ADDR "$CW20_SEND" --from validator $TXFLAG -y
+    ```
+12. Start daemon
     ```bash
     cargo run -- --network local daemon -r
     ``` 
-11. Add new task:
+13. Add new task:
     ```bash
+    BASE64_TRANSFER=$(echo '{"transfer":{"recipient":"'$AGENT_ADDR'","amount":"5"}}' | base64 -w 0)
     RULES='{
-    "create_task": {
-      "task": {
-        "interval": "Once",
-        "boundary": null,
-        "cw20_coins": [],
-        "stop_on_fail": false,
-        "actions": [
-          {
-            "msg": {
-              "bank": {
-                "send": {
-                  "amount": [
+        "create_task": {
+            "task": {
+                "interval": "Once",
+                "boundary": null,
+                "stop_on_fail": false,
+                "actions": [
                     {
-                      "amount": "1",
-                      "denom": "ujunox"
+                        "msg": {
+                            "wasm": {
+                                "execute": {
+                                    "contract_addr": "'$CW20_ADDR'",
+                                    "msg": "'$BASE64_TRANSFER'",
+                                    "funds": []
+                                }
+                            }
+                        },
+                        "gas_limit": null
                     }
-                  ],
-                  "to_address": "juno1yhqft6d2msmzpugdjtawsgdlwvgq3samrm5wrw"
-                }
-              }
-            }
-          },
-          {
-            "msg": {
-              "bank": {
-                "send": {
-                  "amount": [
+                ],
+                "rules": [
                     {
-                      "amount": "1",
-                      "denom": "ujunox"
+                        "has_balance_gte": {
+                            "address": "'$BOB'",
+                            "required_balance": {
+                                "cw20": {
+                                    "address": "'$CW20_ADDR'",
+                                    "amount": "5"
+                                }
+                            }
+                        }
                     }
-                  ],
-                  "to_address": "juno15w7hw4klzl9j2hk4vq7r3vuhz53h3mlzug9q6s"
-                }
-              }
+                ],
+                "cw20_coins": [
+                    {
+                        "address": "'$CW20_ADDR'",
+                        "amount": "5"
+                    }
+                ]
             }
-          }
-        ],
-        "rules": [{"has_balance_gte":{"address":"'$BOB'","required_balance":{"native":[{"denom":"ujunox","amount":"5"}]}}}]
-      }
-    }
+        }
     }'
     $BINARY tx wasm execute $CONTRACT_ADDRESS "$RULES" --amount 1700004ujunox --from validator $TXFLAG -y
     ```
-12. Transfer to bob 5ujunox
+14. Transfer to bob 5memecoins to activate rules
     ```bash
-    $BINARY tx bank send validator $BOB 5ujunox $TXFLAG
+    CW20_TRANSFER='{"transfer": {"recipient": "'$BOB'", "amount": "5"}}'
+    $BINARY tx wasm execute $CW20_ADDR "$CW20_TRANSFER" --from validator $TXFLAG -y
+    ```
+15. Ensure Agent's cw20 balance updated
+    ```bash
+    $BINARY query wasm contract-state smart $CW20_ADDR '{"balance": {"address": "'$AGENT_ADDR'"}}'
+    # Expected to be 5
     ```

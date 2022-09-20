@@ -4,6 +4,6 @@ chain_id: "testing"
 rpc_endpoint: "http://localhost:26657/"
 grpc_endpoint: "http://localhost:9090/"
 wsrpc_endpoint: "ws://localhost:26657/websocket"
-contract_address: "juno1qg5ega6dykkxc307y25pecuufrjkxkaggkkxh7nad0vhyhtuhw3seew7v3"
+contract_address: "juno1ghd753shjuwexxywmgs4xz7x2q732vcnkm6h2pyv9s6ah3hylvrq722sry"
 gas_prices: 0.1
 gas_adjustment: 1.5

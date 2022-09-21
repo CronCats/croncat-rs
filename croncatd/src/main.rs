@@ -7,8 +7,8 @@ use std::process::exit;
 use croncat::{
     channels,
     client::{BankQueryClient, QueryBank},
-    config::{ChainConfig},
-    errors::{eyre, Report},
+    config::ChainConfig,
+    errors::Report,
     grpc::{GrpcQuerier, GrpcSigner},
     logging::{self, info},
     store::agent::LocalAgentStorage,
@@ -45,8 +45,8 @@ async fn main() -> Result<(), Report> {
         cli::print_banner();
     }
 
-    let chain_id: Option<&str> = Some(opts.chain_id.as_ref());
-    let cfg = ChainConfig::new(chain_id).await?;
+    let chain_id = opts.chain_id.clone();
+    let cfg = ChainConfig::new(&chain_id).await?;
     info!("Starting croncatd...");
     match opts.cmd {
         opts::Command::RegisterAgent {
@@ -102,7 +102,7 @@ async fn main() -> Result<(), Report> {
         }
         opts::Command::GenerateMnemonic { new_name, mnemonic } => {
             storage.generate_account(new_name, mnemonic)?
-        },
+        }
         opts::Command::UpdateAgent {
             payable_account_id,
             sender_name,
@@ -131,19 +131,8 @@ async fn main() -> Result<(), Report> {
             let (shutdown_tx, shutdown_rx) = channels::create_shutdown_channel();
             system::go(shutdown_tx, shutdown_rx, signer).await?;
         }
-        opts::Command::Daemon { sender_name } => {
-            let key = storage.get_agent_signing_key(&sender_name)?;
-            let signer = GrpcSigner::new(cfg, key).await?;
-            let initial_status = signer
-                .get_agent(signer.account_id().as_ref())
-                .await?
-                .ok_or(eyre!("Agent must be registered to start the loop"))?
-                .status;
-            // Create a channel to handle graceful shutdown and wrap receiver for cloning
-            let (shutdown_tx, shutdown_rx) = channels::create_shutdown_channel();
-
-            // Start the agent
-            system::run(shutdown_tx, shutdown_rx, signer, initial_status).await?;
+        opts::Command::Daemonize { output } => {
+            system::ServiceDaemon::create(output, &chain_id)?;
         }
         _ => {}
     }

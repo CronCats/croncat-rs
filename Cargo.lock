@@ -650,6 +650,7 @@ dependencies = [
  "dotenv",
  "envy",
  "futures-util",
+ "indoc",
  "prost",
  "prost-types",
  "rand 0.8.5",
@@ -663,6 +664,7 @@ dependencies = [
  "tracing-subscriber",
  "tracing-test",
  "url",
+ "whoami",
 ]
 
 [[package]]
@@ -1511,6 +1513,12 @@ dependencies = [
  "autocfg 1.1.0",
  "hashbrown",
 ]
+
+[[package]]
+name = "indoc"
+version = "1.0.7"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "adab1eaa3408fb7f0c777a73e7465fd5656136fc93b670eb6df3c88c2c1344e3"
 
 [[package]]
 name = "input_buffer"
@@ -3847,6 +3855,17 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "aabe153544e473b775453675851ecc86863d2a81d786d741f6b76778f2a48940"
 dependencies = [
  "webpki",
+]
+
+[[package]]
+name = "whoami"
+version = "1.2.3"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "d6631b6a2fd59b1841b622e8f1a7ad241ef0a46f2d580464ce8140ac94cbd571"
+dependencies = [
+ "bumpalo",
+ "wasm-bindgen",
+ "web-sys",
 ]
 
 [[package]]

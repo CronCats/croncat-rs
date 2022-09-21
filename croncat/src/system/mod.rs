@@ -2,9 +2,11 @@
 //! The croncat system daemon.
 //!
 
-use std::sync::Arc;
+use std::{fs::File, io::Write, path::PathBuf, sync::Arc};
 
 use cw_croncat_core::types::AgentStatus;
+use indoc::indoc;
+use std::fs;
 use tokio::sync::Mutex;
 
 use crate::{
@@ -15,6 +17,10 @@ use crate::{
     streams::{agent, tasks, ws},
     tokio,
 };
+
+pub mod service;
+
+pub use service::ServiceDaemon;
 
 ///
 /// Kick off the croncat daemon

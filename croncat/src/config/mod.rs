@@ -5,7 +5,6 @@ use config::Config;
 use serde::{Deserialize, Serialize};
 use std::path::Path;
 
-
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct ChainConfig {
     pub denom: String,
@@ -23,13 +22,9 @@ impl ChainConfig {
     pub fn is_chain_registry_enabled() -> bool {
         true
     }
-    pub async fn new(chain_id: Option<&str>) -> Result<Self, Report> {
-        let mut ch_id=chain_id.unwrap();
-        if !chain_id.is_some() {
-            ch_id = "uni-3";
-        }
-        let config_file = &format!("config.{}.yaml", ch_id);
-        let config_override_file = &format!("config.{}.override.yaml", ch_id);
+    pub async fn new(chain_id: &String) -> Result<Self, Report> {
+        let config_file = &format!("config.{}.yaml", chain_id);
+        let config_override_file = &format!("config.{}.override.yaml", chain_id);
         if Path::new(config_override_file).is_file() {
             return Self::from_file(config_override_file);
         }

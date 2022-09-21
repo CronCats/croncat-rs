@@ -2,11 +2,9 @@
 //! The croncat system daemon.
 //!
 
-use std::{fs::File, io::Write, path::PathBuf, sync::Arc};
+use std::sync::Arc;
 
 use cw_croncat_core::types::AgentStatus;
-use indoc::indoc;
-use std::fs;
 use tokio::sync::Mutex;
 
 use crate::{

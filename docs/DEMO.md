@@ -46,7 +46,7 @@
 6. Create and store new agent addr
    ```bash
    # Inside croncat-rs
-   cargo run -- --network local generate-mnemonic
+   cargo run -- --chain-id local generate-mnemonic
    # Store your agent addr
    AGENT_ADDR=juno18luucfmwyqta72u4qj4wt6dc4jwlgwcgzvw0jp
    ```
@@ -56,11 +56,11 @@
    ```
 8. Register first agent
    ```bash
-   cargo run -- --network local register-agent
+   cargo run -- --chain-id local register-agent
    ```
 9. Now lets add mike-agent
     ```bash
-    cargo run -- --network local generate-mnemonic --new-name mike
+    cargo run -- --chain-id local generate-mnemonic --new-name mike
     # Store Mike addr
     MIKE_ADDR=juno1n6ns7urmgslq2mjl9qx49rn0a9504m23jdrn3x
     ```
@@ -68,11 +68,11 @@
     ```bash
     $BINARY tx bank send validator $MIKE_ADDR 100000000ujunox $TXFLAG
     # And start daemon
-    cargo run -- --network local daemon --sender-name mike
+    cargo run -- --chain-id local daemon --sender-name mike
     ```
 11. Unregister first agent
     ```bash
-    cargo run -- --network local unregister-agent
+    cargo run -- --chain-id local unregister-agent
     ```
 12. Add new task:
     ```bash

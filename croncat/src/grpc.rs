@@ -28,7 +28,6 @@ use crate::logging::info;
 ///
 /// Create message and query clients for interacting with the chain.
 ///
-//#[no_coverage]
 pub async fn connect(url: String) -> Result<(MsgClient<Channel>, QueryClient<Channel>), Report> {
     // Parse url
     let url = Url::parse(&url)?;

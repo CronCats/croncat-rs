@@ -31,6 +31,9 @@ impl ServiceDaemon {
         // Create the service file based on the chain ID.
         Self::create_service_file(path, chain_id)?;
 
+        // TODO: Link the service file to the systemd directory
+        // TODO: Enable and start the service.
+
         Ok(())
     }
 
@@ -39,7 +42,7 @@ impl ServiceDaemon {
         let user = whoami::username();
         // Get the full path to the croncatd service directory.
         let full_service_dir_path = fs::canonicalize(&path)?;
-        // File name for the croncatd service file.
+        // File path for the croncatd service file.
         let service_file_path = full_service_dir_path
             .join(format!("croncatd-{}.service", chain_id))
             .to_str()
@@ -51,16 +54,16 @@ impl ServiceDaemon {
         file.write_all(
             format!(
                 indoc! {"
-                    Description=croncatd {0} agent
+                    Description=croncatd {chain_id} agent
                     After=multi-user.target
 
                     [Service]
                     Type=simple
-                    User={1}
-                    WorkingDirectory={2}
-                    ExecStart={3} go
-                    StandardOutput=append:/var/log/croncatd-{0}.log
-                    StandardError=append:/var/log/croncatd-{0}-error.log
+                    User={user}
+                    WorkingDirectory={service_dir}
+                    ExecStart={exe_path} go
+                    StandardOutput=append:/var/log/croncatd-{chain_id}.log
+                    StandardError=append:/var/log/croncatd-{chain_id}-error.log
                     Restart=on-failure
                     RestartSec=60
                     KillSignal=SIGINT
@@ -70,12 +73,12 @@ impl ServiceDaemon {
                     [Install]
                     WantedBy=multi-user.target
                 "},
-                chain_id,
-                user,
-                full_service_dir_path
+                chain_id = chain_id,
+                user = user,
+                service_dir = full_service_dir_path
                     .to_str()
                     .expect("Could not convert daemon service directory path to string."),
-                std::env::current_exe()?
+                exe_path = std::env::current_exe()?
                     .to_str()
                     .expect("Could not convert daemon service executable path to string."),
             )

@@ -19,7 +19,7 @@ pub struct Opts {
     pub no_frills: bool,
 
     #[structopt(long)]
-    pub network: String,
+    pub chain_id: String,
 
     #[structopt(subcommand)] // Note that we mark a field as a subcommand
     pub cmd: Command,

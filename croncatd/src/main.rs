@@ -7,7 +7,7 @@ use std::process::exit;
 use croncat::{
     channels,
     client::{BankQueryClient, QueryBank},
-    config::{ChainConfig, NetworkType},
+    config::{ChainConfig},
     errors::{eyre, Report},
     grpc::{GrpcQuerier, GrpcSigner},
     logging::{self, info},
@@ -45,8 +45,8 @@ async fn main() -> Result<(), Report> {
         cli::print_banner();
     }
 
-    let network_type: Option<NetworkType> = Some(opts.network.parse().unwrap());
-    let cfg = ChainConfig::new(network_type).await?;
+    let chain_id: Option<&str> = Some(opts.chain_id.as_ref());
+    let cfg = ChainConfig::new(chain_id).await?;
     info!("Starting croncatd...");
     match opts.cmd {
         opts::Command::RegisterAgent {

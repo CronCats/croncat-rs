@@ -18,7 +18,7 @@ use crate::{
 
 pub mod service;
 
-pub use service::ServiceDaemon;
+pub use service::DaemonService;
 
 ///
 /// Kick off the croncat daemon

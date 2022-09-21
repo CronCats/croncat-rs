@@ -25,6 +25,9 @@ pub struct Opts {
     pub cmd: Command,
 }
 
+///
+/// Command line subcommands.
+///
 #[derive(Debug, StructOpt)]
 pub enum Command {
     /// Registers an agent, placing them in the pending queue unless it's the first agent.

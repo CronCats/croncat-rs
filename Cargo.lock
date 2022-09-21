@@ -756,7 +756,7 @@ dependencies = [
 [[package]]
 name = "cw-croncat-core"
 version = "0.1.0"
-source = "git+https://github.com/CronCats/cw-croncat#c531c669b8c1c8ad70d2eb08fff3ccaa7f93db10"
+source = "git+https://github.com/CronCats/cw-croncat#4f3c9f582eaeeec7e0ccc398b9ba9fbb663065c7"
 dependencies = [
  "cosmwasm-std",
  "cosmwasm-storage",
@@ -775,7 +775,7 @@ dependencies = [
 [[package]]
 name = "cw-rules-core"
 version = "0.1.0"
-source = "git+https://github.com/CronCats/cw-croncat#c531c669b8c1c8ad70d2eb08fff3ccaa7f93db10"
+source = "git+https://github.com/CronCats/cw-croncat#4f3c9f582eaeeec7e0ccc398b9ba9fbb663065c7"
 dependencies = [
  "cosmwasm-std",
  "cw20",
@@ -1202,7 +1202,7 @@ dependencies = [
 [[package]]
 name = "generic-query"
 version = "0.1.0"
-source = "git+https://github.com/CronCats/cw-croncat#c531c669b8c1c8ad70d2eb08fff3ccaa7f93db10"
+source = "git+https://github.com/CronCats/cw-croncat#4f3c9f582eaeeec7e0ccc398b9ba9fbb663065c7"
 dependencies = [
  "cosmwasm-std",
  "schemars",

@@ -82,9 +82,9 @@
     CW20_SEND='{"send": {"contract": "'$CONTRACT_ADDRESS'", "amount": "5", "msg": ""}}'
     $BINARY tx wasm execute $CW20_ADDR "$CW20_SEND" --from validator $TXFLAG -y
     ```
-12. Start daemon
+12. Start go
     ```bash
-    cargo run -- --chain-id local daemon -r
+    cargo run -- --chain-id local go -r
     ``` 
 13. Add new task:
     ```bash

@@ -65,6 +65,9 @@ pub enum Command {
     Go {
         #[structopt(long, default_value = "agent")]
         sender_name: String,
+        /// Allow agent to do tasks with rules, uses more computer resources
+        #[structopt(long, short = "r")]
+        with_rules: bool,
     },
     /// Gets the configuration from the Croncat manager contract
     Info,
@@ -87,8 +90,5 @@ pub enum Command {
     Daemon {
         #[structopt(long, default_value = "agent")]
         sender_name: String,
-        /// Allow daemon to do tasks with rules, uses more computer resources
-        #[structopt(long, short = "r")]
-        with_rules: bool,
     },
 }

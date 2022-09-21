@@ -33,6 +33,8 @@ anyhow = "1.0"
 bip39 = {version = "1.0.1", features = ["rand"] }
 async-trait = "0.1.57"
 chain-registry = "0.1.0"
+indoc = "1.0.7"
+whoami = "1.2.3"
 
 
 [dependencies.prost]

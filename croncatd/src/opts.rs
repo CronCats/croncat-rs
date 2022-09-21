@@ -74,7 +74,7 @@ pub enum Command {
         new_name: String,
         /// Recover agent from mnemonic phrase. Please do not use your own account!
         #[structopt(long)]
-        mnemonic: Option<String>
+        mnemonic: Option<String>,
     },
     /// (in progress) Send native tokens to an address
     DepositUjunox { account_id: String },
@@ -83,9 +83,9 @@ pub enum Command {
         #[structopt(long, default_value = "agent")]
         name: String,
     },
-    /// (in progress) Set up Croncat agent as a service
-    Daemon {
-        #[structopt(long, default_value = "agent")]
-        sender_name: String,
+    /// Set up Croncat agent as a service
+    Daemonize {
+        #[structopt(long)]
+        output: Option<String>,
     },
 }

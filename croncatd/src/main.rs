@@ -153,7 +153,7 @@ async fn main() -> Result<(), Report> {
             let (shutdown_tx, shutdown_rx) = channels::create_shutdown_channel();
 
             // Start the agent
-            system::run(shutdown_tx, shutdown_rx, signer, initial_status).await?;
+            system::run(shutdown_tx, shutdown_rx, signer, initial_status, false).await?;
         }
         _ => {}
     }

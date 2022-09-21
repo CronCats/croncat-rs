@@ -56,7 +56,7 @@
 6. Create and store new agent addr
    ```bash
    # Inside croncat-rs
-   cargo run -- --network local generate-mnemonic
+   cargo run -- --chain-id local generate-mnemonic
    # Store your agent addr
    AGENT_ADDR=juno18luucfmwyqta72u4qj4wt6dc4jwlgwcgzvw0jp
    ```
@@ -66,7 +66,7 @@
    ```
 8. Register agent
    ```bash
-   cargo run -- --network local register-agent
+   cargo run -- --chain-id local register-agent
    ```
 9. Generate some random wallet and save address
    ```bash
@@ -84,7 +84,7 @@
     ```
 12. Start daemon
     ```bash
-    cargo run -- --network local daemon -r
+    cargo run -- --chain-id local daemon -r
     ``` 
 13. Add new task:
     ```bash

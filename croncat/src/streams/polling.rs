@@ -20,19 +20,11 @@ use crate::{
 pub async fn poll(
     duration: Duration,
     block_stream_tx: BlockStreamTx,
+    rpc_address: String,
 ) {
-    // @TODO we need to pass in the chain ID
-    let config_file = &format!("config.{}.yaml", "local");
-    let config_result = ChainConfig::from_file(config_file);
-    if config_result.is_err() {
-        error!("Cannot load config file: {}.", config_file);
-    }
-
-    let config = config_result.unwrap();
-    let rpc_address = config.rpc_endpoint;
     info!("rpc_address {}", rpc_address);
 
-    let node_address: Url = rpc_address.as_str().parse().unwrap();
+    let node_address: Url = rpc_address.parse().unwrap();
     info!("node_address {}", node_address);
 
     let rpc_client = HttpClient::new(node_address).expect("Could not get http client for RPC node for polling");

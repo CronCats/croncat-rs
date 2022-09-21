@@ -45,7 +45,13 @@ async fn main() -> Result<(), Report> {
         cli::print_banner();
     }
 
-    let chain_id: Option<&str> = Some(opts.chain_id.as_ref());
+    // let chain_id: Option<&str> = Some(opts.chain_id.as_ref());
+    // if chain_id.is_some() {
+    //     info!("chain_id {}", chain_id.clone().unwrap());
+    // } else {
+    //     info!("chain_id wtf");
+    // }
+    let chain_id = Some("croncat-0.0.1");
     let cfg = ChainConfig::new(chain_id).await?;
     info!("Starting croncatd...");
     match opts.cmd {

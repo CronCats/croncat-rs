@@ -30,6 +30,21 @@
       "contributions": [
         "code"
       ]
+    },
+    {
+      "login": "deveusss",
+      "name": "Raf Deveus",
+      "avatar_url": "https://avatars.githubusercontent.com/u/42238266?v=4",
+      "profile": "http://deveus.me/",
+      "contributions": [
+        "code",
+        "bug",
+        "ideas",
+        "example",
+        "question",
+        "talk",
+        "review"
+      ]
     }
   ],
   "contributorsPerLine": 7,

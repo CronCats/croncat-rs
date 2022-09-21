@@ -30,6 +30,20 @@
       "contributions": [
         "code"
       ]
+    },
+    {
+      "login": "Buckram123",
+      "name": "Mykhailo Donchenko",
+      "avatar_url": "https://avatars.githubusercontent.com/u/91957742?v=4",
+      "profile": "https://github.com/Buckram123",
+      "contributions": [
+        "bug",
+        "ideas",
+        "example",
+        "question",
+        "talk",
+        "review"
+      ]
     }
   ],
   "contributorsPerLine": 7,

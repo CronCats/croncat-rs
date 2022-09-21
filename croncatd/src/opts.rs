@@ -83,7 +83,7 @@ pub enum Command {
         #[structopt(long, default_value = "agent")]
         name: String,
     },
-    /// Set up Croncat agent as a service
+    /// Set up an agent as a system service
     Daemonize {
         #[structopt(long)]
         output: Option<String>,

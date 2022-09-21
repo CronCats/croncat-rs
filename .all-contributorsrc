@@ -30,6 +30,20 @@
       "contributions": [
         "code"
       ]
+    },
+    {
+      "login": "mikedotexe",
+      "name": "Mike Purvis",
+      "avatar_url": "https://avatars.githubusercontent.com/u/1042667?v=4",
+      "profile": "https://www.linkedin.com/in/mikerobertpurvis",
+      "contributions": [
+        "bug",
+        "ideas",
+        "example",
+        "question",
+        "talk",
+        "review"
+      ]
     }
   ],
   "contributorsPerLine": 7,

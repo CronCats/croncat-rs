@@ -3,6 +3,7 @@
 //!
 
 use std::sync::Arc;
+use std::time::Duration;
 
 use cw_croncat_core::types::AgentStatus;
 use tokio::sync::Mutex;
@@ -12,7 +13,7 @@ use crate::{
     errors::Report,
     grpc::{self, GrpcSigner},
     logging::info,
-    streams::{agent, tasks, ws},
+    streams::{agent, tasks, ws, polling},
     tokio,
 };
 
@@ -96,12 +97,14 @@ pub async fn run(
     Ok(())
 }
 
+/// Start the agent which ingests/polls blocks, and executes tasks
 pub async fn go(
     shutdown_tx: ShutdownTx,
     shutdown_rx: ShutdownRx,
     signer: GrpcSigner,
 ) -> Result<(), Report> {
-    let (block_stream_tx, block_stream_rx) = channels::create_block_stream(128);
+    let (ws_block_stream_tx, ws_block_stream_rx) = channels::create_block_stream(128);
+    let http_block_stream_tx = ws_block_stream_tx.clone();
 
     // Connect to GRPC
     let (_msg_client, _query_client) = grpc::connect(signer.grpc().to_owned()).await?;
@@ -110,14 +113,19 @@ pub async fn go(
     let block_stream_shutdown_rx = shutdown_rx.clone();
     let wsrpc = signer.wsrpc().to_owned();
     let block_stream_handle = tokio::task::spawn(async move {
-        ws::stream_blocks_loop(wsrpc, block_stream_tx, block_stream_shutdown_rx)
+        ws::stream_blocks_loop(wsrpc, ws_block_stream_tx.clone(), block_stream_shutdown_rx)
             .await
             .expect("Failed to stream blocks")
     });
 
+    let polling_handle = tokio::task::spawn(async move {
+        polling::poll(Duration::from_secs(6), http_block_stream_tx.clone())
+            .await
+    });
+
     // Process blocks coming in from the blockchain
     let task_runner_shutdown_rx = shutdown_rx.clone();
-    let task_runner_block_stream_rx = block_stream_rx.clone();
+    let task_runner_block_stream_rx = ws_block_stream_rx.clone();
     let task_runner_handle = tokio::task::spawn(async move {
         tasks::do_task_if_any(task_runner_block_stream_rx, task_runner_shutdown_rx, signer)
             .await
@@ -137,6 +145,6 @@ pub async fn go(
         info!("Shutting down croncatd...");
     });
 
-    let _ = tokio::join!(ctrl_c_handle, block_stream_handle, task_runner_handle);
+    let _ = tokio::join!(ctrl_c_handle, block_stream_handle, task_runner_handle, polling_handle);
     Ok(())
 }

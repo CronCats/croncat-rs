@@ -56,7 +56,8 @@ pub async fn do_task_if_any(
     signer: GrpcSigner,
 ) -> Result<(), Report> {
     let block_consumer_stream = tokio::task::spawn(async move {
-        while (block_stream_rx.recv().await).is_ok() {
+        'grab_blocks: while let Ok(block) = block_stream_rx.recv().await {
+            info!("Received block {:?}", block);
             let account_addr = signer.account_id().as_ref();
             let agent_active = signer
                 .get_agent(account_addr)

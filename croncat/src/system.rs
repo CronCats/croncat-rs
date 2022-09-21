@@ -118,8 +118,9 @@ pub async fn go(
             .expect("Failed to stream blocks")
     });
 
+    let rpc_addr = signer.rpc().to_owned();
     let polling_handle = tokio::task::spawn(async move {
-        polling::poll(Duration::from_secs(6), http_block_stream_tx.clone())
+        polling::poll(Duration::from_secs(6), http_block_stream_tx.clone(), rpc_addr)
             .await
     });
 

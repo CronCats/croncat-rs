@@ -4,7 +4,7 @@ use std::{
     path::PathBuf,
 };
 
-use color_eyre::Report;
+use color_eyre::{eyre::eyre, Report};
 use indoc::indoc;
 use tracing::log::info;
 
@@ -12,14 +12,14 @@ use tracing::log::info;
 const DAEMON_SERVICES_DIR_NAME: &str = "system-services";
 
 /// The croncat system service daemon.
-pub struct ServiceDaemon;
+pub struct DaemonService;
 
-impl ServiceDaemon {
+impl DaemonService {
     /// Create a new daemon service file at the given path with chain ID.
-    pub fn create(path: Option<String>, chain_id: &String) -> Result<(), Report> {
+    pub fn create(path: Option<String>, chain_id: &String, no_frills: bool) -> Result<(), Report> {
         // If no path is given, use the default path
         let default_output = std::env::current_dir()
-            .expect("Failed to get current directory")
+            .map_err(|err| eyre!("Failed to get current directory: {}", err))?
             .to_str()
             .unwrap()
             .to_string();
@@ -29,15 +29,25 @@ impl ServiceDaemon {
         fs::create_dir_all(&path)?;
 
         // Create the service file based on the chain ID.
-        Self::create_service_file(path, chain_id)?;
+        let service_file_path = Self::create_service_file(path, chain_id)?;
 
-        // TODO: Link the service file to the systemd directory
-        // TODO: Enable and start the service.
+        info!(
+            "Created croncatd service file for chain ID {} at {}",
+            chain_id, &service_file_path
+        );
+
+        // Link the service file to the systemd directory.
+        Self::link_service_file(&service_file_path)?;
+
+        info!("Linked croncatd service file to systemd directory");
+
+        // Print a nice little message if we're not in no-frills mode.
+        Self::print_next_steps(chain_id, no_frills);
 
         Ok(())
     }
 
-    fn create_service_file(path: PathBuf, chain_id: &String) -> Result<(), Report> {
+    fn create_service_file(path: PathBuf, chain_id: &String) -> Result<String, Report> {
         // Get the current user's name.
         let user = whoami::username();
         // Get the full path to the croncatd service directory.
@@ -46,7 +56,7 @@ impl ServiceDaemon {
         let service_file_path = full_service_dir_path
             .join(format!("croncatd-{}.service", chain_id))
             .to_str()
-            .expect("Failed to get service file path.")
+            .ok_or_else(|| eyre!("Failed to get service file path."))?
             .to_string();
 
         info!("Creating system service daemon at {}", &service_file_path);
@@ -75,16 +85,41 @@ impl ServiceDaemon {
                 "},
                 chain_id = chain_id,
                 user = user,
-                service_dir = full_service_dir_path
-                    .to_str()
-                    .expect("Could not convert daemon service directory path to string."),
-                exe_path = std::env::current_exe()?
-                    .to_str()
-                    .expect("Could not convert daemon service executable path to string."),
+                service_dir = full_service_dir_path.to_str().ok_or_else(|| eyre!(
+                    "Could not convert daemon service directory path to string",
+                ))?,
+                exe_path = std::env::current_exe()?.to_str().ok_or_else(|| eyre!(
+                    "Could not convert daemon service executable path to string",
+                ))?,
             )
             .as_bytes(),
         )?;
 
+        Ok(service_file_path)
+    }
+
+    /// Create a symlink to the service file in the systemd directory.
+    fn link_service_file(service_file_path: &String) -> Result<(), Report> {
+        std::process::Command::new("sudo")
+            .arg("systemctl")
+            .arg("link")
+            .arg(service_file_path)
+            .status()
+            .map_err(|err| eyre!("Failed to link service file to systemd: {}", err))?;
+
         Ok(())
+    }
+
+    fn print_next_steps(chain_id: &String, no_frills: bool) {
+        if !no_frills {
+            println!(
+                indoc! {"\n
+                    Next steps:
+                    1. Enable the service: `sudo systemctl enable croncatd-{chain_id}`
+                    2. Start the service: `sudo systemctl start croncatd-{chain_id}`
+                "},
+                chain_id = chain_id,
+            );
+        }
     }
 }

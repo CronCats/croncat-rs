@@ -131,7 +131,7 @@ async fn main() -> Result<(), Report> {
             system::go(shutdown_tx, shutdown_rx, signer).await?;
         }
         opts::Command::SetupService { output } => {
-            system::ServiceDaemon::create(output, &chain_id)?;
+            system::DaemonService::create(output, &chain_id, opts.no_frills)?;
         }
         _ => {}
     }

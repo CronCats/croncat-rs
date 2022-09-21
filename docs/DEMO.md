@@ -64,11 +64,11 @@
     # Store Mike addr
     MIKE_ADDR=juno1n6ns7urmgslq2mjl9qx49rn0a9504m23jdrn3x
     ```
-10. Refill Mike's balance and start daemon as Mike 
+10. Refill Mike's balance and start "go" as Mike 
     ```bash
     $BINARY tx bank send validator $MIKE_ADDR 100000000ujunox $TXFLAG
-    # And start daemon
-    cargo run -- --chain-id local daemon --sender-name mike
+    # And start "go"
+    cargo run -- --chain-id local go --sender-name mike
     ```
 11. Unregister first agent
     ```bash

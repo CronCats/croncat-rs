@@ -1,3 +1,5 @@
+//! Cosmos client helpers.
+
 pub use cosmos_sdk_proto::cosmos::auth::v1beta1::query_client::QueryClient as AuthQueryClient;
 pub use cosmos_sdk_proto::cosmwasm::wasm::v1::query_client::QueryClient as WasmQueryClient;
 

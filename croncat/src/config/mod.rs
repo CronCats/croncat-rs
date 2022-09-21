@@ -1,3 +1,5 @@
+//! Agent configuration.
+
 /// TODO: Move to chain registry
 /// Right now juno testnet missing grpc's, so we keeping it like `cosm-orc`'s chain config
 use color_eyre::Report;

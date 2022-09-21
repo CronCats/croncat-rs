@@ -96,8 +96,8 @@ pub enum Command {
         name: String,
     },
 
-    /// Set up an agent as a system service
-    Daemonize {
+    /// Setup an agent as a system service (systemd)
+    SetupService {
         #[structopt(long)]
         output: Option<String>,
     },

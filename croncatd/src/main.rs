@@ -130,7 +130,7 @@ async fn main() -> Result<(), Report> {
             let (shutdown_tx, shutdown_rx) = channels::create_shutdown_channel();
             system::go(shutdown_tx, shutdown_rx, signer).await?;
         }
-        opts::Command::Daemonize { output } => {
+        opts::Command::SetupService { output } => {
             system::ServiceDaemon::create(output, &chain_id)?;
         }
         _ => {}

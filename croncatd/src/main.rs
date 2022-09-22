@@ -143,7 +143,11 @@ async fn main() -> Result<(), Report> {
         opts::Command::SetupService { output } => {
             system::DaemonService::create(output, &chain_id, opts.no_frills)?;
         }
-        _ => {}
+        opts::Command::GetState { from_index, limit } => {
+            let querier = GrpcQuerier::new(cfg).await?;
+
+            querier.get_contract_state(from_index, limit).await?;
+        }
     }
 
     // Say goodbye if no no-frills

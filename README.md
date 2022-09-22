@@ -47,12 +47,12 @@ SUBCOMMANDS:
     get-agent            Sensitive. Shows all details about agents on this machine
     get-agent-status     Get the agent's status (pending/active)
     get-agent-tasks      Get the agent's tasks they're assigned to fulfill
+    get-state            Get contract's state
     go                   Starts the Croncat agent, allowing it to fulfill tasks
     help                 Prints this message or the help of the given subcommand(s)
     info                 Gets the configuration from the Croncat manager contract
     register-agent       Registers an agent, placing them in the pending queue unless it's the first agent
     setup-service        Setup an agent as a system service (systemd)
-    status               (in progress) Get the agent's status
     tasks                Show all task(s) information
     unregister-agent     Unregisters the agent from being in the queue with other agents
     update-agent         Update the agent's configuration

@@ -47,7 +47,6 @@ pub async fn poll(duration: Duration, block_stream_tx: BlockStreamTx, mut shutdo
     });
 
     // Allow this task to get shut down when a person types Ctrl+C
-    let mut continue_loop = true;
     tokio::select! {
         _ = polling_loop_handle => {}
         _ = shutdown_rx.recv() => {}

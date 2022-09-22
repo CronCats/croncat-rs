@@ -30,13 +30,33 @@ croncatd 0.1.0
 The croncat agent daemon.
 
 USAGE:
-    croncatd [FLAGS]
+    croncatd [FLAGS] --chain-id <chain-id> <SUBCOMMAND>
 
 FLAGS:
     -d, --debug        Debug mode
     -h, --help         Prints help information
         --no-frills    Whether to print nice little things like the banner and a goodbye
     -V, --version      Prints version information
+
+OPTIONS:
+        --chain-id <chain-id>
+
+SUBCOMMANDS:
+    deposit-ujunox       (in progress) Send native tokens to an address
+    generate-mnemonic    Generates a new keypair and agent account (good first step)
+    get-agent            Sensitive. Shows all details about agents on this machine
+    get-agent-status     Get the agent's status (pending/active)
+    get-agent-tasks      Get the agent's tasks they're assigned to fulfill
+    go                   Starts the Croncat agent, allowing it to fulfill tasks
+    help                 Prints this message or the help of the given subcommand(s)
+    info                 Gets the configuration from the Croncat manager contract
+    register-agent       Registers an agent, placing them in the pending queue unless it's the first agent
+    setup-service        Setup an agent as a system service (systemd)
+    status               (in progress) Get the agent's status
+    tasks                Show all task(s) information
+    unregister-agent     Unregisters the agent from being in the queue with other agents
+    update-agent         Update the agent's configuration
+    withdraw             Withdraw the agent's funds to the payable account ID
 ```
 
 ## Generate Docs

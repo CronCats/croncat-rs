@@ -7,7 +7,7 @@ use std::process::exit;
 use croncat::{
     channels,
     client::{BankQueryClient, QueryBank},
-    config::{ChainConfig},
+    config::ChainConfig,
     errors::{eyre, Report},
     grpc::{GrpcQuerier, GrpcSigner},
     logging::{self, info},
@@ -23,7 +23,6 @@ mod opts;
 ///
 /// Start the `croncatd` agent.
 ///
-
 #[tokio::main]
 async fn main() -> Result<(), Report> {
     // Get environment variables
@@ -45,8 +44,8 @@ async fn main() -> Result<(), Report> {
         cli::print_banner();
     }
 
-    let chain_id: Option<&str> = Some(opts.chain_id.as_ref());
-    let cfg = ChainConfig::new(chain_id).await?;
+    let chain_id = opts.chain_id.clone();
+    let cfg = ChainConfig::new(&chain_id).await?;
     info!("Starting croncatd...");
     match opts.cmd {
         opts::Command::RegisterAgent {
@@ -102,7 +101,7 @@ async fn main() -> Result<(), Report> {
         }
         opts::Command::GenerateMnemonic { new_name, mnemonic } => {
             storage.generate_account(new_name, mnemonic)?
-        },
+        }
         opts::Command::UpdateAgent {
             payable_account_id,
             sender_name,
@@ -125,13 +124,10 @@ async fn main() -> Result<(), Report> {
             );
         }
         opts::Command::GetAgent { name } => storage.display_account(&name),
-        opts::Command::Go { sender_name } => {
-            let key = storage.get_agent_signing_key(&sender_name)?;
-            let signer = GrpcSigner::new(cfg, key).await?;
-            let (shutdown_tx, shutdown_rx) = channels::create_shutdown_channel();
-            system::go(shutdown_tx, shutdown_rx, signer).await?;
-        }
-        opts::Command::Daemon { sender_name } => {
+        opts::Command::Go {
+            sender_name,
+            with_rules,
+        } => {
             let key = storage.get_agent_signing_key(&sender_name)?;
             let signer = GrpcSigner::new(cfg, key).await?;
             let initial_status = signer
@@ -141,9 +137,11 @@ async fn main() -> Result<(), Report> {
                 .status;
             // Create a channel to handle graceful shutdown and wrap receiver for cloning
             let (shutdown_tx, shutdown_rx) = channels::create_shutdown_channel();
-
             // Start the agent
-            system::run(shutdown_tx, shutdown_rx, signer, initial_status).await?;
+            system::run(shutdown_tx, shutdown_rx, signer, initial_status, with_rules).await?;
+        }
+        opts::Command::SetupService { output } => {
+            system::DaemonService::create(output, &chain_id, opts.no_frills)?;
         }
         _ => {}
     }

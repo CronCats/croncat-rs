@@ -3,6 +3,6 @@
 //!
 
 pub mod agent;
+pub mod polling;
 pub mod tasks;
 pub mod ws;
-pub mod polling;

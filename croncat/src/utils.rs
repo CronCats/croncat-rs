@@ -7,6 +7,8 @@ use std::sync::{
     Arc,
 };
 
+use cw_croncat_core::msg::AgentTaskResponse;
+
 pub const DEFAULT_AGENT_ID: &str = "agent";
 pub const DERVIATION_PATH: &str = "m/44'/118'/0'/0/0";
 
@@ -38,4 +40,12 @@ impl AtomicIntervalCounter {
 
         current_count > 0 && current_count % self.check_interval == 0
     }
+}
+
+pub fn sum_num_tasks(tasks: &AgentTaskResponse) -> u64 {
+    (tasks.num_block_tasks
+        + tasks.num_block_tasks_extra
+        + tasks.num_cron_tasks
+        + tasks.num_cron_tasks_extra)
+        .into()
 }

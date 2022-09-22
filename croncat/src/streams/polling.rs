@@ -6,10 +6,8 @@ use std::time::Duration;
 use tendermint_rpc::{Client, HttpClient, Url};
 use tokio::time::sleep;
 
-use crate::config::ChainConfig;
-
 use crate::channels::BlockStreamTx;
-use crate::logging::{error, info};
+use crate::logging::info;
 
 ///
 /// Polls the chain using HTTP client calling latest_block

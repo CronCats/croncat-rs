@@ -38,10 +38,19 @@ pub async fn run(
     // Connect to GRPC  Stream new blocks from the WS RPC subscription
     let block_stream_shutdown_rx = shutdown_rx.clone();
     let wsrpc = signer.wsrpc().to_owned();
+    let ws_block_stream_tx = block_stream_tx.clone();
     let block_stream_handle = tokio::task::spawn(async move {
-        ws::stream_blocks_loop(wsrpc, block_stream_tx, block_stream_shutdown_rx)
+        ws::stream_blocks_loop(wsrpc, ws_block_stream_tx, block_stream_shutdown_rx)
             .await
             .expect("Failed to stream blocks")
+    });
+
+    // Set up polling
+    let rpc_addr = signer.rpc().to_owned();
+    let http_block_stream_tx = block_stream_tx.clone();
+    let polling_handle = tokio::task::spawn(async move {
+        // TODO (mikedotexe) let's have the duration be in config. lfg Cosmoverse first
+        polling::poll(Duration::from_secs(6), http_block_stream_tx, rpc_addr).await
     });
 
     // TODO (SeedyROM): For each agent check the status before beginning the loop.
@@ -108,6 +117,7 @@ pub async fn run(
         task_runner_handle,
         account_status_check_handle,
         rules_runner_handle,
+        polling_handle
     );
 
     Ok(())

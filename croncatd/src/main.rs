@@ -146,7 +146,8 @@ async fn main() -> Result<(), Report> {
         opts::Command::GetState { from_index, limit } => {
             let querier = GrpcQuerier::new(cfg).await?;
 
-            querier.get_contract_state(from_index, limit).await?;
+            let state = querier.get_contract_state(from_index, limit).await?;
+            println!("{state}");
         }
     }
 

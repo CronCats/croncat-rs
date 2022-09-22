@@ -27,7 +27,7 @@
 $ cargo run -- --help
 ...
 croncatd 0.1.0
-Command line subcommands
+The croncat agent daemon.
 
 USAGE:
     croncatd [FLAGS] --chain-id <chain-id> <SUBCOMMAND>

@@ -46,11 +46,12 @@ pub async fn run(
     });
 
     // Set up polling
+    let block_polling_shutdown_rx = shutdown_rx.clone();
     let rpc_addr = signer.rpc().to_owned();
     let http_block_stream_tx = block_stream_tx.clone();
     let polling_handle = tokio::task::spawn(async move {
         // TODO (mikedotexe) let's have the duration be in config. lfg Cosmoverse first
-        polling::poll(Duration::from_secs(6), http_block_stream_tx, rpc_addr).await
+        polling::poll(Duration::from_secs(6), http_block_stream_tx, block_polling_shutdown_rx, rpc_addr).await
     });
 
     // TODO (SeedyROM): For each agent check the status before beginning the loop.

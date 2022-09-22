@@ -4,9 +4,6 @@
 
 use structopt::StructOpt;
 
-///
-/// Command line options.
-///
 #[derive(Debug, StructOpt)]
 #[structopt(name = "croncatd", about = "The croncat agent daemon.")]
 pub struct Opts {
@@ -25,9 +22,6 @@ pub struct Opts {
     pub cmd: Command,
 }
 
-///
-/// Command line subcommands.
-///
 #[derive(Debug, StructOpt)]
 pub enum Command {
     /// Registers an agent, placing them in the pending queue unless it's the first agent.

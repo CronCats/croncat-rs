@@ -16,6 +16,10 @@ use crate::{
     tokio,
 };
 
+pub mod service;
+
+pub use service::DaemonService;
+
 ///
 /// Kick off the croncat daemon
 ///

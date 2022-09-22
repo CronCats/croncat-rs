@@ -4,9 +4,6 @@
 
 use structopt::StructOpt;
 
-///
-/// Command line options.
-///
 #[derive(Debug, StructOpt)]
 #[structopt(name = "croncatd", about = "The croncat agent daemon.")]
 pub struct Opts {
@@ -34,33 +31,41 @@ pub enum Command {
         #[structopt(long, default_value = "agent")]
         sender_name: String,
     },
+
     /// Get the agent's status (pending/active)
     GetAgentStatus { account_id: String },
+
     /// Get the agent's tasks they're assigned to fulfill
     GetAgentTasks { account_addr: String },
+
     /// Unregisters the agent from being in the queue with other agents
     UnregisterAgent {
         #[structopt(long, default_value = "agent")]
         sender_name: String,
     },
+
     /// Update the agent's configuration
     UpdateAgent {
         payable_account_id: String,
         #[structopt(long, default_value = "agent")]
         sender_name: String,
     },
+
     /// Withdraw the agent's funds to the payable account ID
     Withdraw {
         #[structopt(long, default_value = "agent")]
         sender_name: String,
     },
+
     /// (in progress) Get the agent's status
     Status,
+
     /// Show all task(s) information
     Tasks {
         from_index: Option<u64>,
         limit: Option<u64>,
     },
+
     /// Starts the Croncat agent, allowing it to fulfill tasks
     Go {
         #[structopt(long, default_value = "agent")]
@@ -69,8 +74,10 @@ pub enum Command {
         #[structopt(long, short = "r")]
         with_rules: bool,
     },
+
     /// Gets the configuration from the Croncat manager contract
     Info,
+
     /// Generates a new keypair and agent account (good first step)
     GenerateMnemonic {
         #[structopt(long, default_value = "agent")]
@@ -79,16 +86,19 @@ pub enum Command {
         #[structopt(long)]
         mnemonic: Option<String>,
     },
+
     /// (in progress) Send native tokens to an address
     DepositUjunox { account_id: String },
+
     /// Sensitive. Shows all details about agents on this machine
     GetAgent {
         #[structopt(long, default_value = "agent")]
         name: String,
     },
-    /// (in progress) Set up Croncat agent as a service
-    Daemon {
-        #[structopt(long, default_value = "agent")]
-        sender_name: String,
+
+    /// Setup an agent as a system service (systemd)
+    SetupService {
+        #[structopt(long)]
+        output: Option<String>,
     },
 }

@@ -23,7 +23,6 @@ mod opts;
 ///
 /// Start the `croncatd` agent.
 ///
-
 #[tokio::main]
 async fn main() -> Result<(), Report> {
     // Get environment variables
@@ -45,8 +44,8 @@ async fn main() -> Result<(), Report> {
         cli::print_banner();
     }
 
-    let chain_id: Option<&str> = Some(opts.chain_id.as_ref());
-    let cfg = ChainConfig::new(chain_id).await?;
+    let chain_id = opts.chain_id.clone();
+    let cfg = ChainConfig::new(&chain_id).await?;
     info!("Starting croncatd...");
     match opts.cmd {
         opts::Command::RegisterAgent {
@@ -141,19 +140,8 @@ async fn main() -> Result<(), Report> {
             // Start the agent
             system::run(shutdown_tx, shutdown_rx, signer, initial_status, with_rules).await?;
         }
-        opts::Command::Daemon { sender_name } => {
-            let key = storage.get_agent_signing_key(&sender_name)?;
-            let signer = GrpcSigner::new(cfg, key).await?;
-            let initial_status = signer
-                .get_agent(signer.account_id().as_ref())
-                .await?
-                .ok_or(eyre!("Agent must be registered to start the loop"))?
-                .status;
-            // Create a channel to handle graceful shutdown and wrap receiver for cloning
-            let (shutdown_tx, shutdown_rx) = channels::create_shutdown_channel();
-
-            // Start the agent
-            system::run(shutdown_tx, shutdown_rx, signer, initial_status, false).await?;
+        opts::Command::SetupService { output } => {
+            system::DaemonService::create(output, &chain_id, opts.no_frills)?;
         }
         _ => {}
     }

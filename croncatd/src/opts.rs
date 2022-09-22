@@ -57,8 +57,11 @@ pub enum Command {
         sender_name: String,
     },
 
-    /// (in progress) Get the agent's status
-    Status,
+    /// Get contract's state
+    GetState {
+        from_index: Option<u64>,
+        limit: Option<u64>,
+    },
 
     /// Show all task(s) information
     Tasks {

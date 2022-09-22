@@ -5,7 +5,6 @@ use config::Config;
 use serde::{Deserialize, Serialize};
 use std::path::Path;
 
-
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct ChainConfig {
     pub denom: String,
@@ -24,7 +23,7 @@ impl ChainConfig {
         true
     }
     pub async fn new(chain_id: Option<&str>) -> Result<Self, Report> {
-        let mut ch_id=chain_id.unwrap();
+        let mut ch_id = chain_id.unwrap();
         if !chain_id.is_some() {
             ch_id = "uni-3";
         }

@@ -192,6 +192,10 @@ impl GrpcSigner {
     pub fn grpc(&self) -> &str {
         &self.client.cfg.grpc_endpoint
     }
+
+    pub fn rpc(&self) -> &str {
+        &self.client.cfg.rpc_endpoint
+    }
 }
 
 pub struct GrpcQuerier {

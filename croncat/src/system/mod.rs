@@ -126,7 +126,7 @@ pub async fn run(
     match system_status {
         Ok(_) => Ok(()),
         Err(e) => {
-            info!("croncatd shutdown with error: {}", e);
+            error!("croncatd shutdown with error: {}", e);
             Err(e.into())
         }
     }

@@ -21,6 +21,7 @@ pub async fn poll(
     shutdown_rx: &ShutdownRx,
     rpc_address: &String,
 ) -> Result<(), Report> {
+
     info!("rpc_address {}", rpc_address);
 
     let node_address: Url = rpc_address.parse().unwrap();

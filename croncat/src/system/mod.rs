@@ -112,8 +112,8 @@ pub async fn run(
         info!("Shutting down croncatd...");
     });
 
-    // TODO (SeedyROM): Maybe do something with the return values?
-    let _ = tokio::join!(
+    // Try to join all the system tasks.
+    let system_status = tokio::try_join!(
         ctrl_c_handle,
         block_stream_handle,
         task_runner_handle,
@@ -122,5 +122,12 @@ pub async fn run(
         polling_handle
     );
 
-    Ok(())
+    // If any of the tasks failed, we need to propagate the error.
+    match system_status {
+        Ok(_) => Ok(()),
+        Err(e) => {
+            info!("croncatd shutdown with error: {}", e);
+            Err(e.into())
+        }
+    }
 }

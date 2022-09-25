@@ -7,6 +7,10 @@ use std::time::Duration;
 
 use cw_croncat_core::types::AgentStatus;
 use tokio::sync::Mutex;
+use tokio_retry::{
+    strategy::{jitter, ExponentialBackoff},
+    Retry,
+};
 use tracing::log::error;
 
 use crate::{
@@ -50,17 +54,21 @@ pub async fn run(
     let block_polling_shutdown_rx = shutdown_rx.clone();
     let rpc_addr = signer.rpc().to_owned();
     let http_block_stream_tx = block_stream_tx.clone();
-    let polling_handle = tokio::task::spawn(
-        // TODO (mikedotexe) let's have the duration be in config. lfg Cosmoverse first
-        polling::poll(
-            Duration::from_secs(2),
-            http_block_stream_tx,
-            block_polling_shutdown_rx,
-            rpc_addr,
-        ),
-    );
 
-    // TODO (SeedyROM): For each agent check the status before beginning the loop.
+    let retry_strategy = ExponentialBackoff::from_millis(10).map(jitter).take(8);
+    let retry_polling_handle = tokio::task::spawn(async move {
+        Retry::spawn(retry_strategy.clone(), || async {
+            polling::poll(
+                // TODO (mikedotexe) let's have the duration be in config. lfg Cosmoverse first
+                Duration::from_secs(2),
+                &http_block_stream_tx,
+                &block_polling_shutdown_rx,
+                &rpc_addr,
+            )
+            .await
+        })
+        .await
+    });
 
     // Account status checks
     let account_status_check_shutdown_rx = shutdown_rx.clone();
@@ -120,7 +128,7 @@ pub async fn run(
         task_runner_handle,
         account_status_check_handle,
         rules_runner_handle,
-        polling_handle
+        retry_polling_handle,
     );
 
     // If any of the tasks failed, we need to propagate the error.

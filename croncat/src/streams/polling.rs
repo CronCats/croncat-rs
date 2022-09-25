@@ -13,7 +13,12 @@ use crate::logging::info;
 /// Polls the chain using HTTP client calling latest_block
 /// Then broadcasts (only) the height of that block.
 ///
-pub async fn poll(duration: Duration, block_stream_tx: BlockStreamTx, mut shutdown_rx: ShutdownRx, rpc_address: String) {
+pub async fn poll(
+    duration: Duration,
+    block_stream_tx: BlockStreamTx,
+    mut shutdown_rx: ShutdownRx,
+    rpc_address: String,
+) {
     info!("rpc_address {}", rpc_address);
 
     let node_address: Url = rpc_address.parse().unwrap();

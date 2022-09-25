@@ -17,6 +17,11 @@
 -   `croncatd` This is the executable agent daemon.
 -   `croncat` This is all the pieces to build an agent daemon, this will probably become it's own repo so keep it DRY and clean.
 
+## Development Tools
+
+-   `cargo install rusty-hook cargo-make`
+-   `rusty-hook init`
+
 ## Run
 
 -   `cargo run`

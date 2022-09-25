@@ -7,6 +7,7 @@ use futures_util::StreamExt;
 use tendermint_rpc::event::EventData;
 use tendermint_rpc::query::EventType;
 use tendermint_rpc::{SubscriptionClient, WebSocketClient};
+use tokio::task::JoinHandle;
 use url::Url;
 
 use crate::channels::BlockStreamTx;
@@ -42,9 +43,9 @@ pub async fn stream_blocks_loop(
     info!("Successfully subscribed to NewBlock event");
 
     // Handle inbound blocks
-    let block_stream_handle = tokio::task::spawn(async move {
+    let block_stream_handle: JoinHandle<Result<(), Report>> = tokio::task::spawn(async move {
         while let Some(msg) = subscriptions.next().await {
-            let msg = msg.expect("Failed to receive event");
+            let msg = msg?;
             match msg.data {
                 // Handle blocks
                 EventData::NewBlock {
@@ -54,10 +55,7 @@ pub async fn stream_blocks_loop(
                         "Received block (height: {}) from {}",
                         block.header.height, block.header.time
                     );
-                    block_stream_tx
-                        .broadcast(block)
-                        .await
-                        .expect("Failed to send block from ws to block stream");
+                    block_stream_tx.broadcast(block).await?;
                 }
                 // Warn about all events for now
                 message => {
@@ -65,6 +63,8 @@ pub async fn stream_blocks_loop(
                 }
             }
         }
+
+        Ok(())
     });
 
     tokio::select! {

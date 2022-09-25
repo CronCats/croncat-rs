@@ -7,6 +7,7 @@ use std::time::Duration;
 
 use cw_croncat_core::types::AgentStatus;
 use tokio::sync::Mutex;
+use tracing::log::error;
 
 use crate::{
     channels::{self, ShutdownRx, ShutdownTx},

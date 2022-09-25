@@ -55,7 +55,15 @@ pub async fn run(
     let rpc_addr = signer.rpc().to_owned();
     let http_block_stream_tx = block_stream_tx.clone();
 
+    // Handle retries if the polling task fails.
     let retry_strategy = ExponentialBackoff::from_millis(10).map(jitter).take(8);
+    //
+    // NOTE:
+    // This was super tricky, bascially we need to pass all non Copyable values
+    // in by reference otherwise our closure will be FnOnce and we can't call it.
+    //
+    // This should be repeated for all the other tasks probably?
+    //
     let retry_polling_handle = tokio::task::spawn(async move {
         Retry::spawn(retry_strategy.clone(), || async {
             polling::poll(

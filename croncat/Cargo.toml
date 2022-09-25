@@ -42,6 +42,7 @@ async-trait = "0.1.57"
 chain-registry = "0.1.0"
 indoc = "1.0.7"
 whoami = "1.2.3"
+tokio-retry = "0.3.0"
 
 
 [dependencies.prost]

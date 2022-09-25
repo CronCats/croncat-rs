@@ -39,20 +39,25 @@ pub async fn run(
     let block_stream_shutdown_rx = shutdown_rx.clone();
     let wsrpc = signer.wsrpc().to_owned();
     let ws_block_stream_tx = block_stream_tx.clone();
-    let block_stream_handle = tokio::task::spawn(async move {
-        ws::stream_blocks_loop(wsrpc, ws_block_stream_tx, block_stream_shutdown_rx)
-            .await
-            .expect("Failed to stream blocks")
-    });
+    let block_stream_handle = tokio::task::spawn(ws::stream_blocks_loop(
+        wsrpc,
+        ws_block_stream_tx,
+        block_stream_shutdown_rx,
+    ));
 
     // Set up polling
     let block_polling_shutdown_rx = shutdown_rx.clone();
     let rpc_addr = signer.rpc().to_owned();
     let http_block_stream_tx = block_stream_tx.clone();
-    let polling_handle = tokio::task::spawn(async move {
+    let polling_handle = tokio::task::spawn(
         // TODO (mikedotexe) let's have the duration be in config. lfg Cosmoverse first
-        polling::poll(Duration::from_secs(2), http_block_stream_tx, block_polling_shutdown_rx, rpc_addr).await
-    });
+        polling::poll(
+            Duration::from_secs(2),
+            http_block_stream_tx,
+            block_polling_shutdown_rx,
+            rpc_addr,
+        ),
+    );
 
     // TODO (SeedyROM): For each agent check the status before beginning the loop.
 
@@ -62,41 +67,37 @@ pub async fn run(
     let block_status = Arc::new(Mutex::new(initial_status));
     let block_status_accounts_loop = block_status.clone();
     let signer_status = signer.clone();
-    let account_status_check_handle = tokio::task::spawn(async move {
-        agent::check_account_status_loop(
-            account_status_check_block_stream_rx,
-            account_status_check_shutdown_rx,
-            block_status_accounts_loop,
-            signer_status,
-        )
-        .await
-        .expect("Failed to check account statuses")
-    });
+    let account_status_check_handle = tokio::task::spawn(agent::check_account_status_loop(
+        account_status_check_block_stream_rx,
+        account_status_check_shutdown_rx,
+        block_status_accounts_loop,
+        signer_status,
+    ));
 
     // Process blocks coming in from the blockchain
     let task_runner_shutdown_rx = shutdown_rx.clone();
     let task_runner_block_stream_rx = block_stream_rx.clone();
     let tasks_signer = signer.clone();
     let block_status_tasks = block_status.clone();
-    let task_runner_handle = tokio::task::spawn(async move {
-        tasks::tasks_loop(
-            task_runner_block_stream_rx,
-            task_runner_shutdown_rx,
-            tasks_signer,
-            block_status_tasks,
-        )
-        .await
-        .expect("Failed to process streamed blocks")
-    });
+    let task_runner_handle = tokio::task::spawn(tasks::tasks_loop(
+        task_runner_block_stream_rx,
+        task_runner_shutdown_rx,
+        tasks_signer,
+        block_status_tasks,
+    ));
 
     // Check rules if enabled
-    let rules_runner_handle = tokio::task::spawn(async move {
-        if with_rules {
-            tasks::rules_loop(block_stream_rx, shutdown_rx, signer, block_status)
-                .await
-                .expect("Failed to process streamed blocks")
-        }
-    });
+    let rules_runner_handle = if with_rules {
+        tokio::task::spawn(tasks::rules_loop(
+            block_stream_rx,
+            shutdown_rx,
+            signer,
+            block_status,
+        ))
+    } else {
+        tokio::task::spawn(async move { Ok(()) })
+    };
+
     // Handle SIGINT AKA Ctrl-C
     let ctrl_c_shutdown_tx = shutdown_tx.clone();
     let ctrl_c_handle = tokio::task::spawn(async move {

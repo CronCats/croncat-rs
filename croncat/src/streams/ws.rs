@@ -2,6 +2,7 @@
 //! Subscribe and stream blocks from the tendermint WS RPC client.
 //!
 
+use color_eyre::Report;
 use futures_util::StreamExt;
 use tendermint_rpc::event::EventData;
 use tendermint_rpc::query::EventType;
@@ -21,7 +22,7 @@ pub async fn stream_blocks_loop(
     url: String,
     block_stream_tx: BlockStreamTx,
     mut shutdown_rx: ShutdownRx,
-) -> Result<(), Box<dyn std::error::Error>> {
+) -> Result<(), Report> {
     // Parse url
     let url = Url::parse(&url).unwrap();
 

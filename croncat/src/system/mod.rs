@@ -37,8 +37,7 @@ pub async fn run(
     with_rules: bool,
 ) -> Result<(), Report> {
     // Create a block stream channel
-    // TODO (SeedyROM): Remove 128 hardcoded limit
-    let (block_stream_tx, block_stream_rx) = channels::create_block_stream(128);
+    let (block_stream_tx, block_stream_rx) = channels::create_block_stream(32);
 
     // Connect to GRPC  Stream new blocks from the WS RPC subscription
     let block_stream_shutdown_rx = shutdown_rx.clone();
@@ -56,7 +55,7 @@ pub async fn run(
     let http_block_stream_tx = block_stream_tx.clone();
 
     // Handle retries if the polling task fails.
-    let retry_strategy = ExponentialBackoff::from_millis(10).map(jitter).take(8);
+    let retry_strategy = ExponentialBackoff::from_millis(5).map(jitter).take(6);
     //
     // NOTE:
     // This was super tricky, bascially we need to pass all non Copyable values

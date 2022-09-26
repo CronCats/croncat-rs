@@ -26,7 +26,7 @@ pub async fn tasks_loop(
     block_status: Arc<Mutex<AgentStatus>>,
 ) -> Result<(), Report> {
     let block_consumer_stream = tokio::task::spawn(async move {
-        while let Ok(_block) = block_stream_rx.recv().await {
+        while let Ok(block) = block_stream_rx.recv().await {
             let locked_status = block_status.lock().await;
             let is_active = *locked_status == AgentStatus::Active;
             // unlocking it ASAP
@@ -44,7 +44,7 @@ pub async fn tasks_loop(
                         }
                     }
                 } else {
-                    info!("no tasks for this block");
+                    info!("No tasks for block (height: {})", block.header.height);
                 }
             }
         }

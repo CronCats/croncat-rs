@@ -111,7 +111,7 @@ pub async fn run(
             block_status,
         ))
     } else {
-        tokio::task::spawn(async move { Ok(()) })
+        tokio::task::spawn(async { Ok(()) })
     };
 
     // Handle SIGINT AKA Ctrl-C

@@ -6,7 +6,7 @@ use std::sync::Arc;
 use std::time::Duration;
 
 use cw_croncat_core::types::AgentStatus;
-use tokio::sync::Mutex;
+use tokio::{sync::Mutex, task::JoinHandle};
 use tokio_retry::{
     strategy::{jitter, ExponentialBackoff},
     Retry,
@@ -15,11 +15,12 @@ use tracing::log::error;
 
 use crate::{
     channels::{self, ShutdownRx, ShutdownTx},
-    errors::Report,
+    errors::{eyre, Report},
     grpc::GrpcSigner,
     logging::info,
     streams::{agent, polling, tasks, ws},
     tokio,
+    utils::flatten_join,
 };
 
 pub mod service;
@@ -43,19 +44,11 @@ pub async fn run(
     let block_stream_shutdown_rx = shutdown_rx.clone();
     let wsrpc = signer.wsrpc().to_owned();
     let ws_block_stream_tx = block_stream_tx.clone();
-    let block_stream_handle = tokio::task::spawn(ws::stream_blocks_loop(
-        wsrpc,
-        ws_block_stream_tx,
-        block_stream_shutdown_rx,
-    ));
 
-    // Set up polling
-    let block_polling_shutdown_rx = shutdown_rx.clone();
-    let rpc_addr = signer.rpc().to_owned();
-    let http_block_stream_tx = block_stream_tx.clone();
+    // Generic retry strategy
+    let retry_strategy = ExponentialBackoff::from_millis(10).map(jitter).take(4);
 
-    // Handle retries if the polling task fails.
-    let retry_strategy = ExponentialBackoff::from_millis(5).map(jitter).take(6);
+    // Handle retries if the websocket task fails.
     //
     // NOTE:
     // This was super tricky, bascially we need to pass all non Copyable values
@@ -63,8 +56,25 @@ pub async fn run(
     //
     // This should be repeated for all the other tasks probably?
     //
+    let retry_block_stream_strategy = retry_strategy.clone();
+    let retry_block_stream_handle = tokio::task::spawn(async move {
+        Retry::spawn(retry_block_stream_strategy, || async {
+            // Stream blocks
+            ws::stream_blocks_loop(&wsrpc, &ws_block_stream_tx, &block_stream_shutdown_rx).await
+        })
+        .await
+    });
+
+    // Set up polling
+    let block_polling_shutdown_rx = shutdown_rx.clone();
+    let rpc_addr = signer.rpc().to_owned();
+    let http_block_stream_tx = block_stream_tx.clone();
+
+    // Handle retries if the polling task fails.
+    let retry_polling_strategy = retry_strategy.clone();
     let retry_polling_handle = tokio::task::spawn(async move {
-        Retry::spawn(retry_strategy.clone(), || async {
+        Retry::spawn(retry_polling_strategy, || async {
+            // Poll for new blocks
             polling::poll(
                 // TODO (mikedotexe) let's have the duration be in config. lfg Cosmoverse first
                 Duration::from_secs(2),
@@ -116,34 +126,36 @@ pub async fn run(
 
     // Handle SIGINT AKA Ctrl-C
     let ctrl_c_shutdown_tx = shutdown_tx.clone();
-    let ctrl_c_handle = tokio::task::spawn(async move {
+    let ctrl_c_handle: JoinHandle<Result<(), Report>> = tokio::task::spawn(async move {
         tokio::signal::ctrl_c()
             .await
-            .expect("Failed to wait for Ctrl-C");
+            .map_err(|err| eyre!("Failed to wait for Ctrl-C: {}", err))?;
         ctrl_c_shutdown_tx
             .broadcast(())
             .await
-            .expect("Failed to send shutdown signal");
+            .map_err(|err| eyre!("Failed to send shutdown signal: {}", err))?;
         println!();
         info!("Shutting down croncatd...");
+
+        Ok(())
     });
 
     // Try to join all the system tasks.
     let system_status = tokio::try_join!(
-        ctrl_c_handle,
-        block_stream_handle,
-        task_runner_handle,
-        account_status_check_handle,
-        rules_runner_handle,
-        retry_polling_handle,
+        flatten_join(ctrl_c_handle),
+        flatten_join(account_status_check_handle),
+        flatten_join(retry_block_stream_handle),
+        flatten_join(retry_polling_handle),
+        flatten_join(task_runner_handle),
+        flatten_join(rules_runner_handle),
     );
 
     // If any of the tasks failed, we need to propagate the error.
     match system_status {
         Ok(_) => Ok(()),
-        Err(e) => {
-            error!("croncatd shutdown with error: {}", e);
-            Err(e.into())
+        Err(err) => {
+            error!("croncatd shutdown with error");
+            Err(err.into())
         }
     }
 }

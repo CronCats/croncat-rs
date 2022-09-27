@@ -33,8 +33,8 @@ async fn main() -> Result<(), Report> {
 
     // Get the CLI options, handle argument errors nicely
     let opts = cli::get_opts()
-        .map_err(|e| {
-            println!("{}", e);
+        .map_err(|err| {
+            eprintln!("{}", err);
             exit(1);
         })
         .unwrap();

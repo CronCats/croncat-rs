@@ -61,19 +61,13 @@ pub async fn poll(
 
     tokio::select! {
         res = polling_loop_handle => {
-            match res? {
-                Ok(_) => {
-
-                    return Ok(())
-                }
-                Err(err) => {
-                    error!("Block polling loop failed: {}", err);
-                    return Err(err.into());
-                }
-            }
+            res?.map_err(|err| {
+                error!("Block polling loop failed: {}", err);
+                err
+            })?
         }
-        _ = shutdown_rx.recv() => {
-            return Ok(())
-        }
+        _ = shutdown_rx.recv() => {}
     }
+
+    Ok(())
 }

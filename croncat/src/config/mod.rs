@@ -44,12 +44,9 @@ impl ChainConfig {
         let mut config = settings.try_deserialize::<ChainConfig>()?;
 
         // Override config contract address if env var is set
-        if std::env::var("CRONCAT_CONTRACT_ADDRESS").is_ok() {
-            let contract_address = std::env::var("CRONCAT_CONTRACT_ADDRESS").unwrap();
+        if let Ok(contract_address) = std::env::var("CRONCAT_CONTRACT_ADDRESS") {
             config.contract_address = Some(contract_address);
-        }
-
-        if config.contract_address.is_none() {
+        } else if config.contract_address.is_none() {
             return Err(eyre!(
                 "Contract address is not set via config or environment variable"
             ));

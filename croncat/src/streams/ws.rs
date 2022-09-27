@@ -85,24 +85,17 @@ pub async fn stream_blocks_loop(
 
     tokio::select! {
         res = block_stream_handle => {
-            match res? {
-                Ok(_) => {
-                    // Clean up if the block stream loop exits
-                    client.close().unwrap();
-                    let _ = driver_handle.await.unwrap();
-                    return Ok(())
-                }
-                Err(err) => {
-                    error!("Block stream failed: {}", err);
-                    return Err(err.into());
-                }
-            }
+            res?.map_err(|err| {
+                error!("Block stream failed: {}", err);
+                err
+            })?
         }
-        _ = shutdown_rx.recv() => {
-            // Clean up if the shutdown signal is received
-            client.close().unwrap();
-            let _ = driver_handle.await.unwrap();
-            return Ok(())
-        }
-    }
+        _ = shutdown_rx.recv() => {}
+    };
+
+    // Clean up
+    client.close().unwrap();
+    let _ = driver_handle.await.unwrap();
+
+    Ok(())
 }

@@ -4,7 +4,7 @@
 
 use structopt::StructOpt;
 
-#[derive(Debug, StructOpt)]
+#[derive(Debug, StructOpt, Clone)]
 #[structopt(name = "croncatd", about = "The croncat agent daemon.")]
 pub struct Opts {
     /// Debug mode
@@ -19,7 +19,7 @@ pub struct Opts {
     pub cmd: Command,
 }
 
-#[derive(Debug, StructOpt)]
+#[derive(Debug, StructOpt, Clone)]
 pub enum Command {
     /// Registers an agent, placing them in the pending queue unless it's the first agent.
     RegisterAgent {
@@ -127,4 +127,26 @@ pub enum Command {
         #[structopt(long)]
         output: Option<String>,
     },
+}
+
+// NOTE: (SeedyROM) This is a hack to get around the fact that `structopt` doesn't let us get the name of the subcommand
+impl std::fmt::Display for Command {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Command::RegisterAgent { .. } => write!(f, "register-agent"),
+            Command::GetAgentStatus { .. } => write!(f, "get-agent-status"),
+            Command::GetAgentTasks { .. } => write!(f, "get-agent-tasks"),
+            Command::UnregisterAgent { .. } => write!(f, "unregister-agent"),
+            Command::UpdateAgent { .. } => write!(f, "update-agent"),
+            Command::Withdraw { .. } => write!(f, "withdraw"),
+            Command::Status => write!(f, "status"),
+            Command::Tasks { .. } => write!(f, "tasks"),
+            Command::Go { .. } => write!(f, "go"),
+            Command::Info { .. } => write!(f, "info"),
+            Command::GenerateMnemonic { .. } => write!(f, "generate-mnemonic"),
+            Command::DepositUjunox { .. } => write!(f, "deposit-ujunox"),
+            Command::GetAgent { .. } => write!(f, "get-agent"),
+            Command::SetupService { .. } => write!(f, "setup-service"),
+        }
+    }
 }

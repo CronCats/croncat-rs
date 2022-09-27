@@ -210,8 +210,8 @@ impl LocalAgentStorage {
 
         let found = self.data.get(account_id);
 
-        if found.is_some() {
-            info!("Found agent: {:#?}", found.unwrap());
+        if let Some(entry) = found {
+            info!("Found agent: {:#?}", entry);
         }
 
         found

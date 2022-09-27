@@ -48,7 +48,7 @@ async fn main() -> Result<(), Report> {
 
     // Run a command
     run_command(opts.clone(), storage).await.map_err(|err| {
-        error!("Command \"{}\" failed:", opts.cmd);
+        error!("Error from {} command...", opts.cmd);
         error!("{}", err);
         err
     })?;

@@ -132,7 +132,7 @@ impl LocalAgentStorage {
         } else {
             let key = cosmrs::bip32::XPrv::derive_from_path(
                 mnemonic.to_seed(""),
-                &utils::DERVIATION_PATH.parse().unwrap(),
+                &utils::DERIVATION_PATH.parse().unwrap(),
             )?;
             let public_key = key.public_key().to_string(cosmrs::bip32::Prefix::XPRV);
             let private_key = key.to_string(cosmrs::bip32::Prefix::XPRV).to_string();
@@ -199,7 +199,7 @@ impl LocalAgentStorage {
         let mnemonic: Mnemonic = entry.mnemonic.parse()?;
         let key = cosmrs::bip32::XPrv::derive_from_path(
             mnemonic.to_seed(""),
-            &utils::DERVIATION_PATH.parse().unwrap(),
+            &utils::DERIVATION_PATH.parse().unwrap(),
         )?;
         Ok(key)
     }
@@ -211,7 +211,7 @@ impl LocalAgentStorage {
         let found = self.data.get(account_id);
 
         if found.is_some() {
-            info!("Found agent: {:#?}", found);
+            info!("Found agent: {:#?}", found.unwrap());
         }
 
         found

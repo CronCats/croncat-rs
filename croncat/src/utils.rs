@@ -13,7 +13,7 @@ use tokio::task::JoinHandle;
 use cw_croncat_core::msg::AgentTaskResponse;
 
 pub const DEFAULT_AGENT_ID: &str = "agent";
-pub const DERVIATION_PATH: &str = "m/44'/118'/0'/0/0";
+pub const DERIVATION_PATH: &str = "m/44'/118'/0'/0/0";
 
 ///
 /// Count block received from the stream.

@@ -63,7 +63,7 @@ impl GrpcSigner {
         let out = self
             .client
             .query_client
-            .query_contract(&self.client.cfg.contract_address, msg)
+            .query_contract(&self.client.cfg.contract_address.to_owned().unwrap(), msg)
             .await?;
         Ok(out)
     }
@@ -71,7 +71,7 @@ impl GrpcSigner {
     pub async fn execute_croncat(&self, msg: &ExecuteMsg) -> Result<TxResult, Report> {
         let res = self
             .client
-            .execute_wasm(msg, &self.client.cfg.contract_address)
+            .execute_wasm(msg, &self.client.cfg.contract_address.to_owned().unwrap())
             .await?;
 
         Ok(res.deliver_tx)
@@ -206,7 +206,7 @@ impl GrpcQuerier {
     pub async fn new(cfg: ChainConfig) -> Result<Self, Report> {
         Ok(Self {
             client: CosmosQueryClient::new(&cfg.grpc_endpoint, &cfg.denom).await?,
-            croncat_addr: cfg.contract_address,
+            croncat_addr: cfg.contract_address.to_owned().unwrap(),
         })
     }
 

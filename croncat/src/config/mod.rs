@@ -43,8 +43,6 @@ impl ChainConfig {
 
         let mut config = settings.try_deserialize::<ChainConfig>()?;
 
-        eprintln!("{:?}", std::env::var("CRONCAT_CONTRACT_ADDRESS"));
-
         // Override config contract address if env var is set
         if std::env::var("CRONCAT_CONTRACT_ADDRESS").is_ok() {
             let contract_address = std::env::var("CRONCAT_CONTRACT_ADDRESS").unwrap();

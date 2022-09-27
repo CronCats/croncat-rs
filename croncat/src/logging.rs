@@ -12,9 +12,10 @@ pub use tracing::{debug, error, info, warn};
 /// Setup logging with `color_eyre` and `tracing_subscriber`.
 ///
 pub fn setup() -> Result<(), Report> {
-    // Get / set backtrace
+    // Set full backtrace if debug.
+    #[cfg(debug_assertions)]
     if std::env::var("RUST_LIB_BACKTRACE").is_err() {
-        std::env::set_var("RUST_LIB_BACKTRACE", "1")
+        std::env::set_var("RUST_LIB_BACKTRACE", "full")
     }
     // Install color_eyre
     color_eyre::install()?;

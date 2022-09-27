@@ -4,6 +4,6 @@ chain_id: "testing"
 rpc_endpoint: "http://localhost:26657/"
 grpc_endpoint: "http://localhost:9090/"
 wsrpc_endpoint: "ws://localhost:26657/websocket"
-contract_address: null # This can be set via an environment variable, committing this is a pain.
+contract_address: null # This can be set via CRONCAT_CONTRACT_ADDRESS, committing this is a pain.
 gas_prices: 0.07
 gas_adjustment: 1.5

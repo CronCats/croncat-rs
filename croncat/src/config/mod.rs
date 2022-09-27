@@ -2,7 +2,7 @@
 
 /// TODO: Move to chain registry
 /// Right now juno testnet missing grpc's, so we keeping it like `cosm-orc`'s chain config
-use color_eyre::Report;
+use color_eyre::{eyre::eyre, Report};
 use config::Config;
 use serde::{Deserialize, Serialize};
 use std::path::Path;
@@ -15,7 +15,7 @@ pub struct ChainConfig {
     pub rpc_endpoint: String,
     pub grpc_endpoint: String,
     pub wsrpc_endpoint: String,
-    pub contract_address: String,
+    pub contract_address: Option<String>,
     pub gas_prices: f64,
     pub gas_adjustment: f64,
 }
@@ -41,7 +41,22 @@ impl ChainConfig {
             .add_source(config::File::with_name(file_name))
             .build()?;
 
-        let config = settings.try_deserialize::<ChainConfig>()?;
+        let mut config = settings.try_deserialize::<ChainConfig>()?;
+
+        eprintln!("{:?}", std::env::var("CRONCAT_CONTRACT_ADDRESS"));
+
+        // Override config contract address if env var is set
+        if std::env::var("CRONCAT_CONTRACT_ADDRESS").is_ok() {
+            let contract_address = std::env::var("CRONCAT_CONTRACT_ADDRESS").unwrap();
+            config.contract_address = Some(contract_address);
+        }
+
+        if config.contract_address.is_none() {
+            return Err(eyre!(
+                "Contract address is not set via config or environment variable"
+            ));
+        }
+
         Ok(config)
     }
     pub async fn from_chain_registry(fallback: ChainConfig) -> Result<Self, Report> {

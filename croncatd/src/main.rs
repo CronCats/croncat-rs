@@ -6,13 +6,14 @@ use std::process::exit;
 
 use croncat::{
     channels,
-//    client::{BankQueryClient, QueryBank},
+    //    client::{BankQueryClient, QueryBank},
     config::ChainConfig,
     errors::{eyre, Report},
     grpc::{GrpcQuerier, GrpcSigner},
     logging::{self, info},
     store::agent::LocalAgentStorage,
-    system, tokio,
+    system,
+    tokio,
 };
 
 mod cli;
@@ -66,8 +67,7 @@ async fn main() -> Result<(), Report> {
             chain_id,
         } => {
             let key = storage.get_agent_signing_key(&sender_name)?;
-            let signer =
-                GrpcSigner::new(ChainConfig::new(&chain_id).await?, key).await?;
+            let signer = GrpcSigner::new(ChainConfig::new(&chain_id).await?, key).await?;
             let result = signer.unregister_agent().await?;
             let log = result.log;
             println!("{log}");
@@ -77,15 +77,13 @@ async fn main() -> Result<(), Report> {
             chain_id,
         } => {
             let key = storage.get_agent_signing_key(&sender_name)?;
-            let signer =
-                GrpcSigner::new(ChainConfig::new(&chain_id).await?, key).await?;
+            let signer = GrpcSigner::new(ChainConfig::new(&chain_id).await?, key).await?;
             let result = signer.withdraw_reward().await?;
             let log = result.log;
             println!("{log}");
         }
         opts::Command::Info { chain_id } => {
-            let querier =
-                GrpcQuerier::new(ChainConfig::new(&chain_id).await?).await?;
+            let querier = GrpcQuerier::new(ChainConfig::new(&chain_id).await?).await?;
             let config = querier.query_config().await?;
             println!("{config}")
         }
@@ -130,7 +128,7 @@ async fn main() -> Result<(), Report> {
         }
         //@TODO: remember to finish this command, since it's only querying
         opts::Command::DepositUjunox {
-            account_id:_,
+            account_id: _,
             chain_id: _,
         } => {
             todo!("Credit webservice is not working for now!");
@@ -161,7 +159,7 @@ async fn main() -> Result<(), Report> {
             // Start the agent
             system::run(shutdown_tx, shutdown_rx, signer, initial_status, with_rules).await?;
         }
-        opts::Command::SetupService {chain_id, output } => {
+        opts::Command::SetupService { chain_id, output } => {
             system::DaemonService::create(output, &chain_id, opts.no_frills)?;
         }
         _ => {}

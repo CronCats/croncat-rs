@@ -148,8 +148,11 @@ async fn main() -> Result<(), Report> {
             chain_id,
         } => {
             let key = storage.get_agent_signing_key(&sender_name)?;
-            let cfg=ChainConfig::new(&chain_id).await?;
-            let ChainConfig{polling_duration_secs,..}=cfg;
+            let cfg = ChainConfig::new(&chain_id).await?;
+            let ChainConfig {
+                polling_duration_secs,
+                ..
+            } = cfg;
             let signer = GrpcSigner::new(cfg, key).await?;
             let initial_status = signer
                 .get_agent(signer.account_id().as_ref())
@@ -159,12 +162,15 @@ async fn main() -> Result<(), Report> {
             // Create a channel to handle graceful shutdown and wrap receiver for cloning
             let (shutdown_tx, shutdown_rx) = channels::create_shutdown_channel();
             // Start the agent
-            system::run(shutdown_tx,
-                 shutdown_rx, 
-                 signer, 
-                 initial_status, 
-                 with_rules,
-                 polling_duration_secs).await?;
+            system::run(
+                shutdown_tx,
+                shutdown_rx,
+                signer,
+                initial_status,
+                with_rules,
+                polling_duration_secs,
+            )
+            .await?;
         }
         opts::Command::SetupService { chain_id, output } => {
             system::DaemonService::create(output, &chain_id, opts.no_frills)?;

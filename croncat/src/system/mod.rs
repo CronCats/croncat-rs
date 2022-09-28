@@ -30,7 +30,7 @@ pub async fn run(
     signer: GrpcSigner,
     initial_status: AgentStatus,
     with_rules: bool,
-    polling_duration_secs:u64,
+    polling_duration_secs: u64,
 ) -> Result<(), Report> {
     // Create a block stream channel
     // TODO (SeedyROM): Remove 128 hardcoded limit

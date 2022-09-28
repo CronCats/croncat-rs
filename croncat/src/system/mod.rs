@@ -30,6 +30,7 @@ pub async fn run(
     signer: GrpcSigner,
     initial_status: AgentStatus,
     with_rules: bool,
+    polling_duration_secs:u64,
 ) -> Result<(), Report> {
     // Create a block stream channel
     // TODO (SeedyROM): Remove 128 hardcoded limit
@@ -52,7 +53,7 @@ pub async fn run(
     let polling_handle = tokio::task::spawn(async move {
         // TODO (mikedotexe) let's have the duration be in config. lfg Cosmoverse first
         polling::poll(
-            Duration::from_secs(2),
+            Duration::from_secs(polling_duration_secs),
             http_block_stream_tx,
             block_polling_shutdown_rx,
             rpc_addr,

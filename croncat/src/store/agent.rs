@@ -113,10 +113,7 @@ impl LocalAgentStorage {
             fs::create_dir_all(p)?
         };
 
-        fs::write(
-            agent_data_file,
-            serde_json::to_string_pretty(&self.data).unwrap(),
-        )?;
+        fs::write(agent_data_file, serde_json::to_string_pretty(&self.data)?)?;
 
         Ok(())
     }
@@ -132,7 +129,7 @@ impl LocalAgentStorage {
         } else {
             let key = cosmrs::bip32::XPrv::derive_from_path(
                 mnemonic.to_seed(""),
-                &utils::DERIVATION_PATH.parse().unwrap(),
+                &utils::DERIVATION_PATH.parse()?,
             )?;
             let public_key = key.public_key().to_string(cosmrs::bip32::Prefix::XPRV);
             let private_key = key.to_string(cosmrs::bip32::Prefix::XPRV).to_string();
@@ -144,11 +141,7 @@ impl LocalAgentStorage {
 
             let mnemonic = mnemonic.to_string();
 
-            let account_addr = signing_key
-                .public_key()
-                .account_id("juno")
-                .unwrap()
-                .to_string();
+            let account_addr = signing_key.public_key().account_id("juno")?.to_string();
             let new_key = LocalAgentStorageEntry {
                 account_addr,
                 keypair,
@@ -199,7 +192,7 @@ impl LocalAgentStorage {
         let mnemonic: Mnemonic = entry.mnemonic.parse()?;
         let key = cosmrs::bip32::XPrv::derive_from_path(
             mnemonic.to_seed(""),
-            &utils::DERIVATION_PATH.parse().unwrap(),
+            &utils::DERIVATION_PATH.parse()?,
         )?;
         Ok(key)
     }

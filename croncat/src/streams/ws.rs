@@ -32,7 +32,7 @@ pub async fn stream_blocks_loop(
     let mut shutdown_rx = shutdown_rx.clone();
 
     // Parse url
-    let url = Url::parse(&url).unwrap();
+    let url = Url::parse(&url)?;
 
     info!("Connecting to WS RPC server @ {}", url);
 
@@ -94,8 +94,8 @@ pub async fn stream_blocks_loop(
     };
 
     // Clean up
-    client.close().unwrap();
-    let _ = driver_handle.await.unwrap();
+    client.close()?;
+    let _ = driver_handle.await?;
 
     Ok(())
 }

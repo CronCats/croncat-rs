@@ -56,7 +56,7 @@ impl ChainConfig {
     }
     pub async fn from_chain_registry(fallback: ChainConfig) -> Result<Self, Report> {
         let result = chain_registry::get::get_chain("juno").await?;
-        let apis = result.unwrap().apis;
+        let apis = result.ok_or_else(|| eyre!("No chain info found"))?.apis;
 
         let config = ChainConfig {
             rpc_endpoint: apis.rpc[0].address.clone(),

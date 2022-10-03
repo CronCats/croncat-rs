@@ -20,7 +20,7 @@ impl DaemonService {
     /// Create a new daemon service file at the given path with chain ID.
     pub fn create(path: Option<String>, chain_id: &String, no_frills: bool) -> Result<(), Report> {
         // If no path is given, use the default storage path in the HOME directory.
-        let mut default_output = std::env::var("HOME").unwrap();
+        let mut default_output = std::env::var("HOME")?;
         default_output.push_str(LOCAL_STORAGE_DEFAULT_DIR);
         let path = PathBuf::from(path.unwrap_or(default_output)).join(DAEMON_SERVICES_DIR_NAME);
 

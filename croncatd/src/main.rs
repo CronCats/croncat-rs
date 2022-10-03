@@ -10,11 +10,12 @@ use croncat::{
     config::ChainConfig,
     errors::{eyre, Report},
     grpc::{GrpcQuerier, GrpcSigner},
-    logging::{self, info},
+    logging::{self, error, info},
     store::agent::LocalAgentStorage,
     system,
     tokio,
 };
+use opts::Opts;
 
 mod cli;
 mod opts;
@@ -25,15 +26,15 @@ mod opts;
 #[tokio::main]
 async fn main() -> Result<(), Report> {
     // Get environment variables
-    let mut storage = LocalAgentStorage::new();
+    let storage = LocalAgentStorage::new();
 
     // Setup tracing and error reporting
     logging::setup()?;
 
     // Get the CLI options, handle argument errors nicely
     let opts = cli::get_opts()
-        .map_err(|e| {
-            println!("{}", e);
+        .map_err(|err| {
+            eprintln!("{}", err);
             exit(1);
         })
         .unwrap();
@@ -42,7 +43,25 @@ async fn main() -> Result<(), Report> {
     if !opts.no_frills {
         cli::print_banner();
     }
+
     info!("Starting croncatd...");
+
+    // Run a command
+    run_command(opts.clone(), storage).await.map_err(|err| {
+        error!("Error from {} command...", opts.cmd);
+        error!("{}", err);
+        err
+    })?;
+
+    // Say goodbye if no no-frills
+    if !opts.no_frills {
+        println!("\n🐱 Cron Cat says: Goodbye / さようなら\n");
+    }
+
+    Ok(())
+}
+
+async fn run_command(opts: Opts, mut storage: LocalAgentStorage) -> Result<(), Report> {
     match opts.cmd {
         opts::Command::RegisterAgent {
             payable_account_id,
@@ -148,7 +167,9 @@ async fn main() -> Result<(), Report> {
             chain_id,
         } => {
             let key = storage.get_agent_signing_key(&sender_name)?;
-            let signer = GrpcSigner::new(ChainConfig::new(&chain_id).await?, key).await?;
+            let signer = GrpcSigner::new(ChainConfig::new(&chain_id).await?, key)
+                .await
+                .map_err(|err| eyre!("Failed to setup GRPC: {}", err))?;
             let initial_status = signer
                 .get_agent(signer.account_id().as_ref())
                 .await?
@@ -163,11 +184,6 @@ async fn main() -> Result<(), Report> {
             system::DaemonService::create(output, &chain_id, opts.no_frills)?;
         }
         _ => {}
-    }
-
-    // Say goodbye if no no-frills
-    if !opts.no_frills {
-        println!("\n🐱 Cron Cat says: Goodbye / さようなら\n");
     }
 
     Ok(())

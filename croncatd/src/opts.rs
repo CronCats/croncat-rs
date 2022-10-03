@@ -2,9 +2,10 @@
 //! `croncatd` CLI option builder.
 //!
 
+use enum_display::EnumDisplay;
 use structopt::StructOpt;
 
-#[derive(Debug, StructOpt)]
+#[derive(Debug, StructOpt, Clone)]
 #[structopt(name = "croncatd", about = "The croncat agent daemon.")]
 pub struct Opts {
     /// Debug mode
@@ -19,7 +20,8 @@ pub struct Opts {
     pub cmd: Command,
 }
 
-#[derive(Debug, StructOpt)]
+#[derive(Debug, StructOpt, Clone, EnumDisplay)]
+#[enum_display(case = "Kebab")]
 pub enum Command {
     /// Registers an agent, placing them in the pending queue unless it's the first agent.
     RegisterAgent {

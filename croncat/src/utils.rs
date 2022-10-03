@@ -7,10 +7,13 @@ use std::sync::{
     Arc,
 };
 
+use color_eyre::Report;
+use tokio::task::JoinHandle;
+
 use cw_croncat_core::msg::AgentTaskResponse;
 
 pub const DEFAULT_AGENT_ID: &str = "agent";
-pub const DERVIATION_PATH: &str = "m/44'/118'/0'/0/0";
+pub const DERIVATION_PATH: &str = "m/44'/118'/0'/0/0";
 
 ///
 /// Count block received from the stream.
@@ -48,4 +51,15 @@ pub fn sum_num_tasks(tasks: &AgentTaskResponse) -> u64 {
         + tasks.num_cron_tasks
         + tasks.num_cron_tasks_extra)
         .into()
+}
+
+///
+/// Flatten join handle results.
+///
+pub async fn flatten_join<T>(handle: JoinHandle<Result<T, Report>>) -> Result<T, Report> {
+    match handle.await {
+        Ok(Ok(result)) => Ok(result),
+        Ok(Err(err)) => Err(err),
+        Err(err) => Err(err.into()),
+    }
 }

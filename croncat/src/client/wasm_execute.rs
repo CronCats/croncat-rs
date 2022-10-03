@@ -22,8 +22,8 @@ pub fn generate_wasm_body(
 ) -> Result<tx::Body, Report> {
     let body = tx::Body::new(
         vec![MsgExecuteContract {
-            sender: sender.parse().unwrap(),
-            contract: contract_name.parse().unwrap(),
+            sender: sender.parse()?,
+            contract: contract_name.parse()?,
             msg: serde_json::to_vec(msg)?,
             funds: vec![],
         }
@@ -96,7 +96,7 @@ pub async fn simulate_gas_fee(
         .await?
         .into_inner()
         .gas_info
-        .unwrap();
+        .ok_or_else(|| eyre!("No gas info in simulate response"))?;
 
     let gas_limit = (gas_info.gas_used as f64 * cfg.gas_adjustment).ceil();
     let amount = Coin {

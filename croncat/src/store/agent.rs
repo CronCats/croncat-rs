@@ -8,6 +8,7 @@ use color_eyre::eyre::eyre;
 use cosmrs::{bip32, crypto::secp256k1::SigningKey};
 use serde::{Deserialize, Serialize};
 use std::{collections::HashMap, fs, path::PathBuf};
+use tracing::log::info;
 
 use crate::{errors::Report, utils};
 
@@ -22,14 +23,23 @@ type AccountId = String;
 /// The hashmap we intend to store on disk.
 type LocalAgentStorageData = HashMap<AccountId, LocalAgentStorageEntry>;
 
-#[derive(Debug, Serialize, Deserialize, Clone)]
+#[derive(Serialize, Deserialize, Clone)]
 struct KeyPair {
     private_key: String,
     public_key: String,
 }
 
+/// Hide the private key from the user when debug printing.
+impl std::fmt::Debug for KeyPair {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("KeyPair")
+            .field("public_key", &self.public_key)
+            .finish()
+    }
+}
+
 /// Store the keypair and the payable account idea for a stored agent
-#[derive(Debug, Serialize, Deserialize, Clone)]
+#[derive(Serialize, Deserialize, Clone)]
 pub struct LocalAgentStorageEntry {
     pub account_addr: String,
     keypair: KeyPair, // TODO (SeedyROM): This should probably point to a file, not store in memory
@@ -44,6 +54,17 @@ impl LocalAgentStorageEntry {
             Some(account_id) => account_id.as_str(),
             None => self.account_addr.as_str(),
         }
+    }
+}
+
+/// Hide the user mnemonic from the user when debug printing.
+impl std::fmt::Debug for LocalAgentStorageEntry {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("LocalAgentStorageEntry")
+            .field("account_addr", &self.account_addr)
+            .field("keypair", &self.keypair)
+            .field("payable_account_id", &self.payable_account_id)
+            .finish()
     }
 }
 
@@ -92,10 +113,7 @@ impl LocalAgentStorage {
             fs::create_dir_all(p)?
         };
 
-        fs::write(
-            agent_data_file,
-            serde_json::to_string_pretty(&self.data).unwrap(),
-        )?;
+        fs::write(agent_data_file, serde_json::to_string_pretty(&self.data)?)?;
 
         Ok(())
     }
@@ -111,7 +129,7 @@ impl LocalAgentStorage {
         } else {
             let key = cosmrs::bip32::XPrv::derive_from_path(
                 mnemonic.to_seed(""),
-                &utils::DERVIATION_PATH.parse().unwrap(),
+                &utils::DERIVATION_PATH.parse()?,
             )?;
             let public_key = key.public_key().to_string(cosmrs::bip32::Prefix::XPRV);
             let private_key = key.to_string(cosmrs::bip32::Prefix::XPRV).to_string();
@@ -123,11 +141,7 @@ impl LocalAgentStorage {
 
             let mnemonic = mnemonic.to_string();
 
-            let account_addr = signing_key
-                .public_key()
-                .account_id("juno")
-                .unwrap()
-                .to_string();
+            let account_addr = signing_key.public_key().account_id("juno")?.to_string();
             let new_key = LocalAgentStorageEntry {
                 account_addr,
                 keypair,
@@ -169,11 +183,6 @@ impl LocalAgentStorage {
         );
     }
 
-    /// Retrieve an agent based on the key
-    pub fn get(&self, account_id: &str) -> Option<&LocalAgentStorageEntry> {
-        self.data.get(account_id)
-    }
-
     pub fn get_agent_signing_key(&self, account_id: &AccountId) -> Result<bip32::XPrv, Report> {
         let entry = if let Some(entry) = self.get(account_id) {
             entry
@@ -183,9 +192,22 @@ impl LocalAgentStorage {
         let mnemonic: Mnemonic = entry.mnemonic.parse()?;
         let key = cosmrs::bip32::XPrv::derive_from_path(
             mnemonic.to_seed(""),
-            &utils::DERVIATION_PATH.parse().unwrap(),
+            &utils::DERIVATION_PATH.parse()?,
         )?;
         Ok(key)
+    }
+
+    /// Retrieve an agent based on the key
+    fn get(&self, account_id: &str) -> Option<&LocalAgentStorageEntry> {
+        info!("Getting agent by id: {}", account_id);
+
+        let found = self.data.get(account_id);
+
+        if let Some(entry) = found {
+            info!("Found agent: {:#?}", entry);
+        }
+
+        found
     }
 }
 

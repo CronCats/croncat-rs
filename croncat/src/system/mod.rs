@@ -36,6 +36,7 @@ pub async fn run(
     signer: GrpcSigner,
     initial_status: AgentStatus,
     with_rules: bool,
+    polling_duration_secs: u64,
 ) -> Result<(), Report> {
     // Create a block stream channel
     let (block_stream_tx, block_stream_rx) = channels::create_block_stream(32);
@@ -77,7 +78,7 @@ pub async fn run(
             // Poll for new blocks
             polling::poll(
                 // TODO (mikedotexe) let's have the duration be in config. lfg Cosmoverse first
-                Duration::from_secs(2),
+                Duration::from_secs(polling_duration_secs),
                 &http_block_stream_tx,
                 &block_polling_shutdown_rx,
                 &rpc_addr,

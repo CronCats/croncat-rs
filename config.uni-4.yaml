@@ -7,3 +7,4 @@ wsrpc_endpoint: "wss://juno-testnet-rpc.polkachu.com/websocket"
 contract_address: "juno12z4hh9r3j9aurjn6ppkgyjrkuu4ugrdectsh792w8feyj56dhlssvntdls"
 gas_prices: 0.1
 gas_adjustment: 1.5
+polling_duration_secs: 2

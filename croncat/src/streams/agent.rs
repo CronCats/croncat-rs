@@ -41,14 +41,14 @@ pub async fn check_account_status_loop(
                 *locked_status = agent
                     .ok_or(eyre!("Agent unregistered during the loop"))?
                     .status;
-                info!("status:{:?}", *locked_status);
+                info!("Agent status: {:?}", *locked_status);
                 if *locked_status == AgentStatus::Nominated {
                     info!("Checking in agent: {}", signer.check_in_agent().await?.log);
                     let agent = signer.get_agent(account_addr).await?;
                     *locked_status = agent
                         .ok_or(eyre!("Agent unregistered during the loop"))?
                         .status;
-                    info!("status:{:?}", *locked_status);
+                    info!("Agent status: {:?}", *locked_status);
                 }
             }
         }

@@ -23,7 +23,7 @@ use url::Url;
 use crate::client::full_client::CosmosFullClient;
 use crate::client::query_client::CosmosQueryClient;
 use crate::config::ChainConfig;
-use crate::errors::Report;
+use crate::errors::{eyre, Report};
 use crate::logging::info;
 
 ///
@@ -64,7 +64,14 @@ impl GrpcSigner {
         let out = self
             .client
             .query_client
-            .query_contract(&self.client.cfg.contract_address, msg)
+            .query_contract(
+                self.client
+                    .cfg
+                    .contract_address
+                    .as_ref()
+                    .ok_or_else(|| eyre!("No contract address"))?,
+                msg,
+            )
             .await?;
         Ok(out)
     }
@@ -72,7 +79,14 @@ impl GrpcSigner {
     pub async fn execute_croncat(&self, msg: &ExecuteMsg) -> Result<TxResult, Report> {
         let res = self
             .client
-            .execute_wasm(msg, &self.client.cfg.contract_address)
+            .execute_wasm(
+                msg,
+                self.client
+                    .cfg
+                    .contract_address
+                    .as_ref()
+                    .ok_or_else(|| eyre!("No contract address"))?,
+            )
             .await?;
 
         Ok(res.deliver_tx)
@@ -193,6 +207,10 @@ impl GrpcSigner {
     pub fn grpc(&self) -> &str {
         &self.client.cfg.grpc_endpoint
     }
+
+    pub fn rpc(&self) -> &str {
+        &self.client.cfg.rpc_endpoint
+    }
 }
 
 pub struct GrpcQuerier {
@@ -203,7 +221,9 @@ impl GrpcQuerier {
     pub async fn new(cfg: ChainConfig) -> Result<Self, Report> {
         Ok(Self {
             client: CosmosQueryClient::new(&cfg.grpc_endpoint, &cfg.denom).await?,
-            croncat_addr: cfg.contract_address,
+            croncat_addr: cfg
+                .contract_address
+                .ok_or_else(|| eyre!("No contract address"))?,
         })
     }
 

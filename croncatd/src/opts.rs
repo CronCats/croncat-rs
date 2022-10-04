@@ -58,6 +58,7 @@ pub enum Command {
     },
 
     /// Get contract's state
+    #[cfg(feature = "debug")]
     GetState {
         from_index: Option<u64>,
         limit: Option<u64>,

@@ -17,6 +17,11 @@
 -   `croncatd` This is the executable agent daemon.
 -   `croncat` This is all the pieces to build an agent daemon, this will probably become it's own repo so keep it DRY and clean.
 
+## Development Tools
+
+-   `cargo install rusty-hook cargo-make`
+-   `rusty-hook init`
+
 ## Run
 
 -   `cargo run`
@@ -30,16 +35,13 @@ croncatd 0.1.0
 The croncat agent daemon.
 
 USAGE:
-    croncatd [FLAGS] --chain-id <chain-id> <SUBCOMMAND>
+    croncatd [FLAGS] <SUBCOMMAND>
 
 FLAGS:
     -d, --debug        Debug mode
     -h, --help         Prints help information
         --no-frills    Whether to print nice little things like the banner and a goodbye
     -V, --version      Prints version information
-
-OPTIONS:
-        --chain-id <chain-id>
 
 SUBCOMMANDS:
     deposit-ujunox       (in progress) Send native tokens to an address

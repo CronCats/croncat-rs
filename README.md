@@ -63,7 +63,27 @@ SUBCOMMANDS:
 
 ## Generate Docs
 
--   `cargo doc --no-deps`
+```bash
+cargo doc --no-deps
+```
+
+- Set contract address in config.local.yaml
+- Add agent into local keystore
+
+```bash 
+cargo run generate-mnemonic --mnemonic "olive soup parade family educate congress hurt dwarf mom this position hungry unaware aunt swamp sunny analyst wrestle fashion main knife start coffee air"
+```
+
+### Register an agent
+```bash
+cargo run register-agent
+```
+
+### Go for executing tasks
+```bash
+cargo run go
+```
+
 
 ## Contributing
 

@@ -8,6 +8,7 @@ use cosmrs::bip32;
 use cosmrs::crypto::secp256k1::SigningKey;
 use cosmrs::AccountId;
 use cw_croncat_core::msg::AgentTaskResponse;
+use cw_croncat_core::msg::CwCroncatResponse;
 use cw_croncat_core::msg::TaskResponse;
 use cw_croncat_core::msg::TaskWithRulesResponse;
 use cw_croncat_core::msg::{ExecuteMsg, GetConfigResponse, QueryMsg};
@@ -263,6 +264,18 @@ impl GrpcQuerier {
     pub async fn get_agent_tasks(&self, account_id: String) -> Result<String, Report> {
         let response: Option<AgentTaskResponse> = self
             .query_croncat(&QueryMsg::GetAgentTasks { account_id })
+            .await?;
+        let json = serde_json::to_string_pretty(&response)?;
+        Ok(json)
+    }
+
+    pub async fn get_contract_state(
+        &self,
+        from_index: Option<u64>,
+        limit: Option<u64>,
+    ) -> Result<String, Report> {
+        let response: CwCroncatResponse = self
+            .query_croncat(&QueryMsg::GetState { from_index, limit })
             .await?;
         let json = serde_json::to_string_pretty(&response)?;
         Ok(json)

@@ -76,12 +76,12 @@ cargo run generate-mnemonic --mnemonic "olive soup parade family educate congres
 
 ### Register an agent
 ```bash
-cargo run register-agent
+cargo run register-agent --chain-id "local"
 ```
 
 ### Go for executing tasks
 ```bash
-cargo run go
+cargo run go --chain-id "local"
 ```
 
 

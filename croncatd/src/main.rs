@@ -196,7 +196,13 @@ async fn run_command(opts: Opts, mut storage: LocalAgentStorage) -> Result<(), R
         opts::Command::SetupService { chain_id, output } => {
             system::DaemonService::create(output, &chain_id, opts.no_frills)?;
         }
-        _ => {}
+        #[cfg(feature = "debug")]
+        opts::Command::GetState { from_index, limit } => {
+            let querier = GrpcQuerier::new(cfg).await?;
+
+            let state = querier.get_contract_state(from_index, limit).await?;
+            println!("{state}");
+        }
     }
 
     Ok(())

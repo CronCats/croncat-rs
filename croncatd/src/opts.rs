@@ -72,8 +72,12 @@ pub enum Command {
         chain_id: String,
     },
 
-    /// (in progress) Get the agent's status
-    Status,
+    /// Get contract's state
+    #[cfg(feature = "debug")]
+    GetState {
+        from_index: Option<u64>,
+        limit: Option<u64>,
+    },
 
     /// Show all task(s) information
     Tasks {

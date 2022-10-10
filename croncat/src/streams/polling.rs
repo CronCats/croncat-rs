@@ -20,7 +20,7 @@ pub async fn poll(
     duration: Duration,
     block_stream_tx: &BlockStreamTx,
     shutdown_rx: &ShutdownRx,
-    rpc_address: &String,
+    rpc_address: &str,
 ) -> Result<(), Report> {
     let node_address: Url = rpc_address.parse()?;
 

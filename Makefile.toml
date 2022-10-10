@@ -14,6 +14,10 @@ args = ["clean"]
 command = "cargo"
 args = ["check"]
 
+[tasks.clippy]
+command = "cargo"
+args = ["clippy", "--all-targets", "--all-features", "--", "-D", "warnings"]
+
 [tasks.build]
 command = "cargo"
 args = ["build"]
@@ -26,7 +30,5 @@ args = ["test"]
 dependencies = [
     "format",
     "check",
-    # "test" # Don't run test suite on pre-commit for now, we have no tests
+    "clippy",
 ]
-
-# TODO: (SeedyROM) Add CI/CD flow tasks

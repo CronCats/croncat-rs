@@ -1,6 +1,6 @@
 denom: "ujunox"
 prefix: "juno"
-chain_id: "uni-4"
+chain_id: "uni-5"
 rpc_endpoint: "https://juno-testnet-rpc.polkachu.com:443"
 grpc_endpoint: "https://juno-testnet-grpc.polkachu.com:12690"
 wsrpc_endpoint: "wss://juno-testnet-rpc.polkachu.com/websocket"

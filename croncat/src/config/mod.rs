@@ -35,7 +35,7 @@ impl ChainConfig {
         // if Self::is_chain_registry_enabled() {
         //     return Ok(Self::from_chain_registry(config).await?);
         // }
-        return Ok(config);
+        Ok(config)
     }
     pub fn from_file(file_name: &str) -> Result<Self, Report> {
         let settings = Config::builder()

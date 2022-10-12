@@ -156,7 +156,7 @@ pub async fn run(
         Ok(_) => Ok(()),
         Err(err) => {
             error!("croncatd shutdown with error");
-            Err(err.into())
+            Err(err)
         }
     }
 }

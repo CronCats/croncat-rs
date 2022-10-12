@@ -23,16 +23,15 @@ use crate::{
 /// Connect to the RPC websocket endpoint and subscribe for incoming blocks.
 ///
 pub async fn stream_blocks_loop(
-    url: &String,
+    url: &str,
     block_stream_tx: &BlockStreamTx,
     shutdown_rx: &ShutdownRx,
 ) -> Result<(), Report> {
-    let url = url.clone();
     let block_stream_tx = block_stream_tx.clone();
     let mut shutdown_rx = shutdown_rx.clone();
 
     // Parse url
-    let url = Url::parse(&url)?;
+    let url = Url::parse(url)?;
 
     info!("Connecting to WS RPC server @ {}", url);
 

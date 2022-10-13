@@ -13,6 +13,7 @@ use crate::{
     errors::{eyre, Report},
     grpc::GrpcSigner,
     logging::{info, warn},
+    monitor::ping_uptime_monitor,
     utils::sum_num_tasks,
 };
 
@@ -37,6 +38,9 @@ pub async fn tasks_loop(
                     .get_agent_tasks(account_addr)
                     .await
                     .map_err(|err| eyre!("Failed to get agent tasks: {}", err))?;
+
+                ping_uptime_monitor().await;
+
                 if let Some(tasks) = tasks {
                     println!("{:?}", tasks);
                     for _ in 0..sum_num_tasks(&tasks) {
@@ -69,22 +73,12 @@ pub async fn rules_loop(
     signer: GrpcSigner,
     block_status: Arc<Mutex<AgentStatus>>,
 ) -> Result<(), Report> {
-    let uptime_monitor_ping_url = std::env::var("UPTIME_MONITOR_PING_URL").ok();
-
     let block_consumer_stream: JoinHandle<Result<(), Report>> = tokio::task::spawn(async move {
         while let Ok(block) = block_stream_rx.recv().await {
             let tasks_with_rules = signer
                 .fetch_rules()
                 .await
                 .map_err(|err| eyre!("Failed to fetch rules: {}", err))?;
-
-            if uptime_monitor_ping_url.as_ref().is_some() {
-                let _ = reqwest::get(uptime_monitor_ping_url.as_ref().unwrap())
-                    .await
-                    .map_err(|err| {
-                        warn!("Failed to ping uptime monitor: {}", err);
-                    });
-            }
 
             let locked_status = block_status.lock().await;
             let is_active = *locked_status == AgentStatus::Active;

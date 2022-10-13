@@ -15,6 +15,7 @@ pub mod config;
 pub mod errors;
 pub mod grpc;
 pub mod logging;
+pub mod monitor;
 pub mod store;
 pub mod streams;
 pub mod system;

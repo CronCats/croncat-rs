@@ -59,17 +59,16 @@ pub async fn run(
     //
     let retry_block_stream_strategy = retry_strategy.clone();
     let retry_block_stream_handle = tokio::task::spawn(async move {
-        let retry_result = Retry::spawn(retry_block_stream_strategy, || async {
+        Retry::spawn(retry_block_stream_strategy, || async {
             // Stream blocks
-            ws::stream_blocks_loop(&wsrpc, &ws_block_stream_tx, &block_stream_shutdown_rx).await
-        });
-
-        match retry_result.await {
-            Ok(_) => (),
-            Err(err) => error!("Failed to connect to block stream: {}", err),
-        };
-
-        Ok(())
+            ws::stream_blocks_loop(&wsrpc, &ws_block_stream_tx, &block_stream_shutdown_rx)
+                .await
+                .map_err(|err| {
+                    error!("Error streaming blocks: {}", err);
+                    err
+                })
+        })
+        .await
     });
 
     // Set up polling
@@ -89,6 +88,10 @@ pub async fn run(
                 &rpc_addr,
             )
             .await
+            .map_err(|err| {
+                error!("Error polling blocks: {}", err);
+                err
+            })
         })
         .await
     });

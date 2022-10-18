@@ -4,7 +4,7 @@ chain_id: "uni-5"
 rpc_endpoint: "https://juno-testnet-rpc.polkachu.com:443"
 grpc_endpoint: "https://juno-testnet-grpc.polkachu.com:12690"
 wsrpc_endpoint: "wss://juno-testnet-rpc.polkachu.com/websocket"
-contract_address: "juno12z4hh9r3j9aurjn6ppkgyjrkuu4ugrdectsh792w8feyj56dhlssvntdls"
+contract_address: "juno1ntfyfpf4my6jd2ya8ypzeq94j89ejfeg45u9xrmh7u6d7excnuyskuj7cg"
 gas_prices: 0.1
 gas_adjustment: 1.5
 polling_duration_secs: 2

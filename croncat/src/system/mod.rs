@@ -8,7 +8,7 @@ use std::time::Duration;
 use cw_croncat_core::types::AgentStatus;
 use tokio::{sync::Mutex, task::JoinHandle};
 use tokio_retry::{
-    strategy::{jitter, ExponentialBackoff},
+    strategy::{jitter, FixedInterval},
     Retry,
 };
 use tracing::log::error;
@@ -47,7 +47,7 @@ pub async fn run(
     let ws_block_stream_tx = block_stream_tx.clone();
 
     // Generic retry strategy
-    let retry_strategy = ExponentialBackoff::from_millis(10).map(jitter).take(4);
+    let retry_strategy = FixedInterval::from_millis(3000).map(jitter).take(1200);
 
     // Handle retries if the websocket task fails.
     //
@@ -61,7 +61,12 @@ pub async fn run(
     let retry_block_stream_handle = tokio::task::spawn(async move {
         Retry::spawn(retry_block_stream_strategy, || async {
             // Stream blocks
-            ws::stream_blocks_loop(&wsrpc, &ws_block_stream_tx, &block_stream_shutdown_rx).await
+            ws::stream_blocks_loop(&wsrpc, &ws_block_stream_tx, &block_stream_shutdown_rx)
+                .await
+                .map_err(|err| {
+                    error!("Error streaming blocks: {}", err);
+                    err
+                })
         })
         .await
     });
@@ -77,13 +82,16 @@ pub async fn run(
         Retry::spawn(retry_polling_strategy, || async {
             // Poll for new blocks
             polling::poll(
-                // TODO (mikedotexe) let's have the duration be in config. lfg Cosmoverse first
                 Duration::from_secs(polling_duration_secs),
                 &http_block_stream_tx,
                 &block_polling_shutdown_rx,
                 &rpc_addr,
             )
             .await
+            .map_err(|err| {
+                error!("Error polling blocks: {}", err);
+                err
+            })
         })
         .await
     });

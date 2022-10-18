@@ -44,12 +44,6 @@ pub async fn tasks_loop(
                 if let Some(tasks) = tasks {
                     println!("{:?}", tasks);
                     for _ in 0..sum_num_tasks(&tasks) {
-                        // if let Ok(proxy_call_res) = signer.proxy_call(None).await {
-                        //     info!("Finished task: {}", proxy_call_res.log);
-                        // } else {
-                        //     warn!("Something went wrong during proxy_call");
-                        // }
-
                         match signer.proxy_call(None).await {
                             Ok(proxy_call_res) => {
                                 info!("Finished task: {}", proxy_call_res.log);

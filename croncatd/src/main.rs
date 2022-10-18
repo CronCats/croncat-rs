@@ -47,11 +47,11 @@ async fn main() -> Result<(), Report> {
     info!("Starting croncatd...");
 
     // Run a command
-    run_command(opts.clone(), storage).await.map_err(|err| {
-        error!("Error from {} command...", opts.cmd);
+    if let Err(err) = run_command(opts.clone(), storage).await {
+        error!("{} command failed", opts.cmd);
         error!("{}", err);
-        err
-    })?;
+        exit(1);
+    }
 
     // Say goodbye if no no-frills
     if !opts.no_frills {

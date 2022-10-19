@@ -12,7 +12,7 @@ use tracing::log::info;
 
 use crate::{errors::Report, utils};
 
-use super::LOCAL_STORAGE_DEFAULT_DIR;
+use super::get_storage_path;
 
 /// Where our [`LocalAgentStorage`] will be stored.
 const LOCAL_STORAGE_AGENTS_FILENAME: &str = "./agents.json";
@@ -78,9 +78,7 @@ pub struct LocalAgentStorage {
 impl LocalAgentStorage {
     /// Create a new [`LocalAgentStorage`] instance with the default directory.
     pub fn new() -> Self {
-        let mut home = std::env::var("HOME").unwrap();
-        home.push_str(LOCAL_STORAGE_DEFAULT_DIR);
-        Self::from_path(home.into())
+        Self::from_path(get_storage_path())
     }
 
     /// Create a [`LocalAgentStorage`] instance at a specified path,

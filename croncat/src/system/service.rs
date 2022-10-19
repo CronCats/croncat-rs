@@ -8,7 +8,7 @@ use color_eyre::{eyre::eyre, Report};
 use indoc::indoc;
 use tracing::log::info;
 
-use crate::store::LOCAL_STORAGE_DEFAULT_DIR;
+use crate::store::get_storage_path;
 
 /// Name of the daemon service directory.
 const DAEMON_SERVICES_DIR_NAME: &str = "system-services";
@@ -19,10 +19,11 @@ pub struct DaemonService;
 impl DaemonService {
     /// Create a new daemon service file at the given path with chain ID.
     pub fn create(path: Option<String>, chain_id: &String, no_frills: bool) -> Result<(), Report> {
-        // If no path is given, use the default storage path in the HOME directory.
-        let mut default_output = std::env::var("HOME")?;
-        default_output.push_str(LOCAL_STORAGE_DEFAULT_DIR);
-        let path = PathBuf::from(path.unwrap_or(default_output)).join(DAEMON_SERVICES_DIR_NAME);
+        let storage_path = match path {
+            Some(path) => PathBuf::from(path),
+            None => get_storage_path(),
+        };
+        let path = storage_path.join(DAEMON_SERVICES_DIR_NAME);
 
         // Create the daemon service directory at the given path if it doesn't exist.
         fs::create_dir_all(&path)?;

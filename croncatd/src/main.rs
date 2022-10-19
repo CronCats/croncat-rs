@@ -50,6 +50,11 @@ async fn main() -> Result<(), Report> {
     if let Err(err) = run_command(opts.clone(), storage).await {
         error!("{} command failed", opts.cmd);
         error!("{}", err);
+
+        if std::env::var("RUST_LIB_BACKTRACE").is_ok() {
+            Err(err)?;
+        }
+
         exit(1);
     }
 
@@ -71,15 +76,15 @@ async fn run_command(opts: Opts, mut storage: LocalAgentStorage) -> Result<(), R
             let key = storage.get_agent_signing_key(&sender_name)?;
             let signer = GrpcSigner::new(ChainConfig::new(&chain_id).await?, key).await?;
 
-            println!("Key: {}", signer.key().public_key().to_json());
-            println!(
+            info!("Key: {}", signer.key().public_key().to_json());
+            info!(
                 "Payable account Id: {}",
                 serde_json::to_string_pretty(&payable_account_id)?
             );
 
             let result = signer.register_agent(payable_account_id).await?;
             let log = result.log;
-            println!("{log}");
+            info!("Log: {log}");
         }
         opts::Command::UnregisterAgent {
             sender_name,
@@ -89,7 +94,7 @@ async fn run_command(opts: Opts, mut storage: LocalAgentStorage) -> Result<(), R
             let signer = GrpcSigner::new(ChainConfig::new(&chain_id).await?, key).await?;
             let result = signer.unregister_agent().await?;
             let log = result.log;
-            println!("{log}");
+            info!("Log: {log}");
         }
         opts::Command::Withdraw {
             sender_name,
@@ -99,12 +104,12 @@ async fn run_command(opts: Opts, mut storage: LocalAgentStorage) -> Result<(), R
             let signer = GrpcSigner::new(ChainConfig::new(&chain_id).await?, key).await?;
             let result = signer.withdraw_reward().await?;
             let log = result.log;
-            println!("{log}");
+            info!("Log: {log}");
         }
         opts::Command::Info { chain_id } => {
             let querier = GrpcQuerier::new(ChainConfig::new(&chain_id).await?).await?;
             let config = querier.query_config().await?;
-            println!("{config}")
+            info!("Config: {config}")
         }
         opts::Command::GetAgentStatus {
             account_id,
@@ -112,7 +117,7 @@ async fn run_command(opts: Opts, mut storage: LocalAgentStorage) -> Result<(), R
         } => {
             let querier = GrpcQuerier::new(ChainConfig::new(&chain_id).await?).await?;
             let status = querier.get_agent(account_id).await?;
-            println!("status: {status}")
+            info!("Agent Status: {status}")
         }
         opts::Command::Tasks {
             from_index,
@@ -121,7 +126,7 @@ async fn run_command(opts: Opts, mut storage: LocalAgentStorage) -> Result<(), R
         } => {
             let querier = GrpcQuerier::new(ChainConfig::new(&chain_id).await?).await?;
             let tasks = querier.get_tasks(from_index, limit).await?;
-            println!("{tasks}")
+            info!("Tasks: {tasks}")
         }
         opts::Command::GetAgentTasks {
             account_addr,
@@ -129,7 +134,7 @@ async fn run_command(opts: Opts, mut storage: LocalAgentStorage) -> Result<(), R
         } => {
             let querier = GrpcQuerier::new(ChainConfig::new(&chain_id).await?).await?;
             let agent_tasks = querier.get_agent_tasks(account_addr).await?;
-            println!("{agent_tasks}")
+            info!("Agent Tasks: {agent_tasks}")
         }
         opts::Command::GenerateMnemonic { new_name, mnemonic } => {
             storage.generate_account(new_name, mnemonic)?
@@ -143,7 +148,7 @@ async fn run_command(opts: Opts, mut storage: LocalAgentStorage) -> Result<(), R
             let signer = GrpcSigner::new(ChainConfig::new(&chain_id).await?, key).await?;
             let result = signer.update_agent(payable_account_id).await?;
             let log = result.log;
-            println!("{log}");
+            info!("Log: {log}");
         }
         //@TODO: remember to finish this command, since it's only querying
         opts::Command::DepositUjunox {

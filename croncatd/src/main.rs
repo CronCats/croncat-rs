@@ -11,14 +11,17 @@ use croncat::{
     errors::{eyre, Report},
     grpc::{GrpcQuerier, GrpcSigner},
     logging::{self, error, info},
-    store::agent::LocalAgentStorage,
+    store::{agent::LocalAgentStorage, logs::ErrorLogStorage},
     system,
     tokio,
 };
+use once_cell::sync::OnceCell;
 use opts::Opts;
 
 mod cli;
 mod opts;
+
+static CHAIN_ID: OnceCell<String> = OnceCell::new();
 
 ///
 /// Start the `croncatd` agent.
@@ -48,10 +51,12 @@ async fn main() -> Result<(), Report> {
 
     // Run a command
     if let Err(err) = run_command(opts.clone(), storage).await {
-        error!("{} command failed", opts.cmd);
+        error!("Command failed: {}", opts.cmd);
         error!("{}", err);
 
-        if std::env::var("RUST_LIB_BACKTRACE").is_ok() {
+        ErrorLogStorage::write(CHAIN_ID.get().unwrap(), &err)?;
+
+        if opts.debug {
             Err(err)?;
         }
 
@@ -73,6 +78,7 @@ async fn run_command(opts: Opts, mut storage: LocalAgentStorage) -> Result<(), R
             sender_name,
             chain_id,
         } => {
+            CHAIN_ID.set(chain_id.clone()).unwrap();
             let key = storage.get_agent_signing_key(&sender_name)?;
             let signer = GrpcSigner::new(ChainConfig::new(&chain_id).await?, key).await?;
 
@@ -90,6 +96,7 @@ async fn run_command(opts: Opts, mut storage: LocalAgentStorage) -> Result<(), R
             sender_name,
             chain_id,
         } => {
+            CHAIN_ID.set(chain_id.clone()).unwrap();
             let key = storage.get_agent_signing_key(&sender_name)?;
             let signer = GrpcSigner::new(ChainConfig::new(&chain_id).await?, key).await?;
             let result = signer.unregister_agent().await?;
@@ -100,6 +107,7 @@ async fn run_command(opts: Opts, mut storage: LocalAgentStorage) -> Result<(), R
             sender_name,
             chain_id,
         } => {
+            CHAIN_ID.set(chain_id.clone()).unwrap();
             let key = storage.get_agent_signing_key(&sender_name)?;
             let signer = GrpcSigner::new(ChainConfig::new(&chain_id).await?, key).await?;
             let result = signer.withdraw_reward().await?;
@@ -107,6 +115,7 @@ async fn run_command(opts: Opts, mut storage: LocalAgentStorage) -> Result<(), R
             info!("Log: {log}");
         }
         opts::Command::Info { chain_id } => {
+            CHAIN_ID.set(chain_id.clone()).unwrap();
             let querier = GrpcQuerier::new(ChainConfig::new(&chain_id).await?).await?;
             let config = querier.query_config().await?;
             info!("Config: {config}")
@@ -115,6 +124,7 @@ async fn run_command(opts: Opts, mut storage: LocalAgentStorage) -> Result<(), R
             account_id,
             chain_id,
         } => {
+            CHAIN_ID.set(chain_id.clone()).unwrap();
             let querier = GrpcQuerier::new(ChainConfig::new(&chain_id).await?).await?;
             let status = querier.get_agent(account_id).await?;
             info!("Agent Status: {status}")
@@ -124,6 +134,7 @@ async fn run_command(opts: Opts, mut storage: LocalAgentStorage) -> Result<(), R
             limit,
             chain_id,
         } => {
+            CHAIN_ID.set(chain_id.clone()).unwrap();
             let querier = GrpcQuerier::new(ChainConfig::new(&chain_id).await?).await?;
             let tasks = querier.get_tasks(from_index, limit).await?;
             info!("Tasks: {tasks}")
@@ -132,6 +143,7 @@ async fn run_command(opts: Opts, mut storage: LocalAgentStorage) -> Result<(), R
             account_addr,
             chain_id,
         } => {
+            CHAIN_ID.set(chain_id.clone()).unwrap();
             let querier = GrpcQuerier::new(ChainConfig::new(&chain_id).await?).await?;
             let agent_tasks = querier.get_agent_tasks(account_addr).await?;
             info!("Agent Tasks: {agent_tasks}")
@@ -144,6 +156,7 @@ async fn run_command(opts: Opts, mut storage: LocalAgentStorage) -> Result<(), R
             sender_name,
             chain_id,
         } => {
+            CHAIN_ID.set(chain_id.clone()).unwrap();
             let key = storage.get_agent_signing_key(&sender_name)?;
             let signer = GrpcSigner::new(ChainConfig::new(&chain_id).await?, key).await?;
             let result = signer.update_agent(payable_account_id).await?;
@@ -155,6 +168,7 @@ async fn run_command(opts: Opts, mut storage: LocalAgentStorage) -> Result<(), R
             account_id: _,
             chain_id: _,
         } => {
+            // CHAIN_ID.set(chain_id.clone()).unwrap();
             todo!("Credit webservice is not working for now!");
             // //let result = deposit_junox(&account_id).await?;
             // let cfg = ChainConfig::new(&chain_id).await?;
@@ -171,6 +185,7 @@ async fn run_command(opts: Opts, mut storage: LocalAgentStorage) -> Result<(), R
             with_rules,
             chain_id,
         } => {
+            CHAIN_ID.set(chain_id.clone()).unwrap();
             let key = storage.get_agent_signing_key(&sender_name)?;
             let cfg = ChainConfig::new(&chain_id).await?;
             let ChainConfig {

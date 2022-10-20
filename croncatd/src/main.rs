@@ -191,31 +191,11 @@ async fn run_command(opts: Opts, mut storage: LocalAgentStorage) -> Result<(), R
         } => {
             CHAIN_ID.set(chain_id.clone()).unwrap();
             let key = storage.get_agent_signing_key(&sender_name)?;
-            let cfg = ChainConfigFile::new(&chain_id).await?;
-            let ChainConfig {
-                polling_duration_secs,
-                ..
-            } = cfg;
-            let signer = GrpcSigner::new(cfg, key)
-                .await
-                .map_err(|err| eyre!("Failed to setup GRPC: {}", err))?;
-            let initial_status = signer
-                .get_agent(signer.account_id().as_ref())
-                .await?
-                .ok_or(eyre!("Agent must be registered to start the loop"))?
-                .status;
+            let config_file = ChainConfigFile::new(&chain_id).await?;
             // Create a channel to handle graceful shutdown and wrap receiver for cloning
             let (shutdown_tx, shutdown_rx) = channels::create_shutdown_channel();
             // Start the agent
-            system::run(
-                shutdown_tx,
-                shutdown_rx,
-                signer,
-                initial_status,
-                with_rules,
-                polling_duration_secs,
-            )
-            .await?;
+            system::run(shutdown_tx, shutdown_rx, key, &config_file, with_rules).await?;
         }
         opts::Command::SetupService { chain_id, output } => {
             system::DaemonService::create(output, &chain_id, opts.no_frills)?;

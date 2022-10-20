@@ -7,12 +7,13 @@ use std::sync::Arc;
 use cosmos_sdk_proto::tendermint::google::protobuf::Timestamp;
 use cw_croncat_core::types::{AgentStatus, Boundary};
 use tokio::{sync::Mutex, task::JoinHandle};
+use tracing::error;
 
 use crate::{
     channels::{BlockStreamRx, ShutdownRx},
     errors::{eyre, Report},
     grpc::GrpcSigner,
-    logging::{info, warn},
+    logging::info,
     monitor::ping_uptime_monitor,
     utils::sum_num_tasks,
 };
@@ -42,14 +43,14 @@ pub async fn tasks_loop(
                 ping_uptime_monitor().await;
 
                 if let Some(tasks) = tasks {
-                    println!("{:?}", tasks);
+                    info!("Tasks: {:?}", tasks);
                     for _ in 0..sum_num_tasks(&tasks) {
                         match signer.proxy_call(None).await {
                             Ok(proxy_call_res) => {
                                 info!("Finished task: {}", proxy_call_res.log);
                             }
                             Err(err) => {
-                                warn!("Something went wrong during proxy_call: {}", err);
+                                error!("Something went wrong during proxy_call: {}", err);
                             }
                         }
                     }
@@ -110,11 +111,13 @@ pub async fn rules_loop(
                             .await
                             .map_err(|err| eyre!("Failed to query rules: {}", err))?;
                         if rules_ready {
-                            let res = signer.proxy_call(Some(task.task_hash.clone())).await;
-                            if let Ok(proxy_call_res) = res {
-                                info!("Finished task: {}", proxy_call_res.log);
-                            } else {
-                                warn!("Something went wrong during proxy_call");
+                            match signer.proxy_call(None).await {
+                                Ok(proxy_call_res) => {
+                                    info!("Finished task: {}", proxy_call_res.log);
+                                }
+                                Err(err) => {
+                                    error!("Something went wrong during proxy_call: {}", err);
+                                }
                             }
                         }
                     }

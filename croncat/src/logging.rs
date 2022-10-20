@@ -2,8 +2,10 @@
 //! Setup tracing/logging/backtraces and re-export tracing log macros.
 //!
 
-use crate::errors::Report;
-use tracing_subscriber::EnvFilter;
+use crate::{errors::Report, store::get_storage_path};
+use tracing::Level;
+use tracing_appender::non_blocking::WorkerGuard;
+use tracing_subscriber::{fmt, prelude::*, EnvFilter};
 
 // Export the tracing function for use
 pub use tracing::{debug, error, info, warn};
@@ -30,6 +32,42 @@ pub fn setup() -> Result<(), Report> {
         .init();
 
     Ok(())
+}
+
+///
+/// Setup logging for the go command
+///
+pub fn setup_go(chain_id: String) -> Result<Vec<WorkerGuard>, Report> {
+    let mut guards = vec![];
+
+    let error_file_appender = tracing_appender::rolling::daily(
+        format!("{}/logs", get_storage_path().to_str().unwrap()),
+        format!("{}.error.log", chain_id),
+    );
+    let (error_file_writer, guard) = tracing_appender::non_blocking(error_file_appender);
+    guards.push(guard);
+
+    let file_appender = tracing_appender::rolling::daily(
+        format!("{}/logs", get_storage_path().to_str().unwrap()),
+        format!("{}.log", chain_id),
+    );
+    let (file_writer, guard) = tracing_appender::non_blocking(file_appender);
+    guards.push(guard);
+
+    let subscriber = tracing_subscriber::registry()
+        .with(
+            fmt::Layer::new().with_writer(
+                file_writer
+                    .with_max_level(Level::INFO)
+                    .with_min_level(Level::WARN),
+            ),
+        )
+        .with(fmt::Layer::new().with_writer(error_file_writer.with_max_level(Level::ERROR)))
+        .with(fmt::Layer::new().with_writer(std::io::stdout.with_max_level(Level::INFO)));
+
+    tracing::subscriber::set_global_default(subscriber)?;
+
+    Ok(guards)
 }
 
 #[cfg(test)]

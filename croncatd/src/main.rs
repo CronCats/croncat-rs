@@ -203,11 +203,11 @@ async fn run_command(opts: Opts, mut storage: LocalAgentStorage) -> Result<(), R
             // Create a channel to handle graceful shutdown and wrap receiver for cloning
             let (shutdown_tx, shutdown_rx) = channels::create_shutdown_channel();
             // Start the agent
-            system::run(
-                shutdown_tx,
-                shutdown_rx,
-                signer,
-                initial_status,
+            system::run_retry(
+                &shutdown_tx,
+                &shutdown_rx,
+                &signer,
+                &initial_status,
                 with_rules,
                 polling_duration_secs,
             )

@@ -31,8 +31,8 @@ pub use service::DaemonService;
 /// Kick off the croncat daemon
 ///
 pub async fn run(
-    shutdown_tx: ShutdownTx,
-    shutdown_rx: ShutdownRx,
+    shutdown_tx: &ShutdownTx,
+    shutdown_rx: &ShutdownRx,
     signer: GrpcSigner,
     initial_status: AgentStatus,
     with_rules: bool,
@@ -125,7 +125,7 @@ pub async fn run(
     let rules_runner_handle = if with_rules {
         tokio::task::spawn(tasks::rules_loop(
             block_stream_rx,
-            shutdown_rx,
+            shutdown_rx.to_owned(),
             signer,
             block_status,
         ))
@@ -167,4 +167,30 @@ pub async fn run(
             Err(err)
         }
     }
+}
+
+pub async fn run_retry(
+    shutdown_tx: &ShutdownTx,
+    shutdown_rx: &ShutdownRx,
+    signer: &GrpcSigner,
+    initial_status: &AgentStatus,
+    with_rules: bool,
+    polling_duration_secs: u64,
+) -> Result<(), Report> {
+    let retry_strategy = FixedInterval::from_millis(3000).map(jitter).take(1200);
+
+    Retry::spawn(retry_strategy, || async {
+        run(
+            shutdown_tx,
+            shutdown_rx,
+            signer.clone(),
+            initial_status.clone(),
+            with_rules,
+            polling_duration_secs,
+        )
+        .await
+    })
+    .await?;
+
+    Ok(())
 }

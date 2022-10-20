@@ -189,6 +189,11 @@ pub async fn run_retry(
             polling_duration_secs,
         )
         .await
+        .map_err(|err| {
+            error!("System crashed: {}", err);
+            error!("Retrying...");
+            err
+        })
     })
     .await?;
 

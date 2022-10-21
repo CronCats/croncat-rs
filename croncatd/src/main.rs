@@ -7,8 +7,8 @@ use std::process::exit;
 use croncat::{
     channels,
     //    client::{BankQueryClient, QueryBank},
-    config::{ChainConfig, ChainConfigFile},
-    errors::{eyre, Report},
+    config::ChainConfigFile,
+    errors::Report,
     grpc::{GrpcQuerier, GrpcSigner},
     logging::{self, error, info},
     store::{agent::LocalAgentStorage, logs::ErrorLogStorage},

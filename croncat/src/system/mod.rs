@@ -6,8 +6,12 @@ use std::sync::Arc;
 use std::time::Duration;
 
 use cosmrs::bip32::{secp256k1::ecdsa::SigningKey, ExtendedPrivateKey};
-use cw_croncat_core::types::AgentStatus;
-use tokio::{sync::Mutex, task::JoinHandle};
+use croncat_pipeline::{Dispatcher, Sequencer};
+use delegate::delegate;
+use tokio::{
+    sync::{broadcast, mpsc, Mutex},
+    task::JoinHandle,
+};
 use tokio_retry::{
     strategy::{jitter, FixedInterval},
     Retry,
@@ -15,7 +19,7 @@ use tokio_retry::{
 use tracing::log::error;
 
 use crate::{
-    channels::{self, ShutdownRx, ShutdownTx},
+    channels::{ShutdownRx, ShutdownTx},
     config::{ChainConfig, ChainConfigFile},
     errors::{eyre, Report},
     grpc::GrpcSigner,
@@ -30,6 +34,50 @@ pub mod service;
 pub use service::DaemonService;
 
 ///
+/// Block wrapper
+///
+#[derive(Debug, Clone)]
+pub struct Block {
+    pub inner: tendermint::Block,
+}
+
+#[allow(dead_code)]
+impl Block {
+    delegate! {
+        to self.inner {
+            pub fn header(&self) -> &tendermint::block::Header;
+            pub fn data(&self) -> &tendermint::abci::transaction::Data;
+        }
+    }
+}
+
+impl From<tendermint::Block> for Block {
+    fn from(block: tendermint::Block) -> Self {
+        Self { inner: block }
+    }
+}
+
+impl Ord for Block {
+    fn cmp(&self, other: &Self) -> std::cmp::Ordering {
+        self.header().height.cmp(&other.header().height)
+    }
+}
+
+impl PartialOrd for Block {
+    fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
+        Some(self.cmp(other))
+    }
+}
+
+impl PartialEq for Block {
+    fn eq(&self, other: &Self) -> bool {
+        self.header().height == other.header().height
+    }
+}
+
+impl Eq for Block {}
+
+///
 /// Kick off the croncat daemon
 ///
 pub async fn run(
@@ -40,20 +88,30 @@ pub async fn run(
     with_rules: bool,
 ) -> Result<(), Report> {
     // Create a block stream channel
-    let (block_stream_tx, _block_stream_rx) = channels::create_block_stream(32);
+    let (block_stream_tx, block_stream_rx) = mpsc::unbounded_channel();
 
+    // Create a global signer for the chain
+    let signer = GrpcSigner::new(
+        ChainConfig::from_chain_config_file(config_file, 0),
+        key.clone(),
+    )
+    .await
+    .map_err(|err| eyre!("Failed to setup GRPC: {}", err))?;
+
+    // Get the initial agent status
+    let initial_status = signer
+        .get_agent(signer.account_id().as_ref())
+        .await?
+        .ok_or(eyre!("Agent must be registered to start the loop"))?
+        .status;
+    let initial_status = Arc::new(Mutex::new(initial_status));
+
+    // Create shutdown channels.
     let source_shutdown_rx = shutdown_rx.clone();
+
+    // Create a source task for each
     for index in 0..config_file.sources.len() {
         let cfg = ChainConfig::from_chain_config_file(config_file, index as u64);
-
-        let signer = GrpcSigner::new(cfg.clone(), key.clone())
-            .await
-            .map_err(|err| eyre!("Failed to setup GRPC: {}", err))?;
-        let initial_status = signer
-            .get_agent(signer.account_id().as_ref())
-            .await?
-            .ok_or(eyre!("Agent must be registered to start the loop"))?
-            .status;
 
         // Connect to GRPC  Stream new blocks from the WS RPC subscription
         let wsrpc = signer.wsrpc().to_owned();
@@ -72,7 +130,7 @@ pub async fn run(
         //
         let retry_block_stream_strategy = retry_strategy.clone();
         let retry_block_stream_shutdown_rx = source_shutdown_rx.clone();
-        let retry_block_stream_handle = tokio::task::spawn(async move {
+        let _retry_block_stream_handle = tokio::task::spawn(async move {
             Retry::spawn(retry_block_stream_strategy, || async {
                 // Stream blocks
                 ws::stream_blocks_loop(&wsrpc, &ws_block_stream_tx, &retry_block_stream_shutdown_rx)
@@ -93,7 +151,7 @@ pub async fn run(
         // Handle retries if the polling task fails.
         let retry_polling_strategy = retry_strategy.clone();
         let retry_polling_duration_seconds = Duration::from_secs(cfg.polling_duration_secs);
-        let retry_polling_handle = tokio::task::spawn(async move {
+        let _retry_polling_handle = tokio::task::spawn(async move {
             Retry::spawn(retry_polling_strategy, || async {
                 // Poll for new blocks
                 polling::poll(
@@ -110,44 +168,54 @@ pub async fn run(
             })
             .await
         });
-
-        // Account status checks
-        let account_status_check_shutdown_rx = source_shutdown_rx.clone();
-        let account_status_check_block_stream_rx = block_stream_rx.clone();
-        let block_status = Arc::new(Mutex::new(initial_status));
-        let block_status_accounts_loop = block_status.clone();
-        let signer_status = signer.clone();
-        let account_status_check_handle = tokio::task::spawn(agent::check_account_status_loop(
-            account_status_check_block_stream_rx,
-            account_status_check_shutdown_rx,
-            block_status_accounts_loop,
-            signer_status,
-        ));
-
-        // Process blocks coming in from the blockchain
-        let task_runner_shutdown_rx = source_shutdown_rx.clone();
-        let task_runner_block_stream_rx = block_stream_rx.clone();
-        let tasks_signer = signer.clone();
-        let block_status_tasks = block_status.clone();
-        let task_runner_handle = tokio::task::spawn(tasks::tasks_loop(
-            task_runner_block_stream_rx,
-            task_runner_shutdown_rx,
-            tasks_signer,
-            block_status_tasks,
-        ));
-
-        // Check rules if enabled
-        let rules_runner_handle = if with_rules {
-            tokio::task::spawn(tasks::rules_loop(
-                block_stream_rx,
-                source_shutdown_rx,
-                signer,
-                block_status,
-            ))
-        } else {
-            tokio::task::spawn(async { Ok(()) })
-        };
     }
+
+    // Create a sequencer to dedup and sort the blocks with a cache size of 32.
+    let (sequencer_tx, sequencer_rx) = mpsc::unbounded_channel();
+    let mut sequencer = Sequencer::new(block_stream_rx, sequencer_tx, 128)?;
+    let sequencer_handle = tokio::spawn(async move { sequencer.consume().await });
+
+    // Dispatch the blocks to the indexer.
+    let (dispatcher_tx, dispatcher_rx) = broadcast::channel(512);
+    let mut dispatcher = Dispatcher::new(sequencer_rx, dispatcher_tx.clone());
+    let dispatcher_handle = tokio::spawn(async move { dispatcher.fanout().await });
+
+    // Account status checks
+    let account_status_check_shutdown_rx = source_shutdown_rx.clone();
+    let account_status_check_block_stream_rx = dispatcher_tx.subscribe();
+    let block_status = initial_status.clone();
+    let block_status_accounts_loop = block_status.clone();
+    let signer_status = signer.clone();
+    let account_status_check_handle = tokio::task::spawn(agent::check_account_status_loop(
+        account_status_check_block_stream_rx,
+        account_status_check_shutdown_rx,
+        block_status_accounts_loop,
+        signer_status,
+    ));
+
+    // Process blocks coming in from the blockchain
+    let task_runner_shutdown_rx = source_shutdown_rx.clone();
+    let task_runner_block_stream_rx = dispatcher_tx.subscribe();
+    let tasks_signer = signer.clone();
+    let block_status_tasks = initial_status.clone();
+    let task_runner_handle = tokio::task::spawn(tasks::tasks_loop(
+        task_runner_block_stream_rx,
+        task_runner_shutdown_rx,
+        tasks_signer,
+        block_status_tasks,
+    ));
+
+    // Check rules if enabled
+    let rules_runner_handle = if with_rules {
+        tokio::task::spawn(tasks::rules_loop(
+            dispatcher_rx,
+            source_shutdown_rx,
+            signer,
+            initial_status.clone(),
+        ))
+    } else {
+        tokio::task::spawn(async { Ok(()) })
+    };
 
     // Handle SIGINT AKA Ctrl-C
     let ctrl_c_shutdown_tx = shutdown_tx.clone();
@@ -166,7 +234,14 @@ pub async fn run(
     });
 
     // Try to join all the system tasks.
-    let system_status = tokio::try_join!(flatten_join(ctrl_c_handle),);
+    let system_status = tokio::try_join!(
+        flatten_join(sequencer_handle),
+        flatten_join(dispatcher_handle),
+        flatten_join(account_status_check_handle),
+        flatten_join(task_runner_handle),
+        flatten_join(rules_runner_handle),
+        flatten_join(ctrl_c_handle),
+    );
 
     // If any of the tasks failed, we need to propagate the error.
     match system_status {

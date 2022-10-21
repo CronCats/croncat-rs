@@ -9,9 +9,8 @@ use std::path::Path;
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct ChainConfigSource {
-    grpc_endpoint: String,
-    rpc_endpoint: String,
-    wsrpc_endpoint: String,
+    pub rpc_endpoint: String,
+    pub wsrpc_endpoint: String,
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
@@ -20,6 +19,7 @@ pub struct ChainConfigFile {
     pub prefix: String,
     pub chain_id: String,
     pub sources: Vec<ChainConfigSource>,
+    pub grpc_endpoint: String,
     pub contract_address: Option<String>,
     pub gas_prices: f64,
     pub gas_adjustment: f64,
@@ -51,7 +51,7 @@ impl ChainConfig {
             denom: chain_config_file.denom.clone(),
             prefix: chain_config_file.prefix.clone(),
             chain_id: chain_config_file.chain_id.clone(),
-            grpc_endpoint: source.grpc_endpoint.clone(),
+            grpc_endpoint: chain_config_file.grpc_endpoint.clone(),
             rpc_endpoint: source.rpc_endpoint.clone(),
             wsrpc_endpoint: source.wsrpc_endpoint.clone(),
             contract_address: chain_config_file.contract_address.to_owned(),

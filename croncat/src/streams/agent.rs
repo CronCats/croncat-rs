@@ -5,23 +5,20 @@
 
 use std::sync::Arc;
 
+use crate::system::Block;
 use color_eyre::{eyre::eyre, Report};
 use cw_croncat_core::types::AgentStatus;
-use tokio::sync::Mutex;
+use tokio::sync::{broadcast, Mutex};
 use tracing::info;
 
-use crate::{
-    channels::{BlockStreamRx, ShutdownRx},
-    grpc::GrpcSigner,
-    utils::AtomicIntervalCounter,
-};
+use crate::{channels::ShutdownRx, grpc::GrpcSigner, utils::AtomicIntervalCounter};
 
 ///
 /// Check every nth block with [`AtomicIntervalCounter`] for the current account
 /// status of each account the agent watches.
 ///
 pub async fn check_account_status_loop(
-    mut block_stream_rx: BlockStreamRx,
+    mut block_stream_rx: broadcast::Receiver<Block>,
     mut shutdown_rx: ShutdownRx,
     block_status: Arc<Mutex<AgentStatus>>,
     signer: GrpcSigner,
@@ -33,7 +30,7 @@ pub async fn check_account_status_loop(
             if block_counter.is_at_interval() {
                 info!(
                     "Checking agents statuses for block (height: {})",
-                    block.header.height
+                    block.header().height
                 );
                 let account_addr = signer.account_id().as_ref();
                 let agent = signer.get_agent(account_addr).await?;

@@ -4,12 +4,16 @@
 
 use std::sync::Arc;
 
+use crate::system::Block;
 use cosmos_sdk_proto::tendermint::google::protobuf::Timestamp;
 use cw_croncat_core::types::{AgentStatus, Boundary};
-use tokio::{sync::Mutex, task::JoinHandle};
+use tokio::{
+    sync::{broadcast, Mutex},
+    task::JoinHandle,
+};
 
 use crate::{
-    channels::{BlockStreamRx, ShutdownRx},
+    channels::ShutdownRx,
     errors::{eyre, Report},
     grpc::GrpcSigner,
     logging::{info, warn},
@@ -21,7 +25,7 @@ use crate::{
 /// Do work on blocks that are sent from the ws stream.
 ///
 pub async fn tasks_loop(
-    mut block_stream_rx: BlockStreamRx,
+    mut block_stream_rx: broadcast::Receiver<Block>,
     mut shutdown_rx: ShutdownRx,
     signer: GrpcSigner,
     block_status: Arc<Mutex<AgentStatus>>,
@@ -54,7 +58,7 @@ pub async fn tasks_loop(
                         }
                     }
                 } else {
-                    info!("No tasks for block (height: {})", block.header.height);
+                    info!("No tasks for block (height: {})", block.header().height);
                 }
             }
         }
@@ -71,7 +75,7 @@ pub async fn tasks_loop(
 }
 
 pub async fn rules_loop(
-    mut block_stream_rx: BlockStreamRx,
+    mut block_stream_rx: broadcast::Receiver<Block>,
     mut shutdown_rx: ShutdownRx,
     signer: GrpcSigner,
     block_status: Arc<Mutex<AgentStatus>>,
@@ -88,13 +92,13 @@ pub async fn rules_loop(
             // unlocking it ASAP
             std::mem::drop(locked_status);
             if is_active {
-                let time: Timestamp = block.header.time.into();
+                let time: Timestamp = block.header().time.into();
                 let time_nanos = time.seconds as u64 * 1_000_000_000 + time.nanos as u64;
 
                 for task in tasks_with_rules.iter() {
                     let in_boundary = match task.boundary {
                         Some(Boundary::Height { start, end }) => {
-                            let height = block.header.height.value();
+                            let height = block.header().height.value();
                             start.map_or(true, |s| s.u64() >= height)
                                 && end.map_or(true, |e| e.u64() <= height)
                         }

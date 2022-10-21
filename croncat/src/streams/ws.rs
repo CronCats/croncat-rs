@@ -4,16 +4,17 @@
 
 use std::time::Duration;
 
+use crate::system::Block;
 use color_eyre::{eyre::eyre, Report};
 use futures_util::StreamExt;
 use tendermint_rpc::event::EventData;
 use tendermint_rpc::query::EventType;
 use tendermint_rpc::{SubscriptionClient, WebSocketClient};
+use tokio::sync::mpsc;
 use tokio::task::JoinHandle;
 use tracing::log::error;
 use url::Url;
 
-use crate::channels::BlockStreamTx;
 use crate::{
     channels::ShutdownRx,
     logging::{info, warn},
@@ -24,7 +25,7 @@ use crate::{
 ///
 pub async fn stream_blocks_loop(
     url: &str,
-    block_stream_tx: &BlockStreamTx,
+    block_stream_tx: &mpsc::UnboundedSender<Block>,
     shutdown_rx: &ShutdownRx,
 ) -> Result<(), Report> {
     let block_stream_tx = block_stream_tx.clone();
@@ -70,7 +71,7 @@ pub async fn stream_blocks_loop(
                         "Received block (height: {}) from {}",
                         block.header.height, block.header.time
                     );
-                    block_stream_tx.broadcast(block).await?;
+                    block_stream_tx.send(block.into())?;
                 }
                 // Warn about all events for now
                 message => {

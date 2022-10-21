@@ -2,14 +2,16 @@
 //! Subscribe and stream blocks from the tendermint WS RPC client.
 //!
 
+use crate::system::Block;
 use color_eyre::{eyre::eyre, Report};
 use std::time::Duration;
 use tendermint_rpc::{Client, HttpClient, Url};
+use tokio::sync::mpsc;
 use tokio::task::JoinHandle;
 use tokio::time::sleep;
 use tracing::log::error;
 
-use crate::channels::{BlockStreamTx, ShutdownRx};
+use crate::channels::ShutdownRx;
 use crate::logging::info;
 
 ///
@@ -18,7 +20,7 @@ use crate::logging::info;
 ///
 pub async fn poll(
     duration: Duration,
-    block_stream_tx: &BlockStreamTx,
+    block_stream_tx: &mpsc::UnboundedSender<Block>,
     shutdown_rx: &ShutdownRx,
     rpc_address: &str,
 ) -> Result<(), Report> {
@@ -53,7 +55,7 @@ pub async fn poll(
             //   The application panicked (crashed).
             //   Message:  Failed to send block height from polling: SendError(..)
             // I think we need to have the block stream receiver (likely in )
-            block_stream_tx.broadcast(block).await?;
+            block_stream_tx.send(block.into())?;
             // Wait
             sleep(duration).await;
         }

@@ -666,6 +666,7 @@ dependencies = [
  "cw-rules-core",
  "cw20 0.16.0",
  "cw20-base",
+ "delegate",
  "dotenv",
  "envy",
  "futures-util",
@@ -937,6 +938,17 @@ dependencies = [
  "semver 1.0.14",
  "serde",
  "thiserror",
+]
+
+[[package]]
+name = "delegate"
+version = "0.8.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "082a24a9967533dc5d743c602157637116fc1b52806d694a5a45e6f32567fcdd"
+dependencies = [
+ "proc-macro2",
+ "quote",
+ "syn",
 ]
 
 [[package]]

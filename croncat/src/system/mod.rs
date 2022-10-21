@@ -173,12 +173,12 @@ pub async fn run(
     // Create a sequencer to dedup and sort the blocks with a cache size of 32.
     let (sequencer_tx, sequencer_rx) = mpsc::unbounded_channel();
     let mut sequencer = Sequencer::new(block_stream_rx, sequencer_tx, 128)?;
-    let sequencer_handle = tokio::spawn(async move { sequencer.consume().await });
+    let _sequencer_handle = tokio::spawn(async move { sequencer.consume().await });
 
     // Dispatch the blocks to the indexer.
     let (dispatcher_tx, dispatcher_rx) = broadcast::channel(512);
     let mut dispatcher = Dispatcher::new(sequencer_rx, dispatcher_tx.clone());
-    let dispatcher_handle = tokio::spawn(async move { dispatcher.fanout().await });
+    let _dispatcher_handle = tokio::spawn(async move { dispatcher.fanout().await });
 
     // Account status checks
     let account_status_check_shutdown_rx = source_shutdown_rx.clone();
@@ -235,8 +235,6 @@ pub async fn run(
 
     // Try to join all the system tasks.
     let system_status = tokio::try_join!(
-        flatten_join(sequencer_handle),
-        flatten_join(dispatcher_handle),
         flatten_join(account_status_check_handle),
         flatten_join(task_runner_handle),
         flatten_join(rules_runner_handle),

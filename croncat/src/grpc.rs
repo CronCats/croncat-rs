@@ -2,6 +2,8 @@
 //! Use the [cosmos_sdk_proto](https://crates.io/crates/cosmos-sdk-proto) library to create clients for GRPC node requests.
 //!
 
+use std::time::Duration;
+
 use cosmos_sdk_proto::cosmwasm::wasm::v1::msg_client::MsgClient;
 use cosmos_sdk_proto::cosmwasm::wasm::v1::query_client::QueryClient;
 use cosmrs::bip32;
@@ -17,6 +19,7 @@ use cw_rules_core::msg::QueryConstruct;
 use cw_rules_core::types::Rule;
 use serde::de::DeserializeOwned;
 use tendermint_rpc::endpoint::broadcast::tx_commit::TxResult;
+use tokio::time::timeout;
 use tonic::transport::Channel;
 use url::Url;
 
@@ -61,33 +64,37 @@ impl GrpcSigner {
     where
         T: DeserializeOwned,
     {
-        let out = self
-            .client
-            .query_client
-            .query_contract(
+        let out = timeout(
+            Duration::from_secs(30),
+            self.client.query_client.query_contract(
                 self.client
                     .cfg
                     .contract_address
                     .as_ref()
                     .ok_or_else(|| eyre!("No contract address"))?,
                 msg,
-            )
-            .await?;
+            ),
+        )
+        .await
+        .map_err(|err| eyre!("Timeout (30s) while querying contract: {}", err))??;
+
         Ok(out)
     }
 
     pub async fn execute_croncat(&self, msg: &ExecuteMsg) -> Result<TxResult, Report> {
-        let res = self
-            .client
-            .execute_wasm(
+        let res = timeout(
+            Duration::from_secs(30),
+            self.client.execute_wasm(
                 msg,
                 self.client
                     .cfg
                     .contract_address
                     .as_ref()
                     .ok_or_else(|| eyre!("No contract address"))?,
-            )
-            .await?;
+            ),
+        )
+        .await
+        .map_err(|err| eyre!("Timeout (30s) while executing wasm: {}", err))??;
 
         Ok(res.deliver_tx)
     }

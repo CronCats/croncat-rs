@@ -31,9 +31,6 @@ async fn main() -> Result<(), Report> {
     // Get environment variables
     let storage = LocalAgentStorage::new();
 
-    // Setup tracing and error reporting
-    logging::setup()?;
-
     // Get the CLI options, handle argument errors nicely
     let opts = cli::get_opts()
         .map_err(|err| {
@@ -78,7 +75,9 @@ async fn run_command(opts: Opts, mut storage: LocalAgentStorage) -> Result<(), R
             sender_name,
             chain_id,
         } => {
+            let _guards = logging::setup_go(chain_id.to_string())?;
             CHAIN_ID.set(chain_id.clone()).unwrap();
+
             let key = storage.get_agent_signing_key(&sender_name)?;
             let signer = GrpcSigner::new(ChainConfig::new(&chain_id).await?, key).await?;
 
@@ -96,7 +95,9 @@ async fn run_command(opts: Opts, mut storage: LocalAgentStorage) -> Result<(), R
             sender_name,
             chain_id,
         } => {
+            let _guards = logging::setup_go(chain_id.to_string())?;
             CHAIN_ID.set(chain_id.clone()).unwrap();
+
             let key = storage.get_agent_signing_key(&sender_name)?;
             let signer = GrpcSigner::new(ChainConfig::new(&chain_id).await?, key).await?;
             let result = signer.unregister_agent().await?;
@@ -107,7 +108,9 @@ async fn run_command(opts: Opts, mut storage: LocalAgentStorage) -> Result<(), R
             sender_name,
             chain_id,
         } => {
+            let _guards = logging::setup_go(chain_id.to_string())?;
             CHAIN_ID.set(chain_id.clone()).unwrap();
+
             let key = storage.get_agent_signing_key(&sender_name)?;
             let signer = GrpcSigner::new(ChainConfig::new(&chain_id).await?, key).await?;
             let result = signer.withdraw_reward().await?;
@@ -115,7 +118,9 @@ async fn run_command(opts: Opts, mut storage: LocalAgentStorage) -> Result<(), R
             info!("Log: {log}");
         }
         opts::Command::Info { chain_id } => {
+            let _guards = logging::setup_go(chain_id.to_string())?;
             CHAIN_ID.set(chain_id.clone()).unwrap();
+
             let querier = GrpcQuerier::new(ChainConfig::new(&chain_id).await?).await?;
             let config = querier.query_config().await?;
             info!("Config: {config}")
@@ -124,7 +129,9 @@ async fn run_command(opts: Opts, mut storage: LocalAgentStorage) -> Result<(), R
             account_id,
             chain_id,
         } => {
+            let _guards = logging::setup_go(chain_id.to_string())?;
             CHAIN_ID.set(chain_id.clone()).unwrap();
+
             let querier = GrpcQuerier::new(ChainConfig::new(&chain_id).await?).await?;
             let status = querier.get_agent(account_id).await?;
             info!("Agent Status: {status}")
@@ -134,7 +141,9 @@ async fn run_command(opts: Opts, mut storage: LocalAgentStorage) -> Result<(), R
             limit,
             chain_id,
         } => {
+            let _guards = logging::setup_go(chain_id.to_string())?;
             CHAIN_ID.set(chain_id.clone()).unwrap();
+
             let querier = GrpcQuerier::new(ChainConfig::new(&chain_id).await?).await?;
             let tasks = querier.get_tasks(from_index, limit).await?;
             info!("Tasks: {tasks}")
@@ -143,7 +152,9 @@ async fn run_command(opts: Opts, mut storage: LocalAgentStorage) -> Result<(), R
             account_addr,
             chain_id,
         } => {
+            let _guards = logging::setup_go(chain_id.to_string())?;
             CHAIN_ID.set(chain_id.clone()).unwrap();
+
             let querier = GrpcQuerier::new(ChainConfig::new(&chain_id).await?).await?;
             let agent_tasks = querier.get_agent_tasks(account_addr).await?;
             info!("Agent Tasks: {agent_tasks}")
@@ -156,7 +167,9 @@ async fn run_command(opts: Opts, mut storage: LocalAgentStorage) -> Result<(), R
             sender_name,
             chain_id,
         } => {
+            let _guards = logging::setup_go(chain_id.to_string())?;
             CHAIN_ID.set(chain_id.clone()).unwrap();
+
             let key = storage.get_agent_signing_key(&sender_name)?;
             let signer = GrpcSigner::new(ChainConfig::new(&chain_id).await?, key).await?;
             let result = signer.update_agent(payable_account_id).await?;
@@ -185,7 +198,9 @@ async fn run_command(opts: Opts, mut storage: LocalAgentStorage) -> Result<(), R
             with_rules,
             chain_id,
         } => {
+            let _guards = logging::setup_go(chain_id.to_string())?;
             CHAIN_ID.set(chain_id.clone()).unwrap();
+
             let key = storage.get_agent_signing_key(&sender_name)?;
             let cfg = ChainConfig::new(&chain_id).await?;
             let ChainConfig {

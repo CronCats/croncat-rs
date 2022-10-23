@@ -16,7 +16,11 @@ impl ErrorLogStorage {
     fn get_path(agent_id: &String) -> PathBuf {
         let mut path = get_storage_path();
         path.push("logs");
-        path.push(format!("{}-error.log", agent_id));
+        path.push(format!(
+            "{}.error.log.{}",
+            agent_id,
+            chrono::Local::now().format("%Y-%m-%d")
+        ));
         path
     }
 

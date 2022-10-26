@@ -141,7 +141,7 @@ impl LocalAgentStorage {
     }
 
     /// Generate a new account_id to the local storage.
-    pub fn generate_account(
+    pub async fn generate_account(
         &mut self,
         account_id: AccountId,
         mnemonic: Option<String>,
@@ -155,8 +155,8 @@ impl LocalAgentStorage {
                     Mnemonic::generate(24)
                 }?;
                 self.insert(account_id.clone(), validated_mnemonic)?;
-                self.display_addrs(&account_id);
                 self.write_to_disk()?;
+                self.display_addrs(&account_id).await?;
                 Ok(())
             }
         }
@@ -170,18 +170,21 @@ impl LocalAgentStorage {
         );
     }
 
-    pub fn display_addrs(&self, account_id: &str) {
-        let new_account = self.get(account_id);
-        info!("Account Addresses for: {account_id}");
+    pub async fn display_addrs(&self, account_id: &str) -> Result<bool, Report> {
+        println!("Account Addresses for: {account_id}");
         // Loop and print supported accounts for a keypair
-        // TODO: Fix me!
         for chain_id in SUPPORTED_CHAIN_IDS.iter() {
             let config = ChainConfig::new(&chain_id.to_string()).await?;
             let prefix = config.prefix;
-            let account_addr = self.get_agent_signing_account_addr(&account_id, prefix)?;
+            let account_addr =
+                self.get_agent_signing_account_addr(&account_id.to_string(), prefix)?;
 
-            info!("{}: {}", chain_id, account_addr);
+            println!("{}: {}", chain_id, account_addr);
         }
+
+        println!("\n\nPlease fund the above accounts with their native token!\nYou will need enough funds to cover several transactions before rewards will start covering costs.\nYou only need to fund the address for the network you plan to run an agent on.\n\n");
+
+        Ok(true)
     }
 
     pub fn get_agent_signing_key(&self, account_id: &AccountId) -> Result<bip32::XPrv, Report> {
@@ -201,7 +204,7 @@ impl LocalAgentStorage {
         account_id: &AccountId,
         prefix: String,
     ) -> Result<String, Report> {
-        let key = self.get_agent_signing_key(&account_id)?;
+        let key = self.get_agent_signing_key(account_id)?;
         let signing_key: SigningKey = key.try_into()?;
 
         Ok(signing_key

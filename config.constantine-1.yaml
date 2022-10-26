@@ -1,8 +1,8 @@
 denom: "uarchway"
 prefix: "archway"
 chain_id: "constantine-1"
-rpc_endpoint: "https://rpc.constantine-1.archway.tech"
-grpc_endpoint: ""
+rpc_endpoint: "https://rpc.constantine-1.archway.tech:443"
+grpc_endpoint: "https://grpc.constantine-1.archway.tech:443"
 wsrpc_endpoint: "wss://rpc.constantine-1.archway.tech/websocket"
 contract_address: ""
 gas_prices: 0.1

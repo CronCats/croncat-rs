@@ -37,7 +37,8 @@ pub enum Command {
     GetAgentAccounts {
         #[structopt(long, default_value = "agent")]
         sender_name: String,
-        chain_id: Option<String>,
+        #[structopt(long, default_value = "local")]
+        chain_id: String,
     },
 
     /// Get the agent's status (pending/active)

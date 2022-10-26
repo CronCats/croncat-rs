@@ -70,30 +70,6 @@ async fn main() -> Result<(), Report> {
 
 async fn run_command(opts: Opts, mut storage: LocalAgentStorage) -> Result<(), Report> {
     match opts.cmd {
-        opts::Command::GetAgentAccounts {
-            sender_name,
-            chain_id,
-        } => {
-            // IF chain ID, then print the prefix derived account address from chain-id
-            if chain_id.is_some() {
-                let config = ChainConfig::new(&chain_id.clone().unwrap().to_string()).await?;
-                let prefix = config.prefix;
-                let account_addr = storage.get_agent_signing_account_addr(&sender_name, prefix)?;
-
-                info!("{}: {}", chain_id.unwrap(), account_addr);
-            } else {
-                info!("Account Addresses for: {sender_name}");
-                // Loop and print supported accounts for a keypair
-                for chain_id in SUPPORTED_CHAIN_IDS.iter() {
-                    let config = ChainConfig::new(&chain_id.to_string()).await?;
-                    let prefix = config.prefix;
-                    let account_addr =
-                        storage.get_agent_signing_account_addr(&sender_name, prefix)?;
-
-                    info!("{}: {}", chain_id, account_addr);
-                }
-            }
-        }
         opts::Command::RegisterAgent {
             payable_account_id,
             sender_name,
@@ -149,6 +125,30 @@ async fn run_command(opts: Opts, mut storage: LocalAgentStorage) -> Result<(), R
             let config = querier.query_config().await?;
             info!("Config: {config}")
         }
+        opts::Command::GetAgentAccounts {
+            sender_name,
+            chain_id,
+        } => {
+            // IF chain ID, then print the prefix derived account address from chain-id
+            if chain_id != "local" {
+                let config = ChainConfig::new(&chain_id.clone().to_string()).await?;
+                let prefix = config.prefix;
+                let account_addr = storage.get_agent_signing_account_addr(&sender_name, prefix)?;
+
+                println!("{}: {}", chain_id, account_addr);
+            } else {
+                info!("Account Addresses for: {sender_name}");
+                // Loop and print supported accounts for a keypair
+                for chain_id in SUPPORTED_CHAIN_IDS.iter() {
+                    let config = ChainConfig::new(&chain_id.to_string()).await?;
+                    let prefix = config.prefix;
+                    let account_addr =
+                        storage.get_agent_signing_account_addr(&sender_name, prefix)?;
+
+                    println!("{}: {}", chain_id, account_addr);
+                }
+            }
+        }
         opts::Command::GetAgentStatus {
             account_id,
             chain_id,
@@ -184,7 +184,7 @@ async fn run_command(opts: Opts, mut storage: LocalAgentStorage) -> Result<(), R
             info!("Agent Tasks: {agent_tasks}")
         }
         opts::Command::GenerateMnemonic { new_name, mnemonic } => {
-            storage.generate_account(new_name, mnemonic)?
+            storage.generate_account(new_name, mnemonic).await?
         }
         opts::Command::UpdateAgent {
             payable_account_id,

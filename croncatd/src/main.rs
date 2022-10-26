@@ -235,7 +235,7 @@ async fn run_command(opts: Opts, mut storage: LocalAgentStorage) -> Result<(), R
                 .await
                 .map_err(|err| eyre!("Failed to setup GRPC: {}", err))?;
             let initial_status = signer
-                .get_agent(signer.account_id().as_ref())
+                .get_agent(signer.account_id.as_ref())
                 .await?
                 .ok_or(eyre!("Agent must be registered to start the loop"))?
                 .status;

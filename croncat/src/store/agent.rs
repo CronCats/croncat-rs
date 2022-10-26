@@ -142,7 +142,7 @@ impl LocalAgentStorage {
 
             let account_addr = signing_key
                 .public_key()
-                .account_id(&prefix.as_str())?
+                .account_id(prefix.as_str())?
                 .to_string();
             let new_key = LocalAgentStorageEntry {
                 account_addr,

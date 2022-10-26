@@ -2,8 +2,6 @@
 //! The `croncatd` agent.
 //!
 
-use std::process::exit;
-
 use croncat::{
     channels,
     //    client::{BankQueryClient, QueryBank},
@@ -14,9 +12,11 @@ use croncat::{
     store::{agent::LocalAgentStorage, logs::ErrorLogStorage},
     system,
     tokio,
+    utils::SUPPORTED_CHAIN_IDS,
 };
 use once_cell::sync::OnceCell;
 use opts::Opts;
+use std::process::exit;
 
 mod cli;
 mod opts;
@@ -70,6 +70,30 @@ async fn main() -> Result<(), Report> {
 
 async fn run_command(opts: Opts, mut storage: LocalAgentStorage) -> Result<(), Report> {
     match opts.cmd {
+        opts::Command::GetAgentAccounts {
+            sender_name,
+            chain_id,
+        } => {
+            // IF chain ID, then print the prefix derived account address from chain-id
+            if chain_id.is_some() {
+                let config = ChainConfig::new(&chain_id.clone().unwrap().to_string()).await?;
+                let prefix = config.prefix;
+                let account_addr = storage.get_agent_signing_account_addr(&sender_name, prefix)?;
+
+                info!("{}: {}", chain_id.unwrap(), account_addr);
+            } else {
+                info!("Account Addresses for: {sender_name}");
+                // Loop and print supported accounts for a keypair
+                for chain_id in SUPPORTED_CHAIN_IDS.iter() {
+                    let config = ChainConfig::new(&chain_id.to_string()).await?;
+                    let prefix = config.prefix;
+                    let account_addr =
+                        storage.get_agent_signing_account_addr(&sender_name, prefix)?;
+
+                    info!("{}: {}", chain_id, account_addr);
+                }
+            }
+        }
         opts::Command::RegisterAgent {
             payable_account_id,
             sender_name,
@@ -159,11 +183,9 @@ async fn run_command(opts: Opts, mut storage: LocalAgentStorage) -> Result<(), R
             let agent_tasks = querier.get_agent_tasks(account_addr).await?;
             info!("Agent Tasks: {agent_tasks}")
         }
-        opts::Command::GenerateMnemonic {
-            new_name,
-            mnemonic,
-            prefix,
-        } => storage.generate_account(new_name, mnemonic, prefix)?,
+        opts::Command::GenerateMnemonic { new_name, mnemonic } => {
+            storage.generate_account(new_name, mnemonic)?
+        }
         opts::Command::UpdateAgent {
             payable_account_id,
             sender_name,

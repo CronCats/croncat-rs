@@ -46,6 +46,7 @@ FLAGS:
 SUBCOMMANDS:
     generate-mnemonic    Generates a new keypair and agent account (good first step)
     get-agent            Sensitive. Shows all details about agents on this machine
+    get-agent-accounts   Shows all the natively supported bech32 accounts for a key pair
     get-agent-status     Get the agent's status (pending/active)
     get-agent-tasks      Get the agent's tasks they're assigned to fulfill
     go                   Starts the Croncat agent, allowing it to fulfill tasks
@@ -70,10 +71,11 @@ cargo doc --no-deps
 
 ```bash 
 ## Generate for a specific network
-## "prefix" is the Bech32 chain prefix
-cargo run generate-mnemonic --new-name juno --prefix juno
+## "new-name" gives a namespace to a key/pair.
+## It is advised to create separate keys for mainnet/testnet
+cargo run generate-mnemonic --new-name mainnet
 
-## If you really like insecure setup:
+## Another way to load key/pair
 cargo run generate-mnemonic --mnemonic "olive soup parade family educate congress hurt dwarf mom this position hungry unaware aunt swamp sunny analyst wrestle fashion main knife start coffee air"
 ```
 

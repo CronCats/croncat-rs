@@ -1,0 +1,10 @@
+denom: "ustars"
+prefix: "stars"
+chain_id: "elfagar-1"
+rpc_endpoint: "https://rpc.elgafar-1.stargaze-apis.com"
+grpc_endpoint: ""
+wsrpc_endpoint: "wss://rpc.elgafar-1.stargaze-apis.com/websocket"
+contract_address: ""
+gas_prices: 0.1
+gas_adjustment: 1.5
+polling_duration_secs: 2

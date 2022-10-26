@@ -1,0 +1,10 @@
+denom: "uosmo"
+prefix: "osmo"
+chain_id: "osmosis-1"
+rpc_endpoint: "https://rpc.osmosis.zone"
+grpc_endpoint: "https://cosmoshub-grpc.lavenderfive.com:443"
+wsrpc_endpoint: "wss://rpc.osmosis.zone/websocket"
+contract_address: ""
+gas_prices: 0.1
+gas_adjustment: 1.5
+polling_duration_secs: 2

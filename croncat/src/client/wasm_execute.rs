@@ -28,7 +28,7 @@ pub fn generate_wasm_body(
             funds: vec![],
         }
         .to_any()?],
-        "CronCat Agent working…",
+        "MEOW! Luvv, Cron.Cat",
         0u16,
     );
     Ok(body)

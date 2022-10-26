@@ -48,14 +48,13 @@ async fn main() -> Result<(), Report> {
 
     // Run a command
     if let Err(err) = run_command(opts.clone(), storage).await {
-        println!("{}", err);
         error!("Command failed: {}", opts.cmd);
         error!("{}", err);
 
         ErrorLogStorage::write(CHAIN_ID.get().unwrap(), &err)?;
 
         if opts.debug {
-            Err(err)?;
+            return Err(err);
         }
 
         exit(1);

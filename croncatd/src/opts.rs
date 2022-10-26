@@ -33,6 +33,13 @@ pub enum Command {
         chain_id: String,
     },
 
+    /// Get the agent's supported bech32 accounts
+    GetAgentAccounts {
+        #[structopt(long, default_value = "agent")]
+        sender_name: String,
+        chain_id: Option<String>,
+    },
+
     /// Get the agent's status (pending/active)
     GetAgentStatus {
         account_id: String,
@@ -111,8 +118,6 @@ pub enum Command {
         /// Recover agent from mnemonic phrase. Please do not use your own account!
         #[structopt(long)]
         mnemonic: Option<String>,
-        #[structopt(long, default_value = "local")]
-        prefix: String,
     },
 
     /// (in progress) Send native tokens to an address

@@ -48,6 +48,7 @@ async fn main() -> Result<(), Report> {
 
     // Run a command
     if let Err(err) = run_command(opts.clone(), storage).await {
+        println!("{}", err);
         error!("Command failed: {}", opts.cmd);
         error!("{}", err);
 
@@ -159,9 +160,11 @@ async fn run_command(opts: Opts, mut storage: LocalAgentStorage) -> Result<(), R
             let agent_tasks = querier.get_agent_tasks(account_addr).await?;
             info!("Agent Tasks: {agent_tasks}")
         }
-        opts::Command::GenerateMnemonic { new_name, mnemonic } => {
-            storage.generate_account(new_name, mnemonic)?
-        }
+        opts::Command::GenerateMnemonic {
+            new_name,
+            mnemonic,
+            prefix,
+        } => storage.generate_account(new_name, mnemonic, prefix)?,
         opts::Command::UpdateAgent {
             payable_account_id,
             sender_name,

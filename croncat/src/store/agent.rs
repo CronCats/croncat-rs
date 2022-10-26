@@ -121,6 +121,7 @@ impl LocalAgentStorage {
         &mut self,
         account_id: AccountId,
         mnemonic: Mnemonic,
+        prefix: String,
     ) -> Result<Option<LocalAgentStorageEntry>, Report> {
         if self.data.get(&account_id).is_some() {
             Ok(None)
@@ -139,7 +140,10 @@ impl LocalAgentStorage {
 
             let mnemonic = mnemonic.to_string();
 
-            let account_addr = signing_key.public_key().account_id("juno")?.to_string();
+            let account_addr = signing_key
+                .public_key()
+                .account_id(&prefix.as_str())?
+                .to_string();
             let new_key = LocalAgentStorageEntry {
                 account_addr,
                 keypair,
@@ -156,6 +160,7 @@ impl LocalAgentStorage {
         &mut self,
         account_id: AccountId,
         mnemonic: Option<String>,
+        prefix: String,
     ) -> Result<(), Report> {
         match self.get(&account_id) {
             Some(_) => Err(eyre!(r#"Agent "{account_id}" already created"#)),
@@ -165,7 +170,7 @@ impl LocalAgentStorage {
                 } else {
                     Mnemonic::generate(24)
                 }?;
-                self.insert(account_id.clone(), validated_mnemonic)?;
+                self.insert(account_id.clone(), validated_mnemonic, prefix)?;
                 self.display_account(&account_id);
                 self.write_to_disk()?;
                 Ok(())

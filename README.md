@@ -1,7 +1,7 @@
 &nbsp;
 
 <div align="center">
-<img width="600" src="./croncat.png" />
+<img width="300px" src="./croncat.png" />
 </div>
 
 &nbsp;
@@ -14,8 +14,8 @@
 
 ## Modules
 
--   `croncatd` This is the executable agent daemon.
--   `croncat` This is all the pieces to build an agent daemon, this will probably become it's own repo so keep it DRY and clean.
+-   `croncatd` The executable agent daemon.
+-   `croncat` All the pieces to build an agent daemon.
 
 ## Development Tools
 
@@ -44,12 +44,10 @@ FLAGS:
     -V, --version      Prints version information
 
 SUBCOMMANDS:
-    deposit-ujunox       (in progress) Send native tokens to an address
     generate-mnemonic    Generates a new keypair and agent account (good first step)
     get-agent            Sensitive. Shows all details about agents on this machine
     get-agent-status     Get the agent's status (pending/active)
     get-agent-tasks      Get the agent's tasks they're assigned to fulfill
-    get-state            Get contract's state
     go                   Starts the Croncat agent, allowing it to fulfill tasks
     help                 Prints this message or the help of the given subcommand(s)
     info                 Gets the configuration from the Croncat manager contract
@@ -71,6 +69,11 @@ cargo doc --no-deps
 - Add agent into local keystore
 
 ```bash 
+## Generate for a specific network
+## "prefix" is the Bech32 chain prefix
+cargo run generate-mnemonic --new-name juno --prefix juno
+
+## If you really like insecure setup:
 cargo run generate-mnemonic --mnemonic "olive soup parade family educate congress hurt dwarf mom this position hungry unaware aunt swamp sunny analyst wrestle fashion main knife start coffee air"
 ```
 

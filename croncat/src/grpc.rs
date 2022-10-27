@@ -50,7 +50,7 @@ pub async fn connect(url: String) -> Result<(MsgClient<Channel>, QueryClient<Cha
 #[derive(Clone)]
 pub struct GrpcSigner {
     client: CosmosFullClient,
-    account_id: AccountId,
+    pub account_id: AccountId,
 }
 
 impl GrpcSigner {

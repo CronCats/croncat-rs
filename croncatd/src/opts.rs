@@ -33,6 +33,14 @@ pub enum Command {
         chain_id: String,
     },
 
+    /// Get the agent's supported bech32 accounts
+    GetAgentAccounts {
+        #[structopt(long, default_value = "agent")]
+        sender_name: String,
+        #[structopt(long, default_value = "local")]
+        chain_id: String,
+    },
+
     /// Get the agent's status (pending/active)
     GetAgentStatus {
         account_id: String,

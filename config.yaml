@@ -1,0 +1,4 @@
+chains:
+    juno-1:
+        manager: juno1lzkdx44dkvttup0dhmas67rfln4jmu89ms4ew59gwn0kp43wgg0qxl64k0
+        polling_time: 3.0

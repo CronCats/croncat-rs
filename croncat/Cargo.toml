@@ -8,7 +8,7 @@ anyhow = "1.0"
 async-broadcast = "0.4.0"
 async-channel = "1.6.1"
 async-trait = "0.1.57"
-bip39 = { version = "1.0.1", features = ["rand"] }
+bip39 = { version = "~1.0.1", features = ["rand"] }
 chain-registry = "0.1.0"
 chrono = "0.4.19"
 color-eyre = "0.6.1"
@@ -16,6 +16,7 @@ config = { version = "0.13.1", features = ["yaml"] }
 cosmos-sdk-proto = { version = "0.14.0", features = ["grpc", "cosmwasm"] }
 cosmrs = { version = "0.9.0", features = ["bip32", "rpc", "cosmwasm"] }
 cosmwasm-std = { version = "1.1.5" }
+cosmos-chain-registry = { git = "https://github.com/CronCats/cosmos-chain-registry" }
 cw-croncat-core = { version = "0.1.1" }
 cw-rules-core = { version = "0.1.0" }
 cw20 = "0.16.0"
@@ -29,8 +30,9 @@ prost = "0.11.0"
 prost-types = "0.11.1"
 rand = "0.8.5"
 reqwest = "0.11.12"
-serde = { version = "1.0.136", features = ["derive"] }
+serde = { version = "~1.0.136", features = ["derive"] }
 serde_json = "1.0.81"
+serde_yaml = "0.9.14"
 tendermint = "0.23.9"
 tendermint-rpc = { version = "0.23.9", features = ["websocket-client", "http-client"] }
 tokio = { version = "1.18.0", features = ["macros", "rt-multi-thread", "signal", "sync", "time"] }
@@ -39,7 +41,7 @@ tonic = "0.8.2"
 tracing = "0.1.34"
 tracing-appender = "0.2.2"
 tracing-subscriber = { version = "0.3.11", features = ["fmt", "env-filter"] }
-url = "2.2.2"
+url = { version = "2.2.2", features = ["serde"] }
 whoami = "1.2.3"
 
 

@@ -11,7 +11,7 @@ use std::{collections::HashMap, fs, path::PathBuf};
 use tracing::log::info;
 
 use crate::{
-    config::ChainConfig,
+    config::{ChainConfig, Config},
     errors::Report,
     utils::{DERIVATION_PATH, SUPPORTED_CHAIN_IDS},
 };
@@ -170,21 +170,22 @@ impl LocalAgentStorage {
         );
     }
 
-    pub async fn display_addrs(&self, account_id: &str) -> Result<bool, Report> {
-        println!("Account Addresses for: {account_id}");
-        // Loop and print supported accounts for a keypair
-        for chain_id in SUPPORTED_CHAIN_IDS.iter() {
-            let config = ChainConfig::new(&chain_id.to_string()).await?;
-            let prefix = config.prefix;
-            let account_addr =
-                self.get_agent_signing_account_addr(&account_id.to_string(), prefix)?;
+    pub async fn display_addrs(&self, account_id: &str) -> Result<(), Report> {
+        // println!("Account Addresses for: {account_id}");
+        // // Loop and print supported accounts for a keypair
+        // for chain_id in SUPPORTED_CHAIN_IDS.iter() {
+        //     let config = Config::from_pwd()?;
 
-            println!("{}: {}", chain_id, account_addr);
-        }
+        //     let prefix = config.prefix;
+        //     let account_addr =
+        //         self.get_agent_signing_account_addr(&account_id.to_string(), prefix)?;
 
-        println!("\n\nPlease fund the above accounts with their native token!\nYou will need enough funds to cover several transactions before rewards will start covering costs.\nYou only need to fund the address for the network you plan to run an agent on.\n\n");
+        //     println!("{}: {}", chain_id, account_addr);
+        // }
 
-        Ok(true)
+        // println!("\n\nPlease fund the above accounts with their native token!\nYou will need enough funds to cover several transactions before rewards will start covering costs.\nYou only need to fund the address for the network you plan to run an agent on.\n\n");
+
+        Ok(())
     }
 
     pub fn get_agent_signing_key(&self, account_id: &AccountId) -> Result<bip32::XPrv, Report> {

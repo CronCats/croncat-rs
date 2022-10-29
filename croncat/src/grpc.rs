@@ -61,8 +61,18 @@ impl GrpcSigner {
         grpc_url: String,
         chain_info: ChainInfo,
         key: bip32::XPrv,
+        gas_prices: f32,
+        gas_adjustment: f32,
     ) -> Result<Self, Report> {
-        let client = CosmosFullClient::new(rpc_url, grpc_url, chain_info, key).await?;
+        let client = CosmosFullClient::new(
+            rpc_url,
+            grpc_url,
+            chain_info,
+            key,
+            gas_prices,
+            gas_adjustment,
+        )
+        .await?;
         let account_id = client
             .key()
             .public_key()

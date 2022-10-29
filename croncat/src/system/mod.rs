@@ -6,10 +6,15 @@ use std::sync::Arc;
 use std::time::Duration;
 
 use cosmrs::bip32::{secp256k1::ecdsa::SigningKey, ExtendedPrivateKey};
+use croncat_pipeline::{try_flat_join, Dispatcher, Sequencer};
 use cw_croncat_core::types::AgentStatus;
-use tokio::{sync::Mutex, task::JoinHandle};
+use futures_util::{future::join_all, stream::FuturesUnordered, StreamExt};
+use tokio::{
+    sync::{broadcast, mpsc, Mutex},
+    task::JoinHandle,
+};
 use tokio_retry::{
-    strategy::{jitter, FixedInterval},
+    strategy::{jitter, FibonacciBackoff, FixedInterval},
     Retry,
 };
 use tracing::log::error;
@@ -175,26 +180,121 @@ pub use service::DaemonService;
 /// Kick off the croncat daemon
 ///
 pub async fn run(
+    chain_id: &String,
     shutdown_tx: &ShutdownTx,
-    shutdown_rx: &ShutdownRx,
     config: &ChainConfig,
     key: &ExtendedPrivateKey<SigningKey>,
     with_rules: bool,
 ) -> Result<(), Report> {
+    // Create a channel for block sources
+    let (block_source_tx, block_source_rx) = mpsc::unbounded_channel();
+    // Create a FuturesUnordered to handle all the block sources
+    let mut block_stream_tasks = FuturesUnordered::new();
+
+    // For each RPC endpoint, spawn a task to stream blocks from it
     for rpc_polling_url in &config.info.apis.rpc {
-        println!("rpc_polling_url: {}", rpc_polling_url.address);
+        info!(
+            "[{}] Starting polling task for {}",
+            chain_id, &rpc_polling_url.address
+        );
+
+        let polling_block_source_tx = block_source_tx.clone();
+        let rpc_polling_url = rpc_polling_url.clone();
+        let polling_shutdown_tx = shutdown_tx.clone();
+        let polling_config = config.clone();
+        let polling_retry_strategy = FixedInterval::from_millis(5000);
+        let polling_chain_id = chain_id.clone();
+
+        let block_stream_task = tokio::task::spawn(async move {
+            Retry::spawn(polling_retry_strategy, || async {
+                polling::poll(
+                    Duration::from_secs_f64(polling_config.block_polling_seconds),
+                    Duration::from_secs_f64(polling_config.block_polling_timeout_seconds),
+                    &polling_block_source_tx,
+                    &polling_shutdown_tx,
+                    &rpc_polling_url.address,
+                )
+                .await
+                .map_err(|err| {
+                    error!("[{}] Error polling blocks: {}", polling_chain_id, err);
+                    err
+                })
+            })
+            .await
+        });
+        block_stream_tasks.push(block_stream_task);
     }
 
-    for grpc_polling_url in &config.info.apis.grpc {
-        println!("grpc_polling_url: {}", grpc_polling_url.address);
+    // TODO: Try websocket for each polling addr.
+
+    // Sequence the blocks we receive from the block stream. This is necessary because we may receive
+    // blocks from multiple sources, and we need to ensure that we process them in order.
+    let (sequencer_tx, sequencer_rx) = mpsc::unbounded_channel();
+    let mut sequencer = Sequencer::new(block_source_rx, sequencer_tx, 512)?;
+    let _sequencer_handle = tokio::task::spawn(async move { sequencer.consume().await });
+
+    // Dispatch blocks to anybody who is listening.
+    let (dispatcher_tx, dispatcher_rx) = broadcast::channel(32);
+    let mut dispatcher = Dispatcher::new(sequencer_rx, dispatcher_tx.clone());
+    let _dispatcher_handle = tokio::task::spawn(async move { dispatcher.fanout().await });
+
+    // Test block subscriber
+    let test_block_subscriber_dispatcher_tx = dispatcher_tx.clone();
+    let test_block_subscriber_chain_id = chain_id.clone();
+    let _test_block_subscriber_handle = tokio::task::spawn(async move {
+        let mut block_subscriber = test_block_subscriber_dispatcher_tx.subscribe();
+        while let Ok(block) = block_subscriber.recv().await {
+            info!(
+                "[{}] Received block: {}",
+                test_block_subscriber_chain_id,
+                block.header().height
+            );
+        }
+    });
+
+    // Ctrl-C handler
+    let ctrl_c_shutdown_tx = shutdown_tx.clone();
+    let ctrl_c_chain_id = chain_id.clone();
+    let ctrl_c_handle: JoinHandle<Result<(), Report>> = tokio::task::spawn(async move {
+        tokio::signal::ctrl_c()
+            .await
+            .map_err(|err| eyre!("[{}] Failed to wait for Ctrl-C: {}", ctrl_c_chain_id, err))?;
+        ctrl_c_shutdown_tx.send(()).map_err(|err| {
+            eyre!(
+                "[{}] Failed to send shutdown signal: {}",
+                ctrl_c_chain_id,
+                err
+            )
+        })?;
+        println!();
+        info!("[{}] Shutting down...", ctrl_c_chain_id);
+
+        Ok(())
+    });
+
+    // Wait for each block stream task to finish. If any of them fail, we need to propagate the error.
+    while let Some(block_stream_task) = block_stream_tasks.next().await {
+        match block_stream_task {
+            Ok(Ok(())) => (),
+            Ok(Err(err)) => {
+                error!("[{}] Block stream task failed: {}", chain_id, err);
+                return Err(err);
+            }
+            Err(err) => {
+                error!("[{}] Block stream task failed: {}", chain_id, err);
+                return Err(err.into());
+            }
+        }
     }
+
+    try_flat_join!(ctrl_c_handle)?;
 
     Ok(())
 }
 
 pub async fn run_retry(
+    chain_id: &String,
     shutdown_tx: &ShutdownTx,
-    shutdown_rx: &ShutdownRx,
     config: &ChainConfig,
     key: &ExtendedPrivateKey<SigningKey>,
     with_rules: bool,
@@ -202,7 +302,7 @@ pub async fn run_retry(
     let retry_strategy = FixedInterval::from_millis(3000).map(jitter).take(1200);
 
     Retry::spawn(retry_strategy, || async {
-        run(shutdown_tx, shutdown_rx, config, key, with_rules)
+        run(chain_id, shutdown_tx, config, key, with_rules)
             .await
             .map_err(|err| {
                 error!("System crashed: {}", err);

@@ -236,20 +236,21 @@ async fn run_command(opts: Opts, mut storage: LocalAgentStorage) -> Result<(), R
             let mut chains_handles = FuturesUnordered::new();
 
             // Create the global shutdown channel
-            let (shutdown_tx, shutdown_rx) = create_shutdown_channel();
+            let (shutdown_tx, _shutdown_rx) = create_shutdown_channel();
 
-            // For each chain in the config start an agent task!
+            // For each chain in the config start an agent task!?
+            // This probably shouldn't run multiple agents in the same process???
+            // TODO: ASK TREVOR
             for (chain_id, chain_config) in config.chains.into_iter() {
                 info!("Starting agent system chain: {chain_id}");
 
                 // Spawn the sucka!
                 let chain_shutdown_tx = shutdown_tx.clone();
-                let chain_shutdown_rx = shutdown_rx.clone();
                 let chain_key = key.clone();
                 let future = tokio::spawn(async move {
                     system::run_retry(
+                        &chain_id,
                         &chain_shutdown_tx,
-                        &chain_shutdown_rx,
                         &chain_config,
                         &chain_key,
                         with_rules,

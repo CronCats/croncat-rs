@@ -64,6 +64,8 @@ struct RawChainConfigEntry {
     pub block_polling_timeout_seconds: Option<f64>,
     pub websocket_timeout_seconds: Option<f64>,
     pub uptime_ping_url: Option<Url>,
+    pub gas_prices: Option<f32>,
+    pub gas_adjustment: Option<f32>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -75,18 +77,30 @@ pub struct ChainConfig {
     pub block_polling_timeout_seconds: f64,
     pub websocket_timeout_seconds: f64,
     pub uptime_ping_url: Option<Url>,
+    pub gas_prices: f32,
+    pub gas_adjustment: f32,
 }
 
 impl ChainConfig {
     fn from_entry(info: ChainInfo, entry: RawChainConfigEntry) -> Self {
+        let gas_prices = entry
+            .gas_prices
+            .unwrap_or(info.fees.fee_tokens[0].fixed_min_gas_price);
+        let gas_adjustment = entry.gas_adjustment.unwrap_or(1.5);
+        let block_polling_seconds = entry.block_polling_seconds.unwrap_or(5.0);
+        let block_polling_timeout_seconds = entry.block_polling_timeout_seconds.unwrap_or(30.0);
+        let websocket_timeout_seconds = entry.websocket_timeout_seconds.unwrap_or(30.0);
+
         Self {
             info,
             manager: entry.manager,
             registry: entry.registry,
-            block_polling_seconds: entry.block_polling_seconds.unwrap_or(5.0),
-            block_polling_timeout_seconds: entry.block_polling_timeout_seconds.unwrap_or(30.0),
-            websocket_timeout_seconds: entry.websocket_timeout_seconds.unwrap_or(30.0),
+            block_polling_seconds,
+            block_polling_timeout_seconds,
+            websocket_timeout_seconds,
             uptime_ping_url: entry.uptime_ping_url,
+            gas_prices,
+            gas_adjustment,
         }
     }
 }

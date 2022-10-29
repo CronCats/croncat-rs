@@ -8,6 +8,7 @@ use std::sync::{
 };
 
 use color_eyre::Report;
+use delegate::delegate;
 use tokio::task::JoinHandle;
 
 use cw_croncat_core::msg::AgentTaskResponse;
@@ -74,3 +75,47 @@ pub async fn flatten_join<T>(handle: JoinHandle<Result<T, Report>>) -> Result<T,
         Err(err) => Err(err.into()),
     }
 }
+
+///
+/// Block wrapper
+///
+#[derive(Debug, Clone)]
+pub struct Block {
+    pub inner: tendermint::Block,
+}
+
+#[allow(dead_code)]
+impl Block {
+    delegate! {
+        to self.inner {
+            pub fn header(&self) -> &tendermint::block::Header;
+            pub fn data(&self) -> &tendermint::abci::transaction::Data;
+        }
+    }
+}
+
+impl From<tendermint::Block> for Block {
+    fn from(block: tendermint::Block) -> Self {
+        Self { inner: block }
+    }
+}
+
+impl Ord for Block {
+    fn cmp(&self, other: &Self) -> std::cmp::Ordering {
+        self.header().height.cmp(&other.header().height)
+    }
+}
+
+impl PartialOrd for Block {
+    fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
+        Some(self.cmp(other))
+    }
+}
+
+impl PartialEq for Block {
+    fn eq(&self, other: &Self) -> bool {
+        self.header().height == other.header().height
+    }
+}
+
+impl Eq for Block {}

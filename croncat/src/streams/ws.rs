@@ -4,16 +4,19 @@
 
 use std::time::Duration;
 
+use crate::channels::ShutdownTx;
+use crate::utils::Block;
 use color_eyre::{eyre::eyre, Report};
 use futures_util::StreamExt;
 use tendermint_rpc::event::EventData;
 use tendermint_rpc::query::EventType;
 use tendermint_rpc::{SubscriptionClient, WebSocketClient};
+use tokio::sync::mpsc;
 use tokio::task::JoinHandle;
 use tracing::log::error;
+use tracing::trace;
 use url::Url;
 
-use crate::channels::BlockStreamTx;
 use crate::{
     channels::ShutdownRx,
     logging::{info, warn},
@@ -24,16 +27,16 @@ use crate::{
 ///
 pub async fn stream_blocks_loop(
     url: &str,
-    block_stream_tx: &BlockStreamTx,
-    shutdown_rx: &ShutdownRx,
+    block_stream_tx: &mpsc::UnboundedSender<Block>,
+    shutdown_tx: &ShutdownTx,
 ) -> Result<(), Report> {
+    let mut shutdown_rx = shutdown_tx.subscribe();
     let block_stream_tx = block_stream_tx.clone();
-    let mut shutdown_rx = shutdown_rx.clone();
 
     // Parse url
     let url = Url::parse(url)?;
 
-    info!("Connecting to WS RPC server @ {}", url);
+    trace!("Connecting to WS RPC server @ {}", url);
 
     // Connect to the WS RPC url
     let (client, driver) =
@@ -41,9 +44,9 @@ pub async fn stream_blocks_loop(
 
     let driver_handle = tokio::task::spawn(driver.run());
 
-    info!("Connected to WS RPC server @ {}", url);
+    trace!("Connected to WS RPC server @ {}", url);
 
-    info!("Subscribing to NewBlock event");
+    trace!("Subscribing to NewBlock event");
 
     // Subscribe to the NewBlock event stream
     let mut subscriptions = client
@@ -58,19 +61,18 @@ pub async fn stream_blocks_loop(
         while let Ok(msg) =
             tokio::time::timeout(Duration::from_secs(30), subscriptions.next()).await
         {
-            // TODO: (SeedyROM) Keep this
-            // return Err(eyre!("TODO: handle block"));
             let msg = msg.ok_or_else(|| eyre!("Block stream next timeout"))??;
             match msg.data {
                 // Handle blocks
                 EventData::NewBlock {
                     block: Some(block), ..
                 } => {
-                    info!(
+                    trace!(
                         "Received block (height: {}) from {}",
-                        block.header.height, block.header.time
+                        block.header.height,
+                        block.header.time
                     );
-                    block_stream_tx.broadcast(block).await?;
+                    block_stream_tx.send(block.into())?;
                 }
                 // Warn about all events for now
                 message => {

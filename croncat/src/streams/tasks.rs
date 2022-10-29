@@ -34,13 +34,12 @@ pub async fn tasks_loop(
             // unlocking it ASAP
             std::mem::drop(locked_status);
             if is_active {
+                let mut tasks_failed = false;
                 let account_addr = signer.account_id().as_ref();
                 let tasks = signer
                     .get_agent_tasks(account_addr)
                     .await
                     .map_err(|err| eyre!("Failed to get agent tasks: {}", err))?;
-
-                ping_uptime_monitor().await;
 
                 if let Some(tasks) = tasks {
                     info!("Tasks: {:?}", tasks);
@@ -50,12 +49,17 @@ pub async fn tasks_loop(
                                 info!("Finished task: {}", proxy_call_res.log);
                             }
                             Err(err) => {
+                                tasks_failed = true;
                                 error!("Something went wrong during proxy_call: {}", err);
                             }
                         }
                     }
                 } else {
                     info!("No tasks for block (height: {})", block.header.height);
+                }
+
+                if !tasks_failed {
+                    ping_uptime_monitor().await;
                 }
             }
         }
@@ -91,6 +95,7 @@ pub async fn rules_loop(
             if is_active {
                 let time: Timestamp = block.header.time.into();
                 let time_nanos = time.seconds as u64 * 1_000_000_000 + time.nanos as u64;
+                let mut tasks_failed = false;
 
                 for task in tasks_with_rules.iter() {
                     let in_boundary = match task.boundary {
@@ -116,11 +121,16 @@ pub async fn rules_loop(
                                     info!("Finished task: {}", proxy_call_res.log);
                                 }
                                 Err(err) => {
+                                    tasks_failed = true;
                                     error!("Something went wrong during proxy_call: {}", err);
                                 }
                             }
                         }
                     }
+                }
+
+                if !tasks_failed {
+                    ping_uptime_monitor().await;
                 }
             }
         }

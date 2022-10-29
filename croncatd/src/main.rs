@@ -219,7 +219,7 @@ async fn run_command(opts: Opts, mut storage: LocalAgentStorage) -> Result<(), R
         // }
         opts::Command::GetAgent { name } => storage.display_account(&name),
         opts::Command::Go {
-            sender_name,
+            agent,
             with_rules,
             chain_id,
         } => {
@@ -229,73 +229,56 @@ async fn run_command(opts: Opts, mut storage: LocalAgentStorage) -> Result<(), R
             CHAIN_ID.set(chain_id.clone()).unwrap();
 
             // Get the key for the agent signing account
-            let key = storage.get_agent_signing_key(&sender_name)?;
+            let key = storage.get_agent_signing_key(&agent)?;
             let config = Config::from_pwd()?;
-
-            // Chains to spawn off for the agent
-            let mut chains_handles = FuturesUnordered::new();
 
             // Create the global shutdown channel
             let (shutdown_tx, _shutdown_rx) = create_shutdown_channel();
 
+            // Chains to spawn off for the agent
+            // TODO: ASK TREVOR
             // For each chain in the config start an agent task!?
             // This probably shouldn't run multiple agents in the same process???
-            // TODO: ASK TREVOR
-            for (chain_id, chain_config) in config.chains.into_iter() {
-                info!("Starting agent system chain: {chain_id}");
 
-                // Spawn the sucka!
-                let chain_shutdown_tx = shutdown_tx.clone();
-                let chain_key = key.clone();
-                let future = tokio::spawn(async move {
-                    system::run_retry(
-                        &chain_id,
-                        &chain_shutdown_tx,
-                        &chain_config,
-                        &chain_key,
-                        with_rules,
-                    )
-                    .await
-                });
+            // let mut chains_handles = FuturesUnordered::new();
+            // for (chain_id, chain_config) in config.chains.into_iter() {
+            //     info!("Starting agent system chain: {chain_id}");
 
-                chains_handles.push(future);
-            }
+            //     // Spawn the sucka!
+            //     let chain_shutdown_tx = shutdown_tx.clone();
+            //     let chain_key = key.clone();
+            //     let future = tokio::spawn(async move {
+            //         system::run_retry(
+            //             &chain_id,
+            //             &chain_shutdown_tx,
+            //             &chain_config,
+            //             &chain_key,
+            //             with_rules,
+            //         )
+            //         .await
+            //     });
 
-            // Join on all the chain tasks we spawned off
-            while let Some(result) = chains_handles.next().await {
-                match result {
-                    Ok(_) => {}
-                    Err(e) => {
-                        error!("Error: {e}");
-                    }
-                }
-            }
+            //     chains_handles.push(future);
+            // }
 
-            // let cfg = ChainConfig::new(&chain_id).await?;
-            // let ChainConfig {
-            //     polling_duration_secs,
-            //     ..
-            // } = cfg;
-            // let signer = GrpcSigner::new(cfg, key)
-            //     .await
-            //     .map_err(|err| eyre!("Failed to setup GRPC: {}", err))?;
-            // let initial_status = signer
-            //     .get_agent(signer.account_id.as_ref())
-            //     .await?
-            //     .ok_or(eyre!("Agent must be registered to start the loop"))?
-            //     .status;
-            // // Create a channel to handle graceful shutdown and wrap receiver for cloning
-            // let (shutdown_tx, shutdown_rx) = channels::create_shutdown_channel();
-            // // Start the agent
-            // system::run_retry(
-            //     &shutdown_tx,
-            //     &shutdown_rx,
-            //     &signer,
-            //     &initial_status,
-            //     with_rules,
-            //     polling_duration_secs,
-            // )
-            // .await?;
+            // // Join on all the chain tasks we spawned off
+            // while let Some(result) = chains_handles.next().await {
+            //     match result {
+            //         Ok(_) => {}
+            //         Err(e) => {
+            //             error!("Error: {e}");
+            //         }
+            //     }
+            // }
+
+            // Get the chain config for the chain we're going to run on
+            let chain_config = config
+                .chains
+                .get(&chain_id)
+                .ok_or_else(|| eyre!("Chain not found: {}", chain_id))?;
+
+            // Run the agent on the chain
+            system::run_retry(&chain_id, &shutdown_tx, &chain_config, &key, with_rules).await?;
         }
         opts::Command::SetupService { chain_id, output } => {
             system::DaemonService::create(output, &chain_id, opts.no_frills)?;

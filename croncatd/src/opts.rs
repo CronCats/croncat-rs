@@ -28,7 +28,7 @@ pub enum Command {
         payable_account_id: Option<String>,
 
         #[structopt(long, default_value = "agent")]
-        sender_name: String,
+        agent: String,
         #[structopt(long, default_value = "local")]
         chain_id: String,
     },
@@ -36,7 +36,7 @@ pub enum Command {
     /// Get the agent's supported bech32 accounts
     GetAgentAccounts {
         #[structopt(long, default_value = "agent")]
-        sender_name: String,
+        agent: String,
         #[structopt(long, default_value = "local")]
         chain_id: String,
     },
@@ -58,7 +58,7 @@ pub enum Command {
     /// Unregisters the agent from being in the queue with other agents
     UnregisterAgent {
         #[structopt(long, default_value = "agent")]
-        sender_name: String,
+        agent: String,
         #[structopt(long, short, default_value = "local")]
         chain_id: String,
     },
@@ -67,7 +67,7 @@ pub enum Command {
     UpdateAgent {
         payable_account_id: String,
         #[structopt(long, default_value = "agent")]
-        sender_name: String,
+        agent: String,
         #[structopt(long, short, default_value = "local")]
         chain_id: String,
     },
@@ -75,7 +75,7 @@ pub enum Command {
     /// Withdraw the agent's funds to the payable account ID
     Withdraw {
         #[structopt(long, default_value = "agent")]
-        sender_name: String,
+        agent: String,
         #[structopt(long, short, default_value = "local")]
         chain_id: String,
     },
@@ -98,7 +98,7 @@ pub enum Command {
     /// Starts the Croncat agent, allowing it to fulfill tasks
     Go {
         #[structopt(long, default_value = "agent")]
-        sender_name: String,
+        agent: String,
         /// Allow agent to do tasks with rules, uses more computer resources
         #[structopt(long, short = "r")]
         with_rules: bool,

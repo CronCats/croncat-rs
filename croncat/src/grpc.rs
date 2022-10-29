@@ -4,6 +4,7 @@
 
 use std::time::Duration;
 
+use cosmos_chain_registry::ChainInfo;
 use cosmos_sdk_proto::cosmwasm::wasm::v1::msg_client::MsgClient;
 use cosmos_sdk_proto::cosmwasm::wasm::v1::query_client::QueryClient;
 use cosmrs::bip32;
@@ -50,17 +51,29 @@ pub async fn connect(url: String) -> Result<(MsgClient<Channel>, QueryClient<Cha
 #[derive(Clone)]
 pub struct GrpcSigner {
     client: CosmosFullClient,
+    pub manager: AccountId,
     pub account_id: AccountId,
 }
 
 impl GrpcSigner {
-    pub async fn new(cfg: ChainConfig, key: bip32::XPrv) -> Result<Self, Report> {
-        let client = CosmosFullClient::new(cfg, key).await?;
+    pub async fn new(
+        rpc_url: String,
+        grpc_url: String,
+        chain_info: ChainInfo,
+        key: bip32::XPrv,
+    ) -> Result<Self, Report> {
+        let client = CosmosFullClient::new(rpc_url, grpc_url, chain_info, key).await?;
         let account_id = client
             .key()
             .public_key()
-            .account_id(&client.cfg.info.bech32_prefix)?;
-        Ok(Self { client, account_id })
+            .account_id(&client.chain_info.bech32_prefix)?;
+        let manager = account_id.clone();
+
+        Ok(Self {
+            client,
+            account_id,
+            manager,
+        })
     }
 
     pub async fn query_croncat<T>(&self, msg: &QueryMsg) -> Result<T, Report>
@@ -71,7 +84,7 @@ impl GrpcSigner {
             Duration::from_secs(30),
             self.client
                 .query_client
-                .query_contract(&self.client.cfg.manager, msg),
+                .query_contract(&self.manager.to_string(), msg),
         )
         .await
         .map_err(|err| eyre!("Timeout (30s) while querying contract: {}", err))??;
@@ -82,7 +95,7 @@ impl GrpcSigner {
     pub async fn execute_croncat(&self, msg: &ExecuteMsg) -> Result<TxResult, Report> {
         let res = timeout(
             Duration::from_secs(30),
-            self.client.execute_wasm(msg, &self.client.cfg.manager),
+            self.client.execute_wasm(msg, &self.manager.to_string()),
         )
         .await
         .map_err(|err| eyre!("Timeout (30s) while executing wasm: {}", err))??;
@@ -198,16 +211,8 @@ impl GrpcSigner {
         self.client.key()
     }
 
-    pub fn wsrpc(&self) -> &str {
-        &self.client.cfg.wsrpc_endpoint
-    }
-
-    pub fn grpc(&self) -> &str {
-        &self.client.cfg.grpc_endpoint
-    }
-
-    pub fn rpc(&self) -> &str {
-        &self.client.cfg.rpc_endpoint
+    pub fn chain_info(&self) -> &ChainInfo {
+        &self.client.chain_info
     }
 }
 
@@ -218,10 +223,9 @@ pub struct GrpcQuerier {
 impl GrpcQuerier {
     pub async fn new(cfg: ChainConfig) -> Result<Self, Report> {
         Ok(Self {
-            client: CosmosQueryClient::new(&cfg.grpc_endpoint, &cfg.denom).await?,
-            croncat_addr: cfg
-                .contract_address
-                .ok_or_else(|| eyre!("No contract address"))?,
+            client: CosmosQueryClient::new("REPLACE_ME", &cfg.info.fees.fee_tokens[0].denom)
+                .await?,
+            croncat_addr: cfg.manager,
         })
     }
 

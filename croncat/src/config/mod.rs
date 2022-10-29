@@ -9,7 +9,17 @@ use url::Url;
 
 #[derive(Debug, Clone, Serialize)]
 pub struct Config {
-    chains: HashMap<String, ChainConfig>,
+    pub chains: HashMap<String, ChainConfig>,
+}
+
+impl Config {
+    pub fn from_pwd() -> Result<Self> {
+        let pwd = std::env::current_dir()?;
+        let config_path = pwd.join("config.yaml");
+        let config = std::fs::read_to_string(config_path)?;
+        let config = serde_yaml::from_str(&config)?;
+        Ok(config)
+    }
 }
 
 impl<'de> Deserialize<'de> for Config {
@@ -18,23 +28,27 @@ impl<'de> Deserialize<'de> for Config {
         D: serde::Deserializer<'de>,
     {
         // Deserialize the raw config entry so we can get info from the chain registry.
-        let chains = HashMap::<String, RawChainConfigEntry>::deserialize(deserializer)?;
+        let config_yaml =
+            HashMap::<String, HashMap<String, RawChainConfigEntry>>::deserialize(deserializer)?;
+        let chains = config_yaml
+            .get("chains")
+            .ok_or_else(|| serde::de::Error::custom("missing 'chains' key"))?;
         let registry =
             ChainRegistry::from_remote().map_err(|e| serde::de::Error::custom(e.to_string()))?;
 
         // Collect the chain configs from the registry.
-        let chain_configs = HashMap::<String, ChainConfig>::from_iter(
-            chains
-                .into_iter()
-                .map(|(chain_id, entry)| {
-                    let chain_info = registry
-                        .get_by_chain_id(&chain_id)
-                        .map_err(|e| serde::de::Error::custom(e.to_string()))?;
-                    let chain_config = ChainConfig::from_entry(chain_info, entry);
-                    Ok((chain_id, chain_config))
-                })
-                .collect::<Result<Vec<_>, D::Error>>()?,
-        );
+        let chain_configs = chains
+            .to_owned()
+            .into_iter()
+            .map(|(chain_id, entry)| {
+                let chain_info = registry
+                    .get_by_chain_id(&chain_id)
+                    .map_err(|e| serde::de::Error::custom(e.to_string()))?;
+                let chain_config = ChainConfig::from_entry(chain_info, entry);
+                Ok((chain_id, chain_config))
+            })
+            .collect::<Result<Vec<_>, D::Error>>()?;
+        let chain_configs: HashMap<String, ChainConfig> = chain_configs.into_iter().collect();
 
         Ok(Self {
             chains: chain_configs,
@@ -64,14 +78,6 @@ pub struct ChainConfig {
 }
 
 impl ChainConfig {
-    pub fn from_pwd() -> Result<Self> {
-        let pwd = std::env::current_dir()?;
-        let config_path = pwd.join("config.yaml");
-        let config = std::fs::read_to_string(config_path)?;
-        let config = serde_yaml::from_str(&config)?;
-        Ok(config)
-    }
-
     fn from_entry(info: ChainInfo, entry: RawChainConfigEntry) -> Self {
         Self {
             info,

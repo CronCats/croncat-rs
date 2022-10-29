@@ -88,6 +88,8 @@ pub async fn simulate_gas_fee(
     tx_raw: Raw,
     denom: &String,
     chain_info: &ChainInfo,
+    gas_prices: f32,
+    gas_adjustment: f32,
 ) -> Result<Fee, Report> {
     let denom: Denom = denom.parse()?;
     let gas_info = client
@@ -101,10 +103,11 @@ pub async fn simulate_gas_fee(
         .ok_or_else(|| eyre!("No gas info in simulate response"))?;
 
     //  TODO: (REFACTOR) This is a hack to get the gas price from the chain config. We should be able to get this from the chain itself.
-    let gas_limit = (gas_info.gas_used as f64 * 1.5).ceil();
+    let gas_limit = (gas_info.gas_used as f32 * gas_adjustment).ceil();
     let amount = Coin {
         denom: denom.clone(),
-        amount: ((gas_limit * 0.1).ceil() as u64).into(),
+        amount: ((gas_limit * chain_info.fees.fee_tokens[0].fixed_min_gas_price).ceil() as u64)
+            .into(),
     };
 
     Ok(Fee::from_amount_and_gas(amount, gas_limit as u64))

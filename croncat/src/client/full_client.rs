@@ -23,6 +23,8 @@ pub struct CosmosFullClient {
     pub(crate) chain_info: ChainInfo,
     pub(crate) key: bip32::XPrv,
     pub(crate) native_denom: String,
+    pub(crate) gas_prices: f32,
+    pub(crate) gas_adjustment: f32,
     http_client: HttpClient,
     service_client: ServiceClient<Channel>,
     pub(crate) query_client: CosmosQueryClient,
@@ -34,6 +36,8 @@ impl CosmosFullClient {
         grpc_url: String,
         chain_info: ChainInfo,
         key: bip32::XPrv,
+        gas_prices: f32,
+        gas_adjustment: f32,
     ) -> Result<Self, Report> {
         let native_denom = chain_info.fees.fee_tokens[0].denom.clone();
         let http_client = HttpClient::new(rpc_url.as_str())?;
@@ -49,6 +53,8 @@ impl CosmosFullClient {
             http_client,
             service_client,
             query_client,
+            gas_prices,
+            gas_adjustment,
         })
     }
 
@@ -78,6 +84,8 @@ impl CosmosFullClient {
             simulate_tx_raw,
             &self.native_denom,
             &self.chain_info,
+            self.gas_prices,
+            self.gas_adjustment,
         )
         .await?;
         let raw = prepare_send(

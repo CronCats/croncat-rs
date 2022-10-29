@@ -45,7 +45,7 @@ impl std::fmt::Debug for KeyPair {
 /// Store the keypair and the payable account idea for a stored agent
 #[derive(Serialize, Deserialize, Clone)]
 pub struct LocalAgentStorageEntry {
-    keypair: KeyPair, // TODO (SeedyROM): This should probably point to a file, not store in memory
+    keypair: KeyPair,
     pub mnemonic: String,
     pub payable_account_id: Option<String>,
 }
@@ -61,7 +61,6 @@ impl std::fmt::Debug for LocalAgentStorageEntry {
 }
 
 /// Store key pairs on disk and allow access to the data.
-// TODO (SeedyROM): This should be named different but I'm being insane and can't decide
 pub struct LocalAgentStorage {
     pub path: PathBuf,
     data: LocalAgentStorageData,
@@ -98,7 +97,6 @@ impl LocalAgentStorage {
         let agent_data_file = self.path.join(LOCAL_STORAGE_AGENTS_FILENAME);
 
         // Create the directory to store our data if it doesn't exist
-        // TODO (SeedyROM): This can be moved to a helper probably...?
         if let Some(p) = agent_data_file.parent() {
             fs::create_dir_all(p)?
         };

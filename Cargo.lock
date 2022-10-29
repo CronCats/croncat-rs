@@ -641,10 +641,12 @@ dependencies = [
  "cosmos-sdk-proto",
  "cosmrs",
  "cosmwasm-std",
+ "croncat-pipeline",
  "cw-croncat-core",
  "cw-rules-core",
  "cw20 0.16.0",
  "cw20-base",
+ "delegate",
  "dotenv",
  "envy",
  "futures-util",
@@ -668,6 +670,17 @@ dependencies = [
  "tracing-test",
  "url",
  "whoami",
+]
+
+[[package]]
+name = "croncat-pipeline"
+version = "0.1.0"
+source = "git+https://github.com/CronCats/croncat-pipeline#9ca8f36b28cf8bb4ca9c933c7d07c3b110132ee2"
+dependencies = [
+ "async-stream",
+ "color-eyre",
+ "futures 0.3.25",
+ "tokio 1.21.2",
 ]
 
 [[package]]
@@ -916,6 +929,17 @@ dependencies = [
  "semver 1.0.14",
  "serde",
  "thiserror",
+]
+
+[[package]]
+name = "delegate"
+version = "0.8.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "082a24a9967533dc5d743c602157637116fc1b52806d694a5a45e6f32567fcdd"
+dependencies = [
+ "proc-macro2",
+ "quote",
+ "syn",
 ]
 
 [[package]]

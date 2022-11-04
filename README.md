@@ -22,10 +22,6 @@
 -   `cargo install rusty-hook cargo-make`
 -   `rusty-hook init`
 
-## Run
-
--   `cargo run`
-
 ## Help
 
 ```

@@ -42,10 +42,16 @@ pub enum Command {
     },
 
     /// Get the agent's status (pending/active)
-    GetAgentStatus { account_id: String },
+    GetAgentStatus {
+        #[structopt(long, default_value = "agent", env = "CRONCAT_AGENT")]
+        agent: String,
+    },
 
     /// Get the agent's tasks they're assigned to fulfill
-    GetAgentTasks { account_addr: String },
+    GetAgentTasks {
+        #[structopt(long, default_value = "agent", env = "CRONCAT_AGENT")]
+        agent: String,
+    },
 
     /// Unregisters the agent from being in the queue with other agents
     UnregisterAgent {

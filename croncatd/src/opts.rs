@@ -20,7 +20,7 @@ pub struct Opts {
     pub cmd: Command,
 
     /// Chain ID of the chain to connect to
-    #[structopt(long)]
+    #[structopt(long, env = "CRONCAT_CHAIN_ID")]
     pub chain_id: Option<String>,
 }
 
@@ -31,13 +31,13 @@ pub enum Command {
     RegisterAgent {
         payable_account_id: Option<String>,
 
-        #[structopt(long, default_value = "agent")]
+        #[structopt(long, default_value = "agent", env = "CRONCAT_AGENT")]
         agent: String,
     },
 
     /// Get the agent's supported bech32 accounts
     GetAgentAccounts {
-        #[structopt(long, default_value = "agent")]
+        #[structopt(long, default_value = "agent", env = "CRONCAT_AGENT")]
         agent: String,
     },
 
@@ -49,20 +49,20 @@ pub enum Command {
 
     /// Unregisters the agent from being in the queue with other agents
     UnregisterAgent {
-        #[structopt(long, default_value = "agent")]
+        #[structopt(long, default_value = "agent", env = "CRONCAT_AGENT")]
         agent: String,
     },
 
     /// Update the agent's configuration
     UpdateAgent {
         payable_account_id: String,
-        #[structopt(long, default_value = "agent")]
+        #[structopt(long, default_value = "agent", env = "CRONCAT_AGENT")]
         agent: String,
     },
 
     /// Withdraw the agent's funds to the payable account ID
     Withdraw {
-        #[structopt(long, default_value = "agent")]
+        #[structopt(long, default_value = "agent", env = "CRONCAT_AGENT")]
         agent: String,
     },
 
@@ -81,7 +81,7 @@ pub enum Command {
 
     /// Starts the Croncat agent, allowing it to fulfill tasks
     Go {
-        #[structopt(long, default_value = "agent")]
+        #[structopt(long, default_value = "agent", env = "CRONCAT_AGENT")]
         agent: String,
         /// Allow agent to do tasks with rules, uses more computer resources
         #[structopt(long, short = "r")]
@@ -105,7 +105,7 @@ pub enum Command {
 
     /// Sensitive. Shows all details about agents on this machine
     GetAgent {
-        #[structopt(long, default_value = "agent")]
+        #[structopt(long, default_value = "agent", env = "CRONCAT_AGENT")]
         name: String,
     },
 

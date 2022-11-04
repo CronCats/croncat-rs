@@ -37,6 +37,7 @@ impl<'de> Deserialize<'de> for Config {
             ChainRegistry::from_remote().map_err(|e| serde::de::Error::custom(e.to_string()))?;
 
         // Collect the chain configs from the registry.
+        #[allow(clippy::unnecessary_to_owned)]
         let chain_configs = chains
             .to_owned()
             .into_iter()

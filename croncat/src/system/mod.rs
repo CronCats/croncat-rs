@@ -44,6 +44,22 @@ pub async fn run(
     // Create a FuturesUnordered to handle all the block sources
     let mut block_stream_tasks = FuturesUnordered::new();
 
+    // Setup the signer.
+    let signer = GrpcSigner::from_chain_config(config, key.clone())
+        .await
+        .map_err(|err| eyre!("Failed to create GrpcSigner: {}", err))?;
+
+    // Get the status of the agent
+    let account_id = signer.account_id().to_string();
+    let status = signer
+        .get_agent(&account_id)
+        .await
+        .map_err(|err| eyre!("Failed to get agent status: {}", err))?
+        .ok_or_else(|| eyre!("Agent account {} is not registered", account_id,))?
+        .status;
+    info!("Initial agent status: {:?}", status);
+    let status = Arc::new(Mutex::new(status));
+
     // For each RPC endpoint, spawn a task to stream blocks from it
     for rpc_polling_url in &config.info.apis.rpc {
         info!(
@@ -103,28 +119,6 @@ pub async fn run(
             );
         }
     });
-
-    // Setup the signer.
-    let signer = GrpcSigner::from_chain_config(config, key.clone())
-        .await
-        .map_err(|err| eyre!("[{}] Failed to create GrpcSigner: {}", err, chain_id))?;
-
-    // Get the status of the agent
-    let account_id = signer.account_id().to_string();
-    let status = signer
-        .get_agent(&account_id)
-        .await
-        .map_err(|err| eyre!("[{}] Failed to get agent status: {}", chain_id, err))?
-        .ok_or_else(|| {
-            eyre!(
-                "[{}] Agent account  {} is not registered",
-                chain_id,
-                account_id,
-            )
-        })?
-        .status;
-    info!("Agent status: {:?}", status);
-    let status = Arc::new(Mutex::new(status));
 
     // Account status checks
     let account_status_check_shutdown_rx = shutdown_tx.subscribe();

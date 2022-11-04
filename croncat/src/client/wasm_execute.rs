@@ -84,7 +84,7 @@ pub fn prepare_simulate_tx(
 pub async fn simulate_gas_fee(
     mut client: ServiceClient<Channel>,
     tx_raw: Raw,
-    denom: &String,
+    denom: &str,
     gas_prices: f32,
     gas_adjustment: f32,
 ) -> Result<Fee, Report> {

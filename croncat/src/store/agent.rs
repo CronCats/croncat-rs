@@ -191,9 +191,7 @@ impl LocalAgentStorage {
 
     /// Retrieve an agent based on the key
     fn get(&self, account_id: &str) -> Option<&LocalAgentStorageEntry> {
-        let found = self.data.get(account_id);
-
-        found
+        self.data.get(account_id)
     }
 }
 

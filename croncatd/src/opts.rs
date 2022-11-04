@@ -18,6 +18,10 @@ pub struct Opts {
 
     #[structopt(subcommand)] // Note that we mark a field as a subcommand
     pub cmd: Command,
+
+    /// Chain ID of the chain to connect to
+    #[structopt(long)]
+    pub chain_id: Option<String>,
 }
 
 #[derive(Debug, StructOpt, Clone, EnumDisplay)]
@@ -29,38 +33,24 @@ pub enum Command {
 
         #[structopt(long, default_value = "agent")]
         agent: String,
-        #[structopt(long, default_value = "local")]
-        chain_id: String,
     },
 
     /// Get the agent's supported bech32 accounts
     GetAgentAccounts {
         #[structopt(long, default_value = "agent")]
         agent: String,
-        #[structopt(long, default_value = "local")]
-        chain_id: String,
     },
 
     /// Get the agent's status (pending/active)
-    GetAgentStatus {
-        account_id: String,
-        #[structopt(long, default_value = "local")]
-        chain_id: String,
-    },
+    GetAgentStatus { account_id: String },
 
     /// Get the agent's tasks they're assigned to fulfill
-    GetAgentTasks {
-        account_addr: String,
-        #[structopt(long, short, default_value = "local")]
-        chain_id: String,
-    },
+    GetAgentTasks { account_addr: String },
 
     /// Unregisters the agent from being in the queue with other agents
     UnregisterAgent {
         #[structopt(long, default_value = "agent")]
         agent: String,
-        #[structopt(long, short, default_value = "local")]
-        chain_id: String,
     },
 
     /// Update the agent's configuration
@@ -68,16 +58,12 @@ pub enum Command {
         payable_account_id: String,
         #[structopt(long, default_value = "agent")]
         agent: String,
-        #[structopt(long, short, default_value = "local")]
-        chain_id: String,
     },
 
     /// Withdraw the agent's funds to the payable account ID
     Withdraw {
         #[structopt(long, default_value = "agent")]
         agent: String,
-        #[structopt(long, short, default_value = "local")]
-        chain_id: String,
     },
 
     /// Get contract's state
@@ -91,8 +77,6 @@ pub enum Command {
     Tasks {
         from_index: Option<u64>,
         limit: Option<u64>,
-        #[structopt(long, short, default_value = "local")]
-        chain_id: String,
     },
 
     /// Starts the Croncat agent, allowing it to fulfill tasks
@@ -102,15 +86,10 @@ pub enum Command {
         /// Allow agent to do tasks with rules, uses more computer resources
         #[structopt(long, short = "r")]
         with_rules: bool,
-        #[structopt(long, short, default_value = "local")]
-        chain_id: String,
     },
 
     /// Gets the configuration from the Croncat manager contract
-    Info {
-        #[structopt(long, short, default_value = "local")]
-        chain_id: String,
-    },
+    Info {},
 
     /// Generates a new keypair and agent account (good first step)
     GenerateMnemonic {
@@ -122,11 +101,7 @@ pub enum Command {
     },
 
     /// (in progress) Send native tokens to an address
-    DepositUjunox {
-        account_id: String,
-        #[structopt(long, short, default_value = "local")]
-        chain_id: String,
-    },
+    DepositUjunox { account_id: String },
 
     /// Sensitive. Shows all details about agents on this machine
     GetAgent {
@@ -136,8 +111,6 @@ pub enum Command {
 
     /// Setup an agent as a system service (systemd)
     SetupService {
-        #[structopt(long, short, default_value = "local")]
-        chain_id: String,
         #[structopt(long)]
         output: Option<String>,
     },

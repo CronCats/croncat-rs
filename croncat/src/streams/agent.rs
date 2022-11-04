@@ -33,7 +33,7 @@ pub async fn check_account_status_loop(
             if block_counter.is_at_interval() {
                 info!(
                     "Checking agents statuses for block (height: {})",
-                    block.header.height
+                    block.header().height
                 );
                 let account_addr = signer.account_id().as_ref();
                 let agent = signer.get_agent(account_addr).await?;

@@ -190,7 +190,7 @@ impl LocalAgentStorage {
         let entry = if let Some(entry) = self.get(account_id) {
             entry
         } else {
-            return Err(eyre!("No agent key by this id"));
+            return Err(eyre!("Agent not found: {}", account_id));
         };
         let mnemonic: Mnemonic = entry.mnemonic.parse()?;
         let key =
@@ -217,10 +217,6 @@ impl LocalAgentStorage {
         info!("Getting agent by id: {}", account_id);
 
         let found = self.data.get(account_id);
-
-        if let Some(entry) = found {
-            info!("Found agent: {:#?}", entry);
-        }
 
         found
     }

@@ -18,6 +18,7 @@ use cw_croncat_core::msg::{ExecuteMsg, GetConfigResponse, QueryMsg};
 use cw_croncat_core::types::AgentResponse;
 use cw_rules_core::msg::QueryConstruct;
 use cw_rules_core::types::Rule;
+use futures_util::Future;
 use serde::de::DeserializeOwned;
 use tendermint_rpc::endpoint::broadcast::tx_commit::TxResult;
 use tokio::time::timeout;
@@ -51,7 +52,7 @@ pub async fn connect(url: String) -> Result<(MsgClient<Channel>, QueryClient<Cha
 #[derive(Clone)]
 pub struct GrpcSigner {
     client: CosmosFullClient,
-    pub manager: AccountId,
+    pub manager: String,
     pub account_id: AccountId,
 }
 
@@ -60,10 +61,19 @@ impl GrpcSigner {
         rpc_url: String,
         grpc_url: String,
         chain_info: ChainInfo,
+        manager: String,
         key: bip32::XPrv,
         gas_prices: f32,
         gas_adjustment: f32,
     ) -> Result<Self, Report> {
+        // TODO: How should we handle this? Is the hack okay?
+        // Quick hack to add https:// to the url if it is missing
+        let grpc_url = if !grpc_url.starts_with("https://") {
+            format!("https://{}", grpc_url)
+        } else {
+            grpc_url
+        };
+
         let client = CosmosFullClient::new(
             rpc_url,
             grpc_url,
@@ -77,7 +87,6 @@ impl GrpcSigner {
             .key()
             .public_key()
             .account_id(&client.chain_info.bech32_prefix)?;
-        let manager = account_id.clone();
 
         Ok(Self {
             client,
@@ -86,10 +95,26 @@ impl GrpcSigner {
         })
     }
 
+    pub fn from_chain_config(
+        chain_config: &ChainConfig,
+        key: bip32::XPrv,
+    ) -> impl Future<Output = Result<Self, Report>> {
+        GrpcSigner::new(
+            chain_config.info.apis.rpc[0].address.clone(),
+            chain_config.info.apis.grpc[0].address.clone(),
+            chain_config.info.clone(),
+            chain_config.manager.clone(),
+            key.clone(),
+            chain_config.gas_prices,
+            chain_config.gas_adjustment,
+        )
+    }
+
     pub async fn query_croncat<T>(&self, msg: &QueryMsg) -> Result<T, Report>
     where
         T: DeserializeOwned,
     {
+        println!("Manager addr: {}", &self.manager.to_string());
         let out = timeout(
             Duration::from_secs(30),
             self.client
@@ -231,10 +256,9 @@ pub struct GrpcQuerier {
     croncat_addr: String,
 }
 impl GrpcQuerier {
-    pub async fn new(cfg: ChainConfig) -> Result<Self, Report> {
+    pub async fn new(cfg: ChainConfig, grpc_url: String) -> Result<Self, Report> {
         Ok(Self {
-            client: CosmosQueryClient::new("REPLACE_ME", &cfg.info.fees.fee_tokens[0].denom)
-                .await?,
+            client: CosmosQueryClient::new(grpc_url, &cfg.info.fees.fee_tokens[0].denom).await?,
             croncat_addr: cfg.manager,
         })
     }

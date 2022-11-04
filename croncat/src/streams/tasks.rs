@@ -55,7 +55,7 @@ pub async fn tasks_loop(
                         }
                     }
                 } else {
-                    info!("No tasks for block (height: {})", block.header.height);
+                    info!("No tasks for block (height: {})", block.header().height);
                 }
             }
         }
@@ -89,13 +89,13 @@ pub async fn rules_loop(
             // unlocking it ASAP
             std::mem::drop(locked_status);
             if is_active {
-                let time: Timestamp = block.header.time.into();
+                let time: Timestamp = block.header().time.into();
                 let time_nanos = time.seconds as u64 * 1_000_000_000 + time.nanos as u64;
 
                 for task in tasks_with_rules.iter() {
                     let in_boundary = match task.boundary {
                         Some(Boundary::Height { start, end }) => {
-                            let height = block.header.height.value();
+                            let height = block.header().height.value();
                             start.map_or(true, |s| s.u64() >= height)
                                 && end.map_or(true, |e| e.u64() <= height)
                         }

@@ -36,7 +36,7 @@ pub enum Command {
     },
 
     /// Get the agent's supported bech32 accounts
-    GetAgentAccounts {
+    ListAccounts {
         #[structopt(long, default_value = "agent", env = "CRONCAT_AGENT")]
         agent: String,
     },

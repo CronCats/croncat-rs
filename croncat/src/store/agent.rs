@@ -10,11 +10,7 @@ use serde::{Deserialize, Serialize};
 use std::{collections::HashMap, fs, path::PathBuf};
 use tracing::log::info;
 
-use crate::{
-    config::{ChainConfig, Config},
-    errors::Report,
-    utils::{DERIVATION_PATH, SUPPORTED_CHAIN_IDS},
-};
+use crate::{errors::Report, utils::DERIVATION_PATH};
 
 use super::get_storage_path;
 
@@ -154,7 +150,6 @@ impl LocalAgentStorage {
                 }?;
                 self.insert(account_id.clone(), validated_mnemonic)?;
                 self.write_to_disk()?;
-                self.display_addrs(&account_id).await?;
                 Ok(())
             }
         }
@@ -162,28 +157,10 @@ impl LocalAgentStorage {
 
     pub fn display_account(&self, account_id: &str) {
         let new_account = self.get(account_id);
-        println!(
-            "{}",
+        info!(
+            "Agent JSON: {}",
             serde_json::to_string_pretty(&serde_json::json!({ account_id: new_account })).unwrap()
         );
-    }
-
-    pub async fn display_addrs(&self, account_id: &str) -> Result<(), Report> {
-        // println!("Account Addresses for: {account_id}");
-        // // Loop and print supported accounts for a keypair
-        // for chain_id in SUPPORTED_CHAIN_IDS.iter() {
-        //     let config = Config::from_pwd()?;
-
-        //     let prefix = config.prefix;
-        //     let account_addr =
-        //         self.get_agent_signing_account_addr(&account_id.to_string(), prefix)?;
-
-        //     println!("{}: {}", chain_id, account_addr);
-        // }
-
-        // println!("\n\nPlease fund the above accounts with their native token!\nYou will need enough funds to cover several transactions before rewards will start covering costs.\nYou only need to fund the address for the network you plan to run an agent on.\n\n");
-
-        Ok(())
     }
 
     pub fn get_agent_signing_key(&self, account_id: &AccountId) -> Result<bip32::XPrv, Report> {
@@ -214,8 +191,6 @@ impl LocalAgentStorage {
 
     /// Retrieve an agent based on the key
     fn get(&self, account_id: &str) -> Option<&LocalAgentStorageEntry> {
-        info!("Getting agent by id: {}", account_id);
-
         let found = self.data.get(account_id);
 
         found

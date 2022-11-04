@@ -17,10 +17,7 @@ use tracing::log::error;
 use tracing::trace;
 use url::Url;
 
-use crate::{
-    channels::ShutdownRx,
-    logging::{info, warn},
-};
+use crate::logging::{info, warn};
 
 ///
 /// Connect to the RPC websocket endpoint and subscribe for incoming blocks.

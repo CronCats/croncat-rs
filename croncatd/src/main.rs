@@ -113,6 +113,12 @@ async fn run_command(opts: Opts, mut storage: LocalAgentStorage) -> Result<(), R
                 Err(err) if err.to_string().contains("Agent already exists") => {
                     Err(eyre!("Agent already registered"))?;
                 }
+                Err(err)
+                    if err.to_string().contains("account")
+                        && err.to_string().contains("not found") =>
+                {
+                    Err(eyre!("Agent account not found on chain"))?;
+                }
                 Err(err) => Err(eyre!("Failed to register agent: {}", err))?,
             }
         }

@@ -114,7 +114,6 @@ impl GrpcSigner {
     where
         T: DeserializeOwned,
     {
-        println!("Manager addr: {}", &self.manager.to_string());
         let out = timeout(
             Duration::from_secs(30),
             self.client
@@ -140,10 +139,12 @@ impl GrpcSigner {
 
     pub async fn register_agent(
         &self,
-        payable_account_id: Option<String>,
+        payable_account_id: &Option<String>,
     ) -> Result<TxResult, Report> {
-        self.execute_croncat(&ExecuteMsg::RegisterAgent { payable_account_id })
-            .await
+        self.execute_croncat(&ExecuteMsg::RegisterAgent {
+            payable_account_id: payable_account_id.clone(),
+        })
+        .await
     }
 
     pub async fn unregister_agent(&self) -> Result<TxResult, Report> {

@@ -43,8 +43,6 @@ async fn main() -> Result<(), Report> {
         cli::print_banner();
     }
 
-    info!("Starting croncatd...");
-
     // Run a command
 
     if let Err(err) = run_command(opts.clone(), storage).await {
@@ -104,25 +102,62 @@ async fn run_command(opts: Opts, mut storage: LocalAgentStorage) -> Result<(), R
             }
 
             // Register the agent
-            let result = signer.register_agent(payable_account_id).await?;
-            let log = result.log;
+            let query = signer.register_agent(&payable_account_id).await;
 
-            // Print the result
-            info!("Log: {log}");
+            // Handle the result of the query
+            match query {
+                Ok(result) => {
+                    info!("Agent registered successfully");
+                    let log = result.log;
+                    info!("Result: {}", log);
+                }
+                Err(err) if err.to_string().contains("Agent already exists") => {
+                    error!("Agent already registered");
+                    exit(1);
+                }
+                Err(err) => Err(eyre!("Failed to register agent: {}", err))?,
+            }
         }
-        // opts::Command::UnregisterAgent {
-        //     sender_name,
-        //     chain_id,
-        // } => {
-        //     let _guards = logging::setup_go(chain_id.to_string())?;
-        //     CHAIN_ID.set(chain_id.clone()).unwrap();
+        opts::Command::UnregisterAgent { agent } => {
+            // Make sure we have a chain id to run on
+            if opts.chain_id.is_none() {
+                return Err(eyre!("chain-id is required for go command"));
+            }
+            let chain_id = opts.chain_id.unwrap();
 
-        //     let key = storage.get_agent_signing_key(&sender_name)?;
-        //     let signer = GrpcSigner::new(ChainConfig::new(&chain_id).await?, key).await?;
-        //     let result = signer.unregister_agent().await?;
-        //     let log = result.log;
-        //     info!("Log: {log}");
-        // }
+            // Get the chain config for the chain we're going to run on
+            let chain_config = config
+                .chains
+                .get(&chain_id)
+                .ok_or_else(|| eyre!("Chain not found in configuration: {}", chain_id))?;
+
+            // Get the key and create a signer
+            let key = storage.get_agent_signing_key(&agent)?;
+            let signer = GrpcSigner::from_chain_config(chain_config, key)
+                .await
+                .map_err(|err| eyre!("Failed to create GrpcSigner: {}", err))?;
+
+            // Print info about the agent about to be registered
+            info!("Account ID: {}", signer.account_id());
+            info!("Key: {}", signer.key().public_key().to_json());
+
+            // Unregister the agent
+            let query = signer.unregister_agent().await;
+
+            // Handle the result of the query
+            match query {
+                Ok(result) => {
+                    info!("Agent unregistered successfully");
+                    let log = result.log;
+                    info!("Result: {}", log);
+                }
+                Err(err) if err.to_string().contains("Agent not registered") => {
+                    error!("Agent not already registered");
+                    exit(1);
+                }
+                Err(err) => Err(eyre!("Failed to register agent: {}", err))?,
+            }
+        }
         // opts::Command::Withdraw {
         //     sender_name,
         //     chain_id,
@@ -144,8 +179,8 @@ async fn run_command(opts: Opts, mut storage: LocalAgentStorage) -> Result<(), R
         //     let config = querier.query_config().await?;
         //     info!("Config: {config}")
         // }
-        opts::Command::GetAgentAccounts { agent } => {
-            println!("Account Addresses for: {agent}\n");
+        opts::Command::ListAccounts { agent } => {
+            println!("Account addresses for agent: {agent}\n");
             // Get the chain config for the chain we're going to run on
             for (chain_id, chain_config) in config.chains {
                 let account_addr = storage

@@ -73,30 +73,17 @@ impl CosmosFullClient {
             .query_client
             .query_base_account(sender.as_ref().to_owned())
             .await?;
-        let simulate_tx_raw = prepare_simulate_tx(
-            &tx_body,
-            &self.native_denom,
-            &self.chain_info,
-            &self.key(),
-            &base_account,
-        )?;
+        let simulate_tx_raw =
+            prepare_simulate_tx(&tx_body, &self.chain_info, &self.key(), &base_account)?;
         let fee = simulate_gas_fee(
             self.service_client.clone(),
             simulate_tx_raw,
             &self.native_denom,
-            &self.chain_info,
             self.gas_prices,
             self.gas_adjustment,
         )
         .await?;
-        let raw = prepare_send(
-            &tx_body,
-            &self.native_denom,
-            &self.chain_info,
-            &self.key(),
-            &base_account,
-            fee,
-        )?;
+        let raw = prepare_send(&tx_body, &self.chain_info, &self.key(), &base_account, fee)?;
         let tx_result = send_tx(&self.http_client, raw).await?;
         Ok(tx_result)
     }

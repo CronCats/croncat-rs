@@ -35,7 +35,6 @@ pub fn generate_wasm_body(
 
 pub fn prepare_send(
     tx: &tx::Body,
-    denom: &String,
     chain_info: &ChainInfo,
     key: &SigningKey,
     base_account: &BaseAccount,
@@ -55,7 +54,6 @@ pub fn prepare_send(
 
 pub fn prepare_simulate_tx(
     tx: &tx::Body,
-    denom: &String,
     chain_info: &ChainInfo,
     key: &SigningKey,
     base_account: &BaseAccount,
@@ -87,7 +85,6 @@ pub async fn simulate_gas_fee(
     mut client: ServiceClient<Channel>,
     tx_raw: Raw,
     denom: &String,
-    chain_info: &ChainInfo,
     gas_prices: f32,
     gas_adjustment: f32,
 ) -> Result<Fee, Report> {
@@ -106,8 +103,7 @@ pub async fn simulate_gas_fee(
     let gas_limit = (gas_info.gas_used as f32 * gas_adjustment).ceil();
     let amount = Coin {
         denom: denom.clone(),
-        amount: ((gas_limit * chain_info.fees.fee_tokens[0].fixed_min_gas_price).ceil() as u64)
-            .into(),
+        amount: ((gas_limit * gas_prices).ceil() as u64).into(),
     };
 
     Ok(Fee::from_amount_and_gas(amount, gas_limit as u64))

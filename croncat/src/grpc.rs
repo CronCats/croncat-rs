@@ -104,7 +104,7 @@ impl GrpcSigner {
             chain_config.info.apis.grpc[0].address.clone(),
             chain_config.info.clone(),
             chain_config.manager.clone(),
-            key.clone(),
+            key,
             chain_config.gas_prices,
             chain_config.gas_adjustment,
         )

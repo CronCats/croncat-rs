@@ -28,7 +28,7 @@ pub struct Opts {
 #[enum_display(case = "Kebab")]
 pub enum Command {
     /// Registers an agent, placing them in the pending queue unless it's the first agent.
-    RegisterAgent {
+    Register {
         payable_account_id: Option<String>,
 
         #[structopt(long, default_value = "agent", env = "CRONCAT_AGENT")]
@@ -42,25 +42,25 @@ pub enum Command {
     },
 
     /// Get the agent's status (pending/active)
-    GetAgentStatus {
+    Status {
         #[structopt(long, default_value = "agent", env = "CRONCAT_AGENT")]
         agent: String,
     },
 
     /// Get the agent's tasks they're assigned to fulfill
-    GetAgentTasks {
+    GetTasks {
         #[structopt(long, default_value = "agent", env = "CRONCAT_AGENT")]
         agent: String,
     },
 
     /// Unregisters the agent from being in the queue with other agents
-    UnregisterAgent {
+    Unregister {
         #[structopt(long, default_value = "agent", env = "CRONCAT_AGENT")]
         agent: String,
     },
 
     /// Update the agent's configuration
-    UpdateAgent {
+    Update {
         payable_account_id: String,
         #[structopt(long, default_value = "agent", env = "CRONCAT_AGENT")]
         agent: String,
@@ -99,8 +99,7 @@ pub enum Command {
 
     /// Generates a new keypair and agent account (good first step)
     GenerateMnemonic {
-        #[structopt(long, default_value = "agent")]
-        new_name: String,
+        agent: String,
         /// Recover agent from mnemonic phrase. Please do not use your own account!
         #[structopt(long)]
         mnemonic: Option<String>,

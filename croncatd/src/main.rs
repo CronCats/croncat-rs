@@ -43,8 +43,7 @@ async fn main() -> Result<(), Report> {
         cli::print_banner();
     }
 
-    // Run a command
-
+    // Run a command and handle errors
     if let Err(err) = run_command(opts.clone(), storage).await {
         error!("Command failed: {}", opts.cmd);
         error!("{}", err);
@@ -69,7 +68,7 @@ async fn run_command(opts: Opts, mut storage: LocalAgentStorage) -> Result<(), R
     let config = Config::from_pwd()?;
 
     match opts.cmd {
-        opts::Command::RegisterAgent {
+        opts::Command::Register {
             payable_account_id,
             agent,
         } => {
@@ -112,13 +111,12 @@ async fn run_command(opts: Opts, mut storage: LocalAgentStorage) -> Result<(), R
                     info!("Result: {}", log);
                 }
                 Err(err) if err.to_string().contains("Agent already exists") => {
-                    error!("Agent already registered");
-                    exit(1);
+                    Err(eyre!("Agent already registered"))?;
                 }
                 Err(err) => Err(eyre!("Failed to register agent: {}", err))?,
             }
         }
-        opts::Command::UnregisterAgent { agent } => {
+        opts::Command::Unregister { agent } => {
             // Make sure we have a chain id to run on
             if opts.chain_id.is_none() {
                 return Err(eyre!("chain-id is required for go command"));
@@ -152,8 +150,7 @@ async fn run_command(opts: Opts, mut storage: LocalAgentStorage) -> Result<(), R
                     info!("Result: {}", log);
                 }
                 Err(err) if err.to_string().contains("Agent not registered") => {
-                    error!("Agent not already registered");
-                    exit(1);
+                    Err(eyre!("Agent not already registered"))?;
                 }
                 Err(err) => Err(eyre!("Failed to register agent: {}", err))?,
             }
@@ -222,9 +219,9 @@ async fn run_command(opts: Opts, mut storage: LocalAgentStorage) -> Result<(), R
         //     let agent_tasks = querier.get_agent_tasks(account_addr).await?;
         //     info!("Agent Tasks: {agent_tasks}")
         // }
-        // opts::Command::GenerateMnemonic { new_name, mnemonic } => {
-        //     storage.generate_account(new_name, mnemonic).await?
-        // }
+        opts::Command::GenerateMnemonic { agent, mnemonic } => {
+            storage.generate_account(agent, mnemonic).await?
+        }
         // opts::Command::UpdateAgent {
         //     payable_account_id,
         //     sender_name,
@@ -276,17 +273,12 @@ async fn run_command(opts: Opts, mut storage: LocalAgentStorage) -> Result<(), R
             let (shutdown_tx, _shutdown_rx) = create_shutdown_channel();
 
             // Run the agent on the chain
-            system::run_retry(&chain_id, &shutdown_tx, &chain_config, &key, with_rules).await?;
+            system::run_retry(&chain_id, &shutdown_tx, chain_config, &key, with_rules).await?;
         }
-        // opts::Command::SetupService { output } => {
-        //     system::DaemonService::create(output, &chain_id, opts.no_frills)?;
-        // }
-        #[cfg(feature = "debug")]
-        opts::Command::GetState { .. } => {
-            // let querier = GrpcQuerier::new(_cfg).await?;
-
-            // let state = querier.get_contract_state(from_index, limit).await?;
-            // println!("{state}");
+        opts::Command::SetupService { output } => {
+            for (chain_id, _) in config.chains {
+                system::DaemonService::create(output.clone(), &chain_id, opts.no_frills)?;
+            }
         }
         _ => unreachable!(), // TODO: Remove this when done debugging
     }

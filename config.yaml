@@ -1,6 +1,9 @@
 chains:
     juno-1:
         manager: juno1qtan74u3rdeqm5vgum3e0dg2cpfm36yt8d2mcntva03h893aymvs48dttx
-        polling_time: 3.0
+        gas_prices: 0.1
+        gas_adjustment: 1.5
+    uni-5:
+        manager: juno1878569jt6mfq9254mkq7ecqjljswx5z6u6pdtyse45jnnmnu0ups0ezpwq
         gas_prices: 0.1
         gas_adjustment: 1.5

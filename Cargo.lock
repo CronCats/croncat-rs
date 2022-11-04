@@ -687,12 +687,10 @@ dependencies = [
 name = "croncatd"
 version = "0.1.0"
 dependencies = [
- "anyhow",
  "async-compat",
  "croncat",
  "enum-display",
  "futures 0.3.25",
- "once_cell",
  "reqwest",
  "serde",
  "serde_json",

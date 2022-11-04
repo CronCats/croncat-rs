@@ -234,23 +234,75 @@ pub async fn run(
     let _sequencer_handle = tokio::task::spawn(async move { sequencer.consume().await });
 
     // Dispatch blocks to anybody who is listening.
-    let (dispatcher_tx, dispatcher_rx) = broadcast::channel(32);
+    let (dispatcher_tx, _dispatcher_rx) = broadcast::channel(32);
     let mut dispatcher = Dispatcher::new(sequencer_rx, dispatcher_tx.clone());
     let _dispatcher_handle = tokio::task::spawn(async move { dispatcher.fanout().await });
 
-    // Test block subscriber
-    let test_block_subscriber_dispatcher_tx = dispatcher_tx.clone();
-    let test_block_subscriber_chain_id = chain_id.clone();
-    let _test_block_subscriber_handle = tokio::task::spawn(async move {
-        let mut block_subscriber = test_block_subscriber_dispatcher_tx.subscribe();
-        while let Ok(block) = block_subscriber.recv().await {
-            info!(
-                "[{}] Received block: {}",
-                test_block_subscriber_chain_id,
-                block.header().height
-            );
+    // Task to show blocks from the block stream
+    let mut block_stream_info_rx = dispatcher_tx.subscribe();
+    let _block_stream_info_handle = tokio::task::spawn(async move {
+        while let Ok(block) = block_stream_info_rx.recv().await {
+            info!("Processing block at height: {}", block.header().height);
         }
     });
+
+    // Setup the signer.
+    let signer = GrpcSigner::from_chain_config(config, key.clone())
+        .await
+        .map_err(|err| eyre!("Failed to create GrpcSigner: {}", err))?;
+
+    // Get the status of the agent
+    let account_id = signer.account_id().to_string();
+    let status = signer
+        .get_agent(&account_id)
+        .await
+        .map_err(|err| eyre!("Failed to get agent status: {}", err))?
+        .ok_or_else(|| {
+            eyre!(
+                "Agent account {} not found on chain {}",
+                account_id,
+                chain_id
+            )
+        })?
+        .status;
+    let status = Arc::new(Mutex::new(status));
+
+    // Account status checks
+    let account_status_check_shutdown_rx = shutdown_tx.subscribe();
+    let account_status_check_block_stream_rx = dispatcher_tx.subscribe();
+    let block_status = status.clone();
+    let block_status_accounts_loop = block_status.clone();
+    let signer_status = signer.clone();
+    let account_status_check_handle = tokio::task::spawn(agent::check_account_status_loop(
+        account_status_check_block_stream_rx,
+        account_status_check_shutdown_rx,
+        block_status_accounts_loop,
+        signer_status,
+    ));
+
+    // Process blocks coming in from the blockchain
+    let task_runner_shutdown_rx = shutdown_tx.subscribe();
+    let task_runner_block_stream_rx = dispatcher_tx.subscribe();
+    let tasks_signer = signer.clone();
+    let block_status_tasks = block_status.clone();
+    let task_runner_handle = tokio::task::spawn(tasks::tasks_loop(
+        task_runner_block_stream_rx,
+        task_runner_shutdown_rx,
+        tasks_signer,
+        block_status_tasks,
+    ));
+
+    // Check rules if enabled
+    let rules_runner_handle = if with_rules {
+        tokio::task::spawn(tasks::rules_loop(
+            dispatcher_tx.subscribe(),
+            shutdown_tx.subscribe(),
+            signer,
+            block_status,
+        ))
+    } else {
+        tokio::task::spawn(async { Ok(()) })
+    };
 
     // Ctrl-C handler
     let ctrl_c_shutdown_tx = shutdown_tx.clone();
@@ -272,24 +324,49 @@ pub async fn run(
         Ok(())
     });
 
-    // Wait for each block stream task to finish. If any of them fail, we need to propagate the error.
-    while let Some(block_stream_task) = block_stream_tasks.next().await {
-        match block_stream_task {
-            Ok(Ok(())) => (),
-            Ok(Err(err)) => {
-                error!("[{}] Block stream task failed: {}", chain_id, err);
-                return Err(err);
-            }
-            Err(err) => {
-                error!("[{}] Block stream task failed: {}", chain_id, err);
-                return Err(err.into());
+    let block_stream_tasks_handler_chain_id = chain_id.clone();
+    let block_stream_tasks_handler = tokio::task::spawn(async move {
+        // Wait for each block stream task to finish. If any of them fail, we need to propagate the error.
+        while let Some(block_stream_task) = block_stream_tasks.next().await {
+            match block_stream_task {
+                Ok(Ok(())) => (),
+                Ok(Err(err)) => {
+                    error!(
+                        "[{}] Block stream task failed: {}",
+                        block_stream_tasks_handler_chain_id, err
+                    );
+                    return Err(err);
+                }
+                Err(err) => {
+                    error!(
+                        "[{}] Block stream task failed: {}",
+                        block_stream_tasks_handler_chain_id, err
+                    );
+                    return Err(err.into());
+                }
             }
         }
+
+        Ok::<(), Report>(())
+    });
+
+    // Try to join all the system tasks.
+    let system_status = try_flat_join!(
+        ctrl_c_handle,
+        account_status_check_handle,
+        task_runner_handle,
+        rules_runner_handle,
+        block_stream_tasks_handler
+    );
+
+    // If any of the tasks failed, we need to propagate the error.
+    match system_status {
+        Ok(_) => Ok(()),
+        Err(err) => {
+            error!("croncatd shutdown with error");
+            Err(err)
+        }
     }
-
-    try_flat_join!(ctrl_c_handle)?;
-
-    Ok(())
 }
 
 pub async fn run_retry(
@@ -299,18 +376,18 @@ pub async fn run_retry(
     key: &ExtendedPrivateKey<SigningKey>,
     with_rules: bool,
 ) -> Result<(), Report> {
-    let retry_strategy = FixedInterval::from_millis(3000).map(jitter).take(1200);
+    // TODO: Rethink this retry logic
+    // let retry_strategy = FixedInterval::from_millis(5000).take(1200);
 
-    Retry::spawn(retry_strategy, || async {
-        run(chain_id, shutdown_tx, config, key, with_rules)
-            .await
-            .map_err(|err| {
-                error!("System crashed: {}", err);
-                error!("Retrying...");
-                err
-            })
-    })
-    .await?;
+    // Retry::spawn(retry_strategy, || async {
+    run(chain_id, shutdown_tx, config, key, with_rules).await?;
+    // .map_err(|err| {
+    //     error!("[{}] System crashed: {}", &chain_id, err);
+    //     error!("[{}] Retrying...", &chain_id);
+    //     err
+    // })?;
+    // })
+    // .await?;
 
     Ok(())
 }

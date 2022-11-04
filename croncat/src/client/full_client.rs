@@ -1,4 +1,4 @@
-use color_eyre::Report;
+use color_eyre::{eyre::eyre, Report};
 use cosmos_chain_registry::ChainInfo;
 use cosmos_sdk_proto::cosmos::tx::v1beta1::service_client::ServiceClient;
 
@@ -18,8 +18,6 @@ use super::wasm_execute::{
 
 #[derive(Clone)]
 pub struct CosmosFullClient {
-    pub(crate) rpc_url: String,
-    pub(crate) grpc_url: String,
     pub(crate) chain_info: ChainInfo,
     pub(crate) key: bip32::XPrv,
     pub(crate) native_denom: String,
@@ -40,13 +38,16 @@ impl CosmosFullClient {
         gas_adjustment: f32,
     ) -> Result<Self, Report> {
         let native_denom = chain_info.fees.fee_tokens[0].denom.clone();
-        let http_client = HttpClient::new(rpc_url.as_str())?;
-        let service_client = ServiceClient::connect(grpc_url.clone()).await?;
-        let query_client = CosmosQueryClient::new(&grpc_url, &native_denom).await?;
+        let http_client = HttpClient::new(rpc_url.as_str())
+            .map_err(|err| eyre!("Failed to create http client: {}", err))?;
+        let service_client = ServiceClient::connect(grpc_url.clone())
+            .await
+            .map_err(|err| eyre!("Failed to create GRPC service client: {}", err))?;
+        let query_client = CosmosQueryClient::new(&grpc_url, &native_denom)
+            .await
+            .map_err(|err| eyre!("Failed to create GRPC query client: {}", err))?;
 
         Ok(Self {
-            rpc_url,
-            grpc_url,
             chain_info,
             key,
             native_denom,

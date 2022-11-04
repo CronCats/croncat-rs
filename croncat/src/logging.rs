@@ -11,63 +11,67 @@ use tracing_subscriber::{fmt, prelude::*, EnvFilter};
 pub use tracing::{debug, error, info, warn};
 
 ///
-/// Setup logging with `color_eyre` and `tracing_subscriber`.
+/// Setup logging for the go command
 ///
-pub fn setup() -> Result<(), Report> {
+pub fn setup(chain_id: Option<String>) -> Result<Vec<WorkerGuard>, Report> {
     // Set RUST_LIB_BACKTRACE=1 to enable backtraces
     if std::env::var("RUST_LIB_BACKTRACE").is_err() {
         std::env::set_var("RUST_LIB_BACKTRACE", "1");
     }
 
+    // Set RUST_LOG to info by default
+    if std::env::var("RUST_LOG").is_err() {
+        std::env::set_var("RUST_LOG", "info");
+    }
+
     // Install color_eyre
     color_eyre::install()?;
 
-    // Get/set the log level
-    if std::env::var("RUST_LOG").is_err() {
-        std::env::set_var("RUST_LOG", "info")
-    }
-    // Setup tracing and tracing-subscriber
-    tracing_subscriber::fmt::fmt()
+    // Setup multi file logging.
+    let mut file_appender_guards = vec![];
+
+    // TODO: Figure out multi file logging later.
+    // if chain_id.is_none() {
+    tracing_subscriber::fmt()
         .with_env_filter(EnvFilter::from_default_env())
+        .with_writer(std::io::stderr)
         .init();
+    // } else {
+    //     // Log file for errors.
+    //     let error_file_appender = tracing_appender::rolling::daily(
+    //         format!("{}/logs", get_storage_path().to_str().unwrap()),
+    //         format!("{}.error.log", chain_id.as_ref().unwrap()),
+    //     );
+    //     let (error_file_writer, guard) = tracing_appender::non_blocking(error_file_appender);
+    //     file_appender_guards.push(guard);
 
-    Ok(())
-}
+    //     // Log file for info.
+    //     let file_appender = tracing_appender::rolling::daily(
+    //         format!("{}/logs", get_storage_path().to_str().unwrap()),
+    //         format!("{}.log", chain_id.as_ref().unwrap()),
+    //     );
+    //     let (file_writer, guard) = tracing_appender::non_blocking(file_appender);
+    //     file_appender_guards.push(guard);
 
-///
-/// Setup logging for the go command
-///
-pub fn setup_go(chain_id: String) -> Result<Vec<WorkerGuard>, Report> {
-    let mut guards = vec![];
+    //     // Create the tracing subscriber with the file appender layers.
+    //     let subscriber = tracing_subscriber::registry()
+    //         .with(
+    //             fmt::Layer::new().with_writer(
+    //                 file_writer
+    //                     .with_max_level(Level::INFO)
+    //                     .with_min_level(Level::WARN),
+    //             ),
+    //         )
+    //         .with(fmt::Layer::new().with_writer(error_file_writer.with_max_level(Level::ERROR)))
+    //         .with(EnvFilter::from_default_env())
+    //         .with(fmt::Layer::new().with_writer(std::io::stderr));
 
-    let error_file_appender = tracing_appender::rolling::daily(
-        format!("{}/logs", get_storage_path().to_str().unwrap()),
-        format!("{}.error.log", chain_id),
-    );
-    let (error_file_writer, guard) = tracing_appender::non_blocking(error_file_appender);
-    guards.push(guard);
+    //     // Set the subscriber as the global default.
+    //     tracing::subscriber::set_global_default(subscriber)?;
+    // }
 
-    let file_appender = tracing_appender::rolling::daily(
-        format!("{}/logs", get_storage_path().to_str().unwrap()),
-        format!("{}.log", chain_id),
-    );
-    let (file_writer, guard) = tracing_appender::non_blocking(file_appender);
-    guards.push(guard);
-
-    let subscriber = tracing_subscriber::registry()
-        .with(
-            fmt::Layer::new().with_writer(
-                file_writer
-                    .with_max_level(Level::INFO)
-                    .with_min_level(Level::WARN),
-            ),
-        )
-        .with(fmt::Layer::new().with_writer(error_file_writer.with_max_level(Level::ERROR)))
-        .with(fmt::Layer::new().with_writer(std::io::stdout.with_max_level(Level::INFO)));
-
-    tracing::subscriber::set_global_default(subscriber)?;
-
-    Ok(guards)
+    // Return back teh file appender guards.
+    Ok(file_appender_guards)
 }
 
 #[cfg(test)]

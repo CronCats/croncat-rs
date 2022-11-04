@@ -4,6 +4,8 @@
 
 use tokio::sync::broadcast;
 
+use crate::utils;
+
 /// Shutdown channel Sender.
 pub type ShutdownTx = broadcast::Sender<()>;
 
@@ -11,10 +13,10 @@ pub type ShutdownTx = broadcast::Sender<()>;
 pub type ShutdownRx = broadcast::Receiver<()>;
 
 /// Block stream channel Sender.
-pub type BlockStreamTx = broadcast::Sender<tendermint::Block>;
+pub type BlockStreamTx = broadcast::Sender<utils::Block>;
 
 /// Block stream channel Receiver.
-pub type BlockStreamRx = broadcast::Receiver<tendermint::Block>;
+pub type BlockStreamRx = broadcast::Receiver<utils::Block>;
 
 ///
 /// Create a shutdown channel.

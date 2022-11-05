@@ -23,6 +23,7 @@ pub struct Opts {
     #[structopt(long, global = true, env = "CRONCAT_CHAIN_ID")]
     pub chain_id: Option<String>,
 
+    /// ID of the agent config to use
     #[structopt(long, global = true, default_value = "agent", env = "CRONCAT_AGENT")]
     pub agent: String,
 }

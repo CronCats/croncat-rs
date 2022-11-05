@@ -77,6 +77,9 @@ pub enum Command {
 
     /// Generates a new keypair and agent account (good first step)
     GenerateMnemonic {
+        /// The agent's name
+        new_name: String,
+
         /// Recover agent from mnemonic phrase. Please do not use your own account!
         #[structopt(long)]
         mnemonic: Option<String>,

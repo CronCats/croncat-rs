@@ -289,10 +289,8 @@ async fn run_command(opts: Opts, mut storage: LocalAgentStorage) -> Result<(), R
         //     let agent_tasks = querier.get_agent_tasks(account_addr).await?;
         //     info!("Agent Tasks: {agent_tasks}")
         // }
-        opts::Command::GenerateMnemonic { mnemonic } => {
-            storage
-                .generate_account(opts.agent.clone(), mnemonic)
-                .await?
+        opts::Command::GenerateMnemonic { new_name, mnemonic } => {
+            storage.generate_account(new_name, mnemonic).await?
         }
         // opts::Command::UpdateAgent {
         //     payable_account_id,

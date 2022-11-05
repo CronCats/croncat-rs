@@ -73,24 +73,24 @@ cargo doc --no-deps
 
 ```bash
 ## Generate for a specific network
-## "new-name" gives a namespace to a key/pair.
+## "mainnet" gives a namespace to a key/pair.
 ## It is advised to create separate keys for mainnet/testnet
-cargo run generate-mnemonic --new-name mainnet
+cargo run generate-mnemonic mainnet
 
 ## Another way to load key/pair
-cargo run generate-mnemonic --mnemonic "olive soup parade family educate congress hurt dwarf mom this position hungry unaware aunt swamp sunny analyst wrestle fashion main knife start coffee air"
+cargo run generate-mnemonic mainnet --mnemonic "olive soup parade family educate congress hurt dwarf mom this position hungry unaware aunt swamp sunny analyst wrestle fashion main knife start coffee air"
 ```
 
 ### Register an agent
 
 ```bash
-cargo run --  --chain-id uni-5 register --agent mainnet
+cargo run register --agent mainnet --chain-id uni-5
 ```
 
 ### Go for executing tasks
 
 ```bash
-cargo run --  --chain-id uni-5 go --agent mainnet
+cargo run go --agent mainnet --chain-id uni-5
 ```
 
 ## Contributing

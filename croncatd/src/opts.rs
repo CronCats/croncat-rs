@@ -20,57 +20,36 @@ pub struct Opts {
     pub cmd: Command,
 
     /// Chain ID of the chain to connect to
-    #[structopt(long, env = "CRONCAT_CHAIN_ID")]
+    #[structopt(long, global = true, env = "CRONCAT_CHAIN_ID")]
     pub chain_id: Option<String>,
+
+    #[structopt(long, global = true, default_value = "agent", env = "CRONCAT_AGENT")]
+    pub agent: String,
 }
 
 #[derive(Debug, StructOpt, Clone, EnumDisplay)]
 #[enum_display(case = "Kebab")]
 pub enum Command {
     /// Registers an agent, placing them in the pending queue unless it's the first agent.
-    Register {
-        payable_account_id: Option<String>,
-
-        #[structopt(long, default_value = "agent", env = "CRONCAT_AGENT")]
-        agent: String,
-    },
+    Register { payable_account_id: Option<String> },
 
     /// Get the agent's supported bech32 accounts
-    ListAccounts {
-        #[structopt(long, default_value = "agent", env = "CRONCAT_AGENT")]
-        agent: String,
-    },
+    ListAccounts,
 
     /// Get the agent's status (pending/active)
-    Status {
-        #[structopt(long, default_value = "agent", env = "CRONCAT_AGENT")]
-        agent: String,
-    },
+    Status,
 
     /// Get the agent's tasks they're assigned to fulfill
-    GetTasks {
-        #[structopt(long, default_value = "agent", env = "CRONCAT_AGENT")]
-        agent: String,
-    },
+    GetTasks,
 
     /// Unregisters the agent from being in the queue with other agents
-    Unregister {
-        #[structopt(long, default_value = "agent", env = "CRONCAT_AGENT")]
-        agent: String,
-    },
+    Unregister,
 
     /// Update the agent's configuration
-    Update {
-        payable_account_id: String,
-        #[structopt(long, default_value = "agent", env = "CRONCAT_AGENT")]
-        agent: String,
-    },
+    Update { payable_account_id: String },
 
     /// Withdraw the agent's funds to the payable account ID
-    Withdraw {
-        #[structopt(long, default_value = "agent", env = "CRONCAT_AGENT")]
-        agent: String,
-    },
+    Withdraw,
 
     /// Get contract's state
     #[cfg(feature = "debug")]
@@ -87,19 +66,16 @@ pub enum Command {
 
     /// Starts the Croncat agent, allowing it to fulfill tasks
     Go {
-        #[structopt(long, default_value = "agent", env = "CRONCAT_AGENT")]
-        agent: String,
         /// Allow agent to do tasks with rules, uses more computer resources
         #[structopt(long, short = "r")]
         with_rules: bool,
     },
 
     /// Gets the configuration from the Croncat manager contract
-    Info {},
+    Info,
 
     /// Generates a new keypair and agent account (good first step)
     GenerateMnemonic {
-        agent: String,
         /// Recover agent from mnemonic phrase. Please do not use your own account!
         #[structopt(long)]
         mnemonic: Option<String>,

@@ -57,7 +57,8 @@ pub async fn run(
         .map_err(|err| eyre!("Failed to get agent status: {}", err))?
         .ok_or_else(|| eyre!("Agent account {} is not registered", account_id,))?
         .status;
-    info!("Initial agent status: {:?}", status);
+    info!("[{}] Agent account id: {}", chain_id, signer.account_id());
+    info!("[{}] Initial agent status: {:?}", chain_id, status);
     let status = Arc::new(Mutex::new(status));
 
     // For each RPC endpoint, spawn a task to stream blocks from it

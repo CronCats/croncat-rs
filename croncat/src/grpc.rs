@@ -73,6 +73,11 @@ impl GrpcSigner {
         } else {
             grpc_url
         };
+        let rpc_url = if !rpc_url.starts_with("https://") {
+            format!("https://{}", rpc_url)
+        } else {
+            rpc_url
+        };
 
         let client = CosmosFullClient::new(
             rpc_url,
@@ -100,8 +105,8 @@ impl GrpcSigner {
         key: bip32::XPrv,
     ) -> impl Future<Output = Result<Self, Report>> {
         GrpcSigner::new(
-            chain_config.info.apis.rpc[4].address.clone(),
-            chain_config.info.apis.grpc[4].address.clone(),
+            chain_config.info.apis.rpc[0].address.clone(),
+            chain_config.info.apis.grpc[0].address.clone(),
             chain_config.info.clone(),
             chain_config.manager.clone(),
             key,

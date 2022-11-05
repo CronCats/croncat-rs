@@ -68,13 +68,10 @@ async fn run_command(opts: Opts, mut storage: LocalAgentStorage) -> Result<(), R
     let config = Config::from_pwd()?;
 
     match opts.cmd {
-        opts::Command::Register {
-            payable_account_id,
-            agent,
-        } => {
+        opts::Command::Register { payable_account_id } => {
             // Make sure we have a chain id to run on
             if opts.chain_id.is_none() {
-                return Err(eyre!("chain-id is required for go command"));
+                return Err(eyre!("chain-id is required for this command"));
             }
             let chain_id = opts.chain_id.unwrap();
 
@@ -85,7 +82,7 @@ async fn run_command(opts: Opts, mut storage: LocalAgentStorage) -> Result<(), R
                 .ok_or_else(|| eyre!("Chain not found in configuration: {}", chain_id))?;
 
             // Get the key and create a signer
-            let key = storage.get_agent_signing_key(&agent)?;
+            let key = storage.get_agent_signing_key(&opts.agent)?;
             let signer = GrpcSigner::from_chain_config(chain_config, key)
                 .await
                 .map_err(|err| eyre!("Failed to create GrpcSigner: {}", err))?;
@@ -122,7 +119,7 @@ async fn run_command(opts: Opts, mut storage: LocalAgentStorage) -> Result<(), R
                 Err(err) => Err(eyre!("Failed to register agent: {}", err))?,
             }
         }
-        opts::Command::Unregister { agent } => {
+        opts::Command::Unregister => {
             // Make sure we have a chain id to run on
             if opts.chain_id.is_none() {
                 return Err(eyre!("chain-id is required for go command"));
@@ -136,7 +133,7 @@ async fn run_command(opts: Opts, mut storage: LocalAgentStorage) -> Result<(), R
                 .ok_or_else(|| eyre!("Chain not found in configuration: {}", chain_id))?;
 
             // Get the key and create a signer
-            let key = storage.get_agent_signing_key(&agent)?;
+            let key = storage.get_agent_signing_key(&opts.agent)?;
             let signer = GrpcSigner::from_chain_config(chain_config, key)
                 .await
                 .map_err(|err| eyre!("Failed to create GrpcSigner: {}", err))?;
@@ -161,33 +158,100 @@ async fn run_command(opts: Opts, mut storage: LocalAgentStorage) -> Result<(), R
                 Err(err) => Err(eyre!("Failed to register agent: {}", err))?,
             }
         }
-        // opts::Command::Withdraw {
-        //     sender_name,
-        //     chain_id,
-        // } => {
-        //     let _guards = logging::setup_go(chain_id.to_string())?;
-        //     CHAIN_ID.set(chain_id.clone()).unwrap();
+        opts::Command::Withdraw => {
+            // Make sure we have a chain id to run on
+            if opts.chain_id.is_none() {
+                return Err(eyre!("chain-id is required for go command"));
+            }
+            let chain_id = opts.chain_id.unwrap();
 
-        //     let key = storage.get_agent_signing_key(&sender_name)?;
-        //     let signer = GrpcSigner::new(ChainConfig::new(&chain_id).await?, key).await?;
-        //     let result = signer.withdraw_reward().await?;
-        //     let log = result.log;
-        //     info!("Log: {log}");
-        // }
-        // opts::Command::Info { chain_id } => {
-        //     let _guards = logging::setup_go(chain_id.to_string())?;
-        //     CHAIN_ID.set(chain_id.clone()).unwrap();
+            // Get the chain config for the chain we're going to run on
+            let chain_config = config
+                .chains
+                .get(&chain_id)
+                .ok_or_else(|| eyre!("Chain not found in configuration: {}", chain_id))?;
 
-        //     let querier = GrpcQuerier::new(ChainConfig::new(&chain_id).await?).await?;
-        //     let config = querier.query_config().await?;
-        //     info!("Config: {config}")
+            // Get the key and create a signer
+            let key = storage.get_agent_signing_key(&opts.agent)?;
+            let signer = GrpcSigner::from_chain_config(chain_config, key)
+                .await
+                .map_err(|err| eyre!("Failed to create GrpcSigner: {}", err))?;
+
+            // Print info about the agent about to be registered
+            info!("Account ID: {}", signer.account_id());
+            info!("Key: {}", signer.key().public_key().to_json());
+
+            // Unregister the agent
+            let query = signer.withdraw_reward().await;
+
+            // Handle the result of the query
+            match query {
+                Ok(result) => {
+                    info!("Agent reward withdrawn successfully");
+                    let log = result.log;
+                    info!("Result: {}", log);
+                }
+                Err(err) if err.to_string().contains("Agent not registered") => {
+                    Err(eyre!("Agent not already registered"))?;
+                }
+                Err(err) => Err(eyre!("Failed to withdraw reward: {}", err))?,
+            }
+        }
+        // opts::Command::Info { agent } => {
+        //     // let _guards = logging::setup_go(chain_id.to_string())?;
+        //     // CHAIN_ID.set(chain_id.clone()).unwrap();
+
+        //     // let querier = GrpcQuerier::new(ChainConfig::new(&chain_id).await?).await?;
+        //     // let config = querier.query_config().await?;
+        //     // info!("Config: {config}")
+
+        //     // Make sure we have a chain id to run on
+        //     if opts.chain_id.is_none() {
+        //         return Err(eyre!("chain-id is required for go command"));
+        //     }
+        //     let chain_id = opts.chain_id.unwrap();
+
+        //     // Get the chain config for the chain we're going to run on
+        //     let chain_config = config
+        //         .chains
+        //         .get(&chain_id)
+        //         .ok_or_else(|| eyre!("Chain not found in configuration: {}", chain_id))?;
+
+        //     // Get the key and create a signer
+        //     let key = storage.get_agent_signing_key(&agent)?;
+        //     let signer = GrpcQuerier::new(
+        //         chain_config.clone(),
+        //         chain_config.info.apis.grpc[0].address.to_string(),
+        //     )
+        //     .await
+        //     .map_err(|err| eyre!("Failed to create GrpcSigner: {}", err))?;
+
+        //     // Print info about the agent about to be registered
+        //     info!("Account ID: {}", signer.account_id());
+        //     info!("Key: {}", signer.key().public_key().to_json());
+
+        //     // Unregister the agent
+        //     let query = signer.unregister_agent().await;
+
+        //     // Handle the result of the query
+        //     match query {
+        //         Ok(result) => {
+        //             info!("Agent unregistered successfully");
+        //             let log = result.log;
+        //             info!("Result: {}", log);
+        //         }
+        //         Err(err) if err.to_string().contains("Agent not registered") => {
+        //             Err(eyre!("Agent not already registered"))?;
+        //         }
+        //         Err(err) => Err(eyre!("Failed to query configuration: {}", err))?,
+        //     }
         // }
-        opts::Command::ListAccounts { agent } => {
-            println!("Account addresses for agent: {agent}\n");
+        opts::Command::ListAccounts => {
+            println!("Account addresses for agent: {}\n", &opts.agent);
             // Get the chain config for the chain we're going to run on
             for (chain_id, chain_config) in config.chains {
                 let account_addr = storage
-                    .get_agent_signing_account_addr(&agent, chain_config.info.bech32_prefix)?;
+                    .get_agent_signing_account_addr(&opts.agent, chain_config.info.bech32_prefix)?;
                 println!("{}: {}", chain_id, account_addr);
             }
         }
@@ -225,8 +289,10 @@ async fn run_command(opts: Opts, mut storage: LocalAgentStorage) -> Result<(), R
         //     let agent_tasks = querier.get_agent_tasks(account_addr).await?;
         //     info!("Agent Tasks: {agent_tasks}")
         // }
-        opts::Command::GenerateMnemonic { agent, mnemonic } => {
-            storage.generate_account(agent, mnemonic).await?
+        opts::Command::GenerateMnemonic { mnemonic } => {
+            storage
+                .generate_account(opts.agent.clone(), mnemonic)
+                .await?
         }
         // opts::Command::UpdateAgent {
         //     payable_account_id,
@@ -259,7 +325,7 @@ async fn run_command(opts: Opts, mut storage: LocalAgentStorage) -> Result<(), R
         //     // );
         // }
         opts::Command::GetAgent { name } => storage.display_account(&name),
-        opts::Command::Go { agent, with_rules } => {
+        opts::Command::Go { with_rules } => {
             // Make sure we have a chain id to run on
             if opts.chain_id.is_none() {
                 return Err(eyre!("chain-id is required for go command"));
@@ -267,7 +333,7 @@ async fn run_command(opts: Opts, mut storage: LocalAgentStorage) -> Result<(), R
             let chain_id = opts.chain_id.unwrap();
 
             // Get the key for the agent signing account
-            let key = storage.get_agent_signing_key(&agent)?;
+            let key = storage.get_agent_signing_key(&opts.agent)?;
 
             // Get the chain config for the chain we're going to run on
             let chain_config = config

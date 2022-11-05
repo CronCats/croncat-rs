@@ -25,7 +25,7 @@
 ## Help
 
 ```
-$ cargo run -- --help
+$ cargo run help
 ...
 croncatd 0.1.0
 The croncat agent daemon.
@@ -40,6 +40,7 @@ FLAGS:
     -V, --version      Prints version information
 
 OPTIONS:
+        --agent <agent>          ID of the agent config to use [env: CRONCAT_AGENT=mainnet]  [default: agent]
         --chain-id <chain-id>    Chain ID of the chain to connect to [env: CRONCAT_CHAIN_ID=uni-5]
 
 SUBCOMMANDS:
@@ -58,6 +59,7 @@ SUBCOMMANDS:
     unregister           Unregisters the agent from being in the queue with other agents
     update               Update the agent's configuration
     withdraw             Withdraw the agent's funds to the payable account ID
+
 ```
 
 ## Generate Docs

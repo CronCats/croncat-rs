@@ -47,20 +47,20 @@ pub enum Command {
     Unregister,
 
     /// Update the agent's configuration
-    Update { payable_account_id: String },
+    Update,
 
     /// Withdraw the agent's funds to the payable account ID
     Withdraw,
 
     /// Get contract's state
-    #[cfg(feature = "debug")]
-    GetState {
-        from_index: Option<u64>,
-        limit: Option<u64>,
-    },
+    // #[cfg(feature = "debug")]
+    // GetState {
+    //     from_index: Option<u64>,
+    //     limit: Option<u64>,
+    // },
 
     /// Show all task(s) information
-    Tasks {
+    AllTasks {
         from_index: Option<u64>,
         limit: Option<u64>,
     },
@@ -72,9 +72,6 @@ pub enum Command {
         with_rules: bool,
     },
 
-    /// Gets the configuration from the Croncat manager contract
-    Info,
-
     /// Generates a new keypair and agent account (good first step)
     GenerateMnemonic {
         /// The agent's name
@@ -84,9 +81,6 @@ pub enum Command {
         #[structopt(long)]
         mnemonic: Option<String>,
     },
-
-    /// (in progress) Send native tokens to an address
-    DepositUjunox { account_id: String },
 
     /// Sensitive. Shows all details about agents on this machine
     GetAgent {

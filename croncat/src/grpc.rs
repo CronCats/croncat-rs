@@ -367,7 +367,7 @@ pub enum GrpcClient {
     Query(Box<GrpcQuerier>),
 }
 
-#[derive(Debug)]
+#[derive(Clone, Debug)]
 pub struct GrpcClientService {
     chain_config: ChainConfig,
     key: bip32::XPrv,
@@ -383,14 +383,25 @@ impl GrpcClientService {
         Self {
             key,
             chain_config,
-            // grpc_info,
             rng,
         }
     }
 
-    async fn call<Fut, F>(&self, kind: GrpcCallType, f: F) -> Result<(), Report>
+    pub fn key(&self) -> SigningKey {
+        (&self.key).try_into().unwrap()
+    }
+
+    pub fn account_id(&self) -> String {
+        self.key()
+            .public_key()
+            .account_id(&self.chain_config.info.bech32_prefix.clone())
+            .unwrap()
+            .to_string()
+    }
+
+    async fn call<T, Fut, F>(&self, kind: GrpcCallType, f: F) -> Result<T, Report>
     where
-        Fut: Future<Output = Result<(), Report>>,
+        Fut: Future<Output = Result<T, Report>>,
         F: FnOnce(GrpcClient) -> Fut,
     {
         let mut rng = self.rng.lock().await;
@@ -437,9 +448,9 @@ impl GrpcClientService {
         f(grpc_client).await
     }
 
-    pub async fn execute<Fut, F>(&self, f: F) -> Result<(), Report>
+    pub async fn execute<T, Fut, F>(&self, f: F) -> Result<T, Report>
     where
-        Fut: Future<Output = Result<(), Report>>,
+        Fut: Future<Output = Result<T, Report>>,
         F: FnOnce(Box<GrpcSigner>) -> Fut,
     {
         self.call(GrpcCallType::Execute, |client| async {
@@ -452,9 +463,9 @@ impl GrpcClientService {
         .await
     }
 
-    pub async fn query<Fut, F>(&self, f: F) -> Result<(), Report>
+    pub async fn query<T, Fut, F>(&self, f: F) -> Result<T, Report>
     where
-        Fut: Future<Output = Result<(), Report>>,
+        Fut: Future<Output = Result<T, Report>>,
         F: FnOnce(Box<GrpcQuerier>) -> Fut,
     {
         self.call(GrpcCallType::Query, |client| async {

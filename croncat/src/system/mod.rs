@@ -19,7 +19,7 @@ use crate::{
     channels::ShutdownTx,
     config::ChainConfig,
     errors::{eyre, Report},
-    grpc::GrpcSigner,
+    grpc::GrpcClientService,
     logging::info,
     streams::{agent, polling, tasks},
     tokio,
@@ -44,20 +44,24 @@ pub async fn run(
     // Create a FuturesUnordered to handle all the block sources
     let mut block_stream_tasks = FuturesUnordered::new();
 
-    // Setup the signer.
-    let signer = GrpcSigner::from_chain_config(config, key.clone())
-        .await
-        .map_err(|err| eyre!("Failed to create GrpcSigner: {}", err))?;
+    // Setup the chain client.
+    let client = GrpcClientService::new(config.clone(), key.clone());
 
     // Get the status of the agent
-    let account_id = signer.account_id().to_string();
-    let status = signer
-        .get_agent(&account_id)
-        .await
-        .map_err(|err| eyre!("Failed to get agent status: {}", err))?
-        .ok_or_else(|| eyre!("Agent account {} is not registered", account_id,))?
-        .status;
-    info!("[{}] Agent account id: {}", chain_id, signer.account_id());
+    let account_id = client.account_id();
+    let status = client
+        .execute(|signer| async move {
+            signer
+                .get_agent(&account_id)
+                .await
+                .map_err(|err| eyre!("Failed to get agent status: {}", err))?
+                .ok_or_else(|| eyre!("Agent account {} is not registered", account_id))
+                .map(|agent| agent.status)
+        })
+        .await?;
+
+    let account_id = client.account_id();
+    info!("[{}] Agent account id: {}", chain_id, account_id);
     info!("[{}] Initial agent status: {:?}", chain_id, status);
     let status = Arc::new(Mutex::new(status));
 
@@ -126,23 +130,23 @@ pub async fn run(
     let account_status_check_block_stream_rx = dispatcher_tx.subscribe();
     let block_status = status.clone();
     let block_status_accounts_loop = block_status.clone();
-    let signer_status = signer.clone();
+    let block_status_client = client.clone();
     let account_status_check_handle = tokio::task::spawn(agent::check_account_status_loop(
         account_status_check_block_stream_rx,
         account_status_check_shutdown_rx,
         block_status_accounts_loop,
-        signer_status,
+        block_status_client,
     ));
 
     // Process blocks coming in from the blockchain
     let task_runner_shutdown_rx = shutdown_tx.subscribe();
     let task_runner_block_stream_rx = dispatcher_tx.subscribe();
-    let tasks_signer = signer.clone();
+    let tasks_client = client.clone();
     let block_status_tasks = block_status.clone();
     let task_runner_handle = tokio::task::spawn(tasks::tasks_loop(
         task_runner_block_stream_rx,
         task_runner_shutdown_rx,
-        tasks_signer,
+        tasks_client,
         block_status_tasks,
     ));
 
@@ -151,7 +155,7 @@ pub async fn run(
         tokio::task::spawn(tasks::rules_loop(
             dispatcher_tx.subscribe(),
             shutdown_tx.subscribe(),
-            signer,
+            client,
             block_status,
         ))
     } else {
@@ -178,6 +182,7 @@ pub async fn run(
         Ok(())
     });
 
+    // Handle all the block streams
     let block_stream_tasks_handler_chain_id = chain_id.clone();
     let block_stream_tasks_handler = tokio::task::spawn(async move {
         // Wait for each block stream task to finish. If any of them fail, we need to propagate the error.

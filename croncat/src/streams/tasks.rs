@@ -12,7 +12,7 @@ use tracing::error;
 use crate::{
     channels::{BlockStreamRx, ShutdownRx},
     errors::{eyre, Report},
-    grpc::GrpcSigner,
+    grpc::GrpcClientService,
     logging::info,
     monitor::ping_uptime_monitor,
     utils::sum_num_tasks,
@@ -24,7 +24,7 @@ use crate::{
 pub async fn tasks_loop(
     mut block_stream_rx: BlockStreamRx,
     mut shutdown_rx: ShutdownRx,
-    signer: GrpcSigner,
+    client: GrpcClientService,
     block_status: Arc<Mutex<AgentStatus>>,
 ) -> Result<(), Report> {
     let block_consumer_stream: JoinHandle<Result<(), Report>> = tokio::task::spawn(async move {
@@ -34,25 +34,35 @@ pub async fn tasks_loop(
             // unlocking it ASAP
             std::mem::drop(locked_status);
             if is_active {
-                let account_addr = signer.account_id().as_ref();
-                let tasks = signer
-                    .get_agent_tasks(account_addr)
-                    .await
-                    .map_err(|err| eyre!("Failed to get agent tasks: {}", err))?;
+                let account_addr = client.account_id();
+                let tasks = client
+                    .execute(|signer| async move {
+                        signer
+                            .get_agent_tasks(account_addr.as_str())
+                            .await
+                            .map_err(|err| eyre!("Failed to get agent tasks: {}", err))
+                    })
+                    .await?;
 
                 ping_uptime_monitor().await;
 
                 if let Some(tasks) = tasks {
                     info!("Tasks: {:?}", tasks);
                     for _ in 0..sum_num_tasks(&tasks) {
-                        match signer.proxy_call(None).await {
-                            Ok(proxy_call_res) => {
-                                info!("Finished task: {}", proxy_call_res.log);
-                            }
-                            Err(err) => {
-                                error!("Something went wrong during proxy_call: {}", err);
-                            }
-                        }
+                        client
+                            .execute(|signer| async move {
+                                match signer.proxy_call(None).await {
+                                    Ok(proxy_call_res) => {
+                                        info!("Finished task: {}", proxy_call_res.log);
+                                    }
+                                    Err(err) => {
+                                        error!("Something went wrong during proxy_call: {}", err);
+                                    }
+                                }
+
+                                Ok(())
+                            })
+                            .await?;
                     }
                 } else {
                     info!("No tasks for block (height: {})", block.header().height);
@@ -74,15 +84,19 @@ pub async fn tasks_loop(
 pub async fn rules_loop(
     mut block_stream_rx: BlockStreamRx,
     mut shutdown_rx: ShutdownRx,
-    signer: GrpcSigner,
+    client: GrpcClientService,
     block_status: Arc<Mutex<AgentStatus>>,
 ) -> Result<(), Report> {
     let block_consumer_stream: JoinHandle<Result<(), Report>> = tokio::task::spawn(async move {
         while let Ok(block) = block_stream_rx.recv().await {
-            let tasks_with_rules = signer
-                .fetch_rules()
-                .await
-                .map_err(|err| eyre!("Failed to fetch rules: {}", err))?;
+            let tasks_with_rules = client
+                .execute(|signer| async move {
+                    signer
+                        .fetch_rules()
+                        .await
+                        .map_err(|err| eyre!("Failed to fetch rules: {}", err))
+                })
+                .await?;
 
             let locked_status = block_status.lock().await;
             let is_active = *locked_status == AgentStatus::Active;
@@ -106,19 +120,34 @@ pub async fn rules_loop(
                         None => true,
                     };
                     if in_boundary {
-                        let (rules_ready, _) = signer
-                            .check_rules(task.rules.clone().ok_or_else(|| eyre!("No rules"))?)
-                            .await
-                            .map_err(|err| eyre!("Failed to query rules: {}", err))?;
+                        let (rules_ready, _) = client
+                            .execute(|signer| async move {
+                                signer
+                                    .check_rules(
+                                        task.rules.clone().ok_or_else(|| eyre!("No rules"))?,
+                                    )
+                                    .await
+                                    .map_err(|err| eyre!("Failed to query rules: {}", err))
+                            })
+                            .await?;
                         if rules_ready {
-                            match signer.proxy_call(None).await {
-                                Ok(proxy_call_res) => {
-                                    info!("Finished task: {}", proxy_call_res.log);
-                                }
-                                Err(err) => {
-                                    error!("Something went wrong during proxy_call: {}", err);
-                                }
-                            }
+                            client
+                                .execute(|signer| async move {
+                                    match signer.proxy_call(None).await {
+                                        Ok(proxy_call_res) => {
+                                            info!("Finished task: {}", proxy_call_res.log);
+                                        }
+                                        Err(err) => {
+                                            error!(
+                                                "Something went wrong during proxy_call: {}",
+                                                err
+                                            );
+                                        }
+                                    }
+
+                                    Ok(())
+                                })
+                                .await?;
                         }
                     }
                 }

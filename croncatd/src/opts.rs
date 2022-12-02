@@ -2,6 +2,7 @@
 //! `croncatd` CLI option builder.
 //!
 
+use croncat::utils::DEFAULT_AGENT_ID;
 use enum_display::EnumDisplay;
 use structopt::StructOpt;
 
@@ -24,7 +25,7 @@ pub struct Opts {
     pub chain_id: Option<String>,
 
     /// ID of the agent config to use
-    #[structopt(long, global = true, default_value = "agent", env = "CRONCAT_AGENT")]
+    #[structopt(long, global = true, default_value = DEFAULT_AGENT_ID, env = "CRONCAT_AGENT")]
     pub agent: String,
 }
 

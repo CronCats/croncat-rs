@@ -30,13 +30,15 @@ pub fn setup(chain_id: Option<String>) -> Result<Vec<WorkerGuard>, Report> {
     // Setup multi file logging.
     let mut file_appender_guards = vec![];
 
-    // TODO: Figure out multi file logging later.
+    // No chain id, so just log to the default file.
     if chain_id.is_none() {
         tracing_subscriber::fmt()
             .with_env_filter(EnvFilter::from_default_env())
             .with_writer(std::io::stderr)
             .init();
     } else {
+        // Log to a file for the chain.
+
         // Log file for errors.
         let error_file_appender = tracing_appender::rolling::daily(
             format!("{}/logs", get_storage_path().to_str().unwrap()),

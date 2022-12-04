@@ -2,6 +2,7 @@
 //! Use the [cosmos_sdk_proto](https://crates.io/crates/cosmos-sdk-proto) library to create clients for GRPC node requests.
 //!
 
+use std::collections::HashMap;
 use std::sync::Arc;
 use std::time::Duration;
 
@@ -20,19 +21,20 @@ use cw_croncat_core::types::AgentResponse;
 use cw_rules_core::msg::QueryConstruct;
 use cw_rules_core::types::Rule;
 use futures_util::Future;
-use rand::rngs::StdRng;
-use rand::Rng;
-use rand::SeedableRng;
+use rand::seq::IteratorRandom;
+use rand::thread_rng;
 use serde::de::DeserializeOwned;
 use tendermint_rpc::endpoint::broadcast::tx_commit::TxResult;
 use tokio::sync::Mutex;
 use tokio::time::timeout;
 use tonic::transport::Channel;
+use tracing::warn;
 use url::Url;
 
 use crate::client::full_client::CosmosFullClient;
 use crate::client::query_client::CosmosQueryClient;
 use crate::config::ChainConfig;
+use crate::config::ChainDataSource;
 use crate::errors::{eyre, Report};
 use crate::logging::info;
 
@@ -371,19 +373,21 @@ pub enum GrpcClient {
 pub struct GrpcClientService {
     chain_config: ChainConfig,
     key: bip32::XPrv,
-    // grpc_info: Arc<Mutex<HashMap<String, ChainInfo>>>,
-    rng: Arc<Mutex<StdRng>>,
+    source_info: Arc<Mutex<HashMap<String, (ChainDataSource, bool)>>>,
 }
 
 impl GrpcClientService {
     pub fn new(chain_config: ChainConfig, key: bip32::XPrv) -> Self {
-        // let grpc_info = Arc::new(Mutex::new(HashMap::new()));
-        let rng = Arc::new(Mutex::new(StdRng::from_entropy()));
+        let data_sources = chain_config
+            .data_sources()
+            .iter()
+            .map(|ds| (ds.0.clone(), (ds.1.clone(), false)))
+            .collect();
 
         Self {
             key,
             chain_config,
-            rng,
+            source_info: Arc::new(Mutex::new(data_sources)),
         }
     }
 
@@ -402,56 +406,74 @@ impl GrpcClientService {
     async fn call<T, Fut, F>(&self, kind: GrpcCallType, f: F) -> Result<T, Report>
     where
         Fut: Future<Output = Result<T, Report>>,
-        F: FnOnce(GrpcClient) -> Fut,
+        F: Fn(GrpcClient) -> Fut,
     {
-        let mut rng = self.rng.lock().await;
-        // let mut grpc_info = self.grpc_info.lock().await;
-
-        let grpc_endpoint_index = rng.gen_range(0..self.chain_config.info.apis.grpc.len());
-        let grpc_endpoint = self
-            .chain_config
-            .info
-            .apis
-            .grpc
-            .get(grpc_endpoint_index)
-            .unwrap();
-
-        let rpc_endpoint_index = rng.gen_range(0..self.chain_config.info.apis.rpc.len());
-        let rpc_endpoint = self
-            .chain_config
-            .info
-            .apis
-            .rpc
-            .get(rpc_endpoint_index)
-            .unwrap();
-
-        let grpc_client = match kind {
-            GrpcCallType::Execute => GrpcClient::Execute(Box::new(
-                GrpcSigner::new(
-                    rpc_endpoint.address.to_string(),
-                    grpc_endpoint.address.to_string(),
-                    self.chain_config.info.clone(),
-                    self.chain_config.manager.clone(),
-                    self.key.clone(),
-                    self.chain_config.gas_prices,
-                    self.chain_config.gas_adjustment,
-                )
-                .await?,
-            )),
-            GrpcCallType::Query => GrpcClient::Query(Box::new(
-                GrpcQuerier::new(self.chain_config.clone(), grpc_endpoint.address.to_string())
-                    .await?,
-            )),
-        };
-
         let f = Box::new(f);
-        f(grpc_client).await
+
+        loop {
+            let mut source_info = self.source_info.lock().await;
+            let source_key = source_info
+                .keys()
+                .filter(|k| !source_info.get(*k).unwrap().1)
+                .choose(&mut thread_rng())
+                .unwrap()
+                .clone();
+            let (source, _) = source_info.get_mut(&source_key).unwrap().clone();
+
+            let grpc_client = match kind {
+                GrpcCallType::Execute => GrpcClient::Execute(Box::new(
+                    match GrpcSigner::new(
+                        source.rpc.to_string(),
+                        source.grpc.to_string(),
+                        self.chain_config.info.clone(),
+                        self.chain_config.manager.clone(),
+                        self.key.clone(),
+                        self.chain_config.gas_prices,
+                        self.chain_config.gas_adjustment,
+                    )
+                    .await
+                    {
+                        Ok(client) => client,
+                        Err(e) => {
+                            warn!("Failed to create grpc client for {}: {}", source_key, e);
+                            let (_, bad) = source_info.get_mut(&source_key).unwrap();
+                            *bad = true;
+                            continue;
+                        }
+                    },
+                )),
+                GrpcCallType::Query => GrpcClient::Query(Box::new(
+                    match GrpcQuerier::new(self.chain_config.clone(), source.grpc.to_string()).await
+                    {
+                        Ok(client) => client,
+                        Err(e) => {
+                            warn!("Failed to create grpc client for {}: {}", source_key, e);
+                            let (_, bad) = source_info.get_mut(&source_key).unwrap();
+                            *bad = true;
+                            continue;
+                        }
+                    },
+                )),
+            };
+
+            match f(grpc_client).await {
+                Ok(result) => {
+                    return Ok(result);
+                }
+                Err(e) => {
+                    warn!("Error calling chain for {}: {}", source_key, e);
+                    let (_, bad) = source_info.get_mut(&source_key).unwrap();
+                    *bad = true;
+                    continue;
+                }
+            }
+        }
     }
 
     pub async fn execute<T, Fut, F>(&self, f: F) -> Result<T, Report>
     where
         Fut: Future<Output = Result<T, Report>>,
-        F: FnOnce(Box<GrpcSigner>) -> Fut,
+        F: Fn(Box<GrpcSigner>) -> Fut,
     {
         self.call(GrpcCallType::Execute, |client| async {
             if let GrpcClient::Execute(client) = client {
@@ -466,7 +488,7 @@ impl GrpcClientService {
     pub async fn query<T, Fut, F>(&self, f: F) -> Result<T, Report>
     where
         Fut: Future<Output = Result<T, Report>>,
-        F: FnOnce(Box<GrpcQuerier>) -> Fut,
+        F: Fn(Box<GrpcQuerier>) -> Fut,
     {
         self.call(GrpcCallType::Query, |client| async {
             if let GrpcClient::Query(client) = client {

@@ -3,16 +3,15 @@
 //!
 
 use std::sync::Arc;
-use std::time::Duration;
 
 use cosmrs::bip32::{secp256k1::ecdsa::SigningKey, ExtendedPrivateKey};
-use croncat_pipeline::{try_flat_join, Dispatcher, Sequencer};
-use futures_util::{stream::FuturesUnordered, StreamExt};
+use croncat_pipeline::{
+    try_flat_join, Dispatcher, ProviderSystem, ProviderSystemMonitor, Sequencer,
+};
 use tokio::{
     sync::{broadcast, mpsc, Mutex},
     task::JoinHandle,
 };
-use tokio_retry::{strategy::FixedInterval, Retry};
 use tracing::log::error;
 
 use crate::{
@@ -21,7 +20,7 @@ use crate::{
     errors::{eyre, Report},
     grpc::GrpcClientService,
     logging::info,
-    streams::{agent, polling, tasks},
+    streams::{agent, polling::poll_stream_blocks, tasks},
     tokio,
 };
 
@@ -41,65 +40,40 @@ pub async fn run(
 ) -> Result<(), Report> {
     // Create a channel for block sources
     let (block_source_tx, block_source_rx) = mpsc::unbounded_channel();
-    // Create a FuturesUnordered to handle all the block sources
-    let mut block_stream_tasks = FuturesUnordered::new();
 
-    // Setup the chain client.
-    let client = GrpcClientService::new(config.clone(), key.clone());
-
-    // Get the status of the agent
-    let account_id = client.account_id();
-    let status = client
-        .execute(|signer| async move {
-            signer
-                .get_agent(&account_id)
-                .await
-                .map_err(|err| eyre!("Failed to get agent status: {}", err))?
-                .ok_or_else(|| eyre!("Agent account {} is not registered", account_id))
-                .map(|agent| agent.status)
-        })
-        .await?;
-
-    let account_id = client.account_id();
-    info!("[{}] Agent account id: {}", chain_id, account_id);
-    info!("[{}] Initial agent status: {:?}", chain_id, status);
-    let status = Arc::new(Mutex::new(status));
+    // Create a provider system for the polling streams.
+    let mut provider_system = ProviderSystem::new(block_source_tx);
 
     // For each RPC endpoint, spawn a task to stream blocks from it
-    for rpc_polling_url in &config.info.apis.rpc {
+    for (provider, data_source) in &config.data_sources() {
         info!(
-            "[{}] Starting polling task for {}",
-            chain_id, &rpc_polling_url.address
+            "[{}] Starting polling task for {} {}",
+            chain_id, provider, data_source.rpc
         );
 
-        let polling_block_source_tx = block_source_tx.clone();
-        let rpc_polling_url = rpc_polling_url.clone();
-        let polling_shutdown_tx = shutdown_tx.clone();
-        let polling_config = config.clone();
-        let polling_retry_strategy = FixedInterval::from_millis(5000);
-        let polling_chain_id = chain_id.clone();
-
-        let block_stream_task = tokio::task::spawn(async move {
-            Retry::spawn(polling_retry_strategy, || async {
-                polling::poll(
-                    Duration::from_secs_f64(polling_config.block_polling_seconds),
-                    Duration::from_secs_f64(polling_config.block_polling_timeout_seconds),
-                    &polling_block_source_tx,
-                    &polling_shutdown_tx,
-                    &rpc_polling_url.address,
-                )
-                .await
-                .map_err(|err| {
-                    error!("[{}] Error polling blocks: {}", polling_chain_id, err);
-                    err
-                })
-            })
-            .await
-        });
-        block_stream_tasks.push(block_stream_task);
+        provider_system.add_provider_stream(
+            provider,
+            poll_stream_blocks(data_source.rpc.clone(), config.block_polling_seconds),
+        );
     }
 
-    // TODO: Try websocket for each polling addr.
+    // Provider system monitor updates.
+    let (provider_system_monitor_tx, _provider_system_monitor_rx) = mpsc::channel(100);
+    let provider_system_monitor = ProviderSystemMonitor::new(
+        provider_system.get_provider_states(),
+        provider_system_monitor_tx,
+    );
+
+    // Monitor the provider system for updates.
+    let _provider_system_handle = tokio::spawn(async move { provider_system.produce().await });
+    let _provider_system_monitor_handle =
+        tokio::spawn(async move { provider_system_monitor.monitor(6000).await });
+    let _provider_system_monitor_display_handle = tokio::spawn(async move {
+        let mut provider_system_monitor_rx = _provider_system_monitor_rx;
+        while let Some(provider_states) = provider_system_monitor_rx.recv().await {
+            info!("Provider states: {:#?}", provider_states);
+        }
+    });
 
     // Sequence the blocks we receive from the block stream. This is necessary because we may receive
     // blocks from multiple sources, and we need to ensure that we process them in order.
@@ -124,6 +98,30 @@ pub async fn run(
             );
         }
     });
+
+    // Setup the chain client.
+    let client = GrpcClientService::new(config.clone(), key.clone());
+
+    // Get the status of the agent
+    let account_id = client.account_id();
+    let status = client
+        .execute(move |signer| {
+            let account_id = account_id.clone();
+            async move {
+                signer
+                    .get_agent(&account_id)
+                    .await
+                    .map_err(|err| eyre!("Failed to get agent status: {}", err))?
+                    .ok_or_else(|| eyre!("Agent account {} is not registered", account_id))
+                    .map(|agent| agent.status)
+            }
+        })
+        .await?;
+
+    let account_id = client.account_id();
+    info!("[{}] Agent account id: {}", chain_id, account_id);
+    info!("[{}] Initial agent status: {:?}", chain_id, status);
+    let status = Arc::new(Mutex::new(status));
 
     // Account status checks
     let account_status_check_shutdown_rx = shutdown_tx.subscribe();
@@ -182,40 +180,12 @@ pub async fn run(
         Ok(())
     });
 
-    // Handle all the block streams
-    let block_stream_tasks_handler_chain_id = chain_id.clone();
-    let block_stream_tasks_handler = tokio::task::spawn(async move {
-        // Wait for each block stream task to finish. If any of them fail, we need to propagate the error.
-        while let Some(block_stream_task) = block_stream_tasks.next().await {
-            match block_stream_task {
-                Ok(Ok(())) => (),
-                Ok(Err(err)) => {
-                    error!(
-                        "[{}] Block stream task failed: {}",
-                        block_stream_tasks_handler_chain_id, err
-                    );
-                    return Err(err);
-                }
-                Err(err) => {
-                    error!(
-                        "[{}] Block stream task failed: {}",
-                        block_stream_tasks_handler_chain_id, err
-                    );
-                    return Err(err.into());
-                }
-            }
-        }
-
-        Ok::<(), Report>(())
-    });
-
     // Try to join all the system tasks.
     let system_status = try_flat_join!(
         ctrl_c_handle,
         account_status_check_handle,
         task_runner_handle,
         rules_runner_handle,
-        block_stream_tasks_handler
     );
 
     // If any of the tasks failed, we need to propagate the error.

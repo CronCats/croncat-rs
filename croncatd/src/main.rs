@@ -88,39 +88,43 @@ async fn run_command(opts: Opts, mut storage: LocalAgentStorage) -> Result<(), R
             let client = GrpcClientService::new(chain_config.clone(), key);
 
             client
-                .execute(|signer| async move {
-                    // Print info about the agent about to be registered
-                    info!("Account ID: {}", signer.account_id());
-                    info!("Key: {}", signer.key().public_key().to_json());
-                    if payable_account_id.is_some() {
-                        info!(
-                            "Payable account Id: {}",
-                            serde_json::to_string_pretty(&payable_account_id)?
-                        );
-                    }
+                .execute(|signer| {
+                    let payable_account_id = payable_account_id.clone();
 
-                    // Register the agent
-                    let query = signer.register_agent(&payable_account_id).await;
+                    async move {
+                        // Print info about the agent about to be registered
+                        info!("Account ID: {}", signer.account_id());
+                        info!("Key: {}", signer.key().public_key().to_json());
+                        if payable_account_id.is_some() {
+                            info!(
+                                "Payable account Id: {}",
+                                serde_json::to_string_pretty(&payable_account_id)?
+                            );
+                        }
 
-                    // Handle the result of the query
-                    match query {
-                        Ok(result) => {
-                            info!("Agent registered successfully");
-                            let log = result.log;
-                            info!("Result: {}", log);
+                        // Register the agent
+                        let query = signer.register_agent(&payable_account_id).await;
+
+                        // Handle the result of the query
+                        match query {
+                            Ok(result) => {
+                                info!("Agent registered successfully");
+                                let log = result.log;
+                                info!("Result: {}", log);
+                            }
+                            Err(err) if err.to_string().contains("Agent already exists") => {
+                                Err(eyre!("Agent already registered"))?;
+                            }
+                            Err(err)
+                                if err.to_string().contains("account")
+                                    && err.to_string().contains("not found") =>
+                            {
+                                Err(eyre!("Agent account not found on chain"))?;
+                            }
+                            Err(err) => Err(eyre!("Failed to register agent: {}", err))?,
                         }
-                        Err(err) if err.to_string().contains("Agent already exists") => {
-                            Err(eyre!("Agent already registered"))?;
-                        }
-                        Err(err)
-                            if err.to_string().contains("account")
-                                && err.to_string().contains("not found") =>
-                        {
-                            Err(eyre!("Agent account not found on chain"))?;
-                        }
-                        Err(err) => Err(eyre!("Failed to register agent: {}", err))?,
+                        Ok(())
                     }
-                    Ok(())
                 })
                 .await?;
         }
@@ -249,25 +253,28 @@ async fn run_command(opts: Opts, mut storage: LocalAgentStorage) -> Result<(), R
             )?;
 
             client
-                .query(|querier| async move {
-                    // Print info about the agent about to be registered
-                    info!("Account ID: {}", account_addr);
+                .query(|querier| {
+                    let account_addr = account_addr.clone();
+                    async move {
+                        // Print info about the agent about to be registered
+                        info!("Account ID: {}", account_addr);
 
-                    // Get the agent status
-                    let query = querier.get_agent_status(account_addr).await;
+                        // Get the agent status
+                        let query = querier.get_agent_status(account_addr).await;
 
-                    // Handle the result of the query
-                    match query {
-                        Ok(result) => {
-                            info!("Result: {}", result);
+                        // Handle the result of the query
+                        match query {
+                            Ok(result) => {
+                                info!("Result: {}", result);
+                            }
+                            Err(err) if err.to_string().contains("Agent not registered") => {
+                                Err(eyre!("Agent not registered"))?;
+                            }
+                            Err(err) => Err(eyre!("Failed to get agent status: {}", err))?,
                         }
-                        Err(err) if err.to_string().contains("Agent not registered") => {
-                            Err(eyre!("Agent not registered"))?;
-                        }
-                        Err(err) => Err(eyre!("Failed to get agent status: {}", err))?,
+
+                        Ok(())
                     }
-
-                    Ok(())
                 })
                 .await?;
         }
@@ -297,25 +304,28 @@ async fn run_command(opts: Opts, mut storage: LocalAgentStorage) -> Result<(), R
             )?;
 
             client
-                .query(|querier| async move {
-                    // Print info about the agent about to be registered
-                    info!("Account ID: {}", account_addr);
+                .query(|querier| {
+                    let account_addr = account_addr.clone();
+                    async move {
+                        // Print info about the agent about to be registered
+                        info!("Account ID: {}", account_addr);
 
-                    // Get the agent status
-                    let query = querier.get_tasks(from_index, limit).await;
+                        // Get the agent status
+                        let query = querier.get_tasks(from_index, limit).await;
 
-                    // Handle the result of the query
-                    match query {
-                        Ok(result) => {
-                            info!("Result: {}", result);
+                        // Handle the result of the query
+                        match query {
+                            Ok(result) => {
+                                info!("Result: {}", result);
+                            }
+                            Err(err) if err.to_string().contains("Agent not registered") => {
+                                Err(eyre!("Agent not registered"))?;
+                            }
+                            Err(err) => Err(eyre!("Failed to get contract tasks: {}", err))?,
                         }
-                        Err(err) if err.to_string().contains("Agent not registered") => {
-                            Err(eyre!("Agent not registered"))?;
-                        }
-                        Err(err) => Err(eyre!("Failed to get contract tasks: {}", err))?,
+
+                        Ok(())
                     }
-
-                    Ok(())
                 })
                 .await?;
         }
@@ -345,25 +355,29 @@ async fn run_command(opts: Opts, mut storage: LocalAgentStorage) -> Result<(), R
             )?;
 
             client
-                .query(|querier| async move {
-                    // Print info about the agent about to be registered
-                    info!("Account ID: {}", account_addr);
+                .query(|querier| {
+                    let account_addr = account_addr.clone();
 
-                    // Get the agent status
-                    let query = querier.get_agent_tasks(account_addr).await;
+                    async move {
+                        // Print info about the agent about to be registered
+                        info!("Account ID: {}", account_addr);
 
-                    // Handle the result of the query
-                    match query {
-                        Ok(result) => {
-                            info!("Result: {}", result);
+                        // Get the agent status
+                        let query = querier.get_agent_tasks(account_addr).await;
+
+                        // Handle the result of the query
+                        match query {
+                            Ok(result) => {
+                                info!("Result: {}", result);
+                            }
+                            Err(err) if err.to_string().contains("Agent not registered") => {
+                                Err(eyre!("Agent not registered"))?;
+                            }
+                            Err(err) => Err(eyre!("Failed to get contract tasks: {}", err))?,
                         }
-                        Err(err) if err.to_string().contains("Agent not registered") => {
-                            Err(eyre!("Agent not registered"))?;
-                        }
-                        Err(err) => Err(eyre!("Failed to get contract tasks: {}", err))?,
+
+                        Ok(())
                     }
-
-                    Ok(())
                 })
                 .await?;
         }

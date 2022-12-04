@@ -37,9 +37,12 @@ pub async fn check_account_status_loop(
                 );
                 let account_id = client.account_id();
                 let agent = client
-                    .execute(|signer| async move {
-                        let agent = signer.get_agent(account_id.as_str()).await?;
-                        Ok(agent)
+                    .execute(move |signer| {
+                        let account_id = account_id.clone();
+                        async move {
+                            let agent = signer.get_agent(account_id.as_str()).await?;
+                            Ok(agent)
+                        }
                     })
                     .await?;
                 let mut locked_status = block_status.lock().await;
@@ -58,9 +61,12 @@ pub async fn check_account_status_loop(
                     );
                     let account_id = client.account_id();
                     let agent = client
-                        .execute(|signer| async move {
-                            let agent = signer.get_agent(account_id.as_str()).await?;
-                            Ok(agent)
+                        .execute(|signer| {
+                            let account_id = account_id.clone();
+                            async move {
+                                let agent = signer.get_agent(account_id.as_str()).await?;
+                                Ok(agent)
+                            }
                         })
                         .await?;
                     *locked_status = agent

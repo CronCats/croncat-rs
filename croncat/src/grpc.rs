@@ -21,14 +21,14 @@ use cw_croncat_core::types::AgentResponse;
 use cw_rules_core::msg::QueryConstruct;
 use cw_rules_core::types::Rule;
 use futures_util::Future;
-use rand::seq::IteratorRandom;
-use rand::thread_rng;
+use lazy_static::__Deref;
+use rand::seq::SliceRandom;
 use serde::de::DeserializeOwned;
 use tendermint_rpc::endpoint::broadcast::tx_commit::TxResult;
 use tokio::sync::Mutex;
 use tokio::time::timeout;
 use tonic::transport::Channel;
-use tracing::warn;
+use tracing::debug;
 use url::Url;
 
 use crate::client::full_client::CosmosFullClient;
@@ -412,11 +412,19 @@ impl GrpcClientService {
 
         loop {
             let mut source_info = self.source_info.lock().await;
-            let source_key = source_info
+            let source_keys = source_info
                 .keys()
                 .filter(|k| !source_info.get(*k).unwrap().1)
-                .choose(&mut thread_rng())
+                .collect::<Vec<_>>();
+
+            if source_keys.is_empty() {
+                return Err(eyre!("No valid data sources available"));
+            }
+
+            let source_key = source_keys
+                .choose(&mut rand::thread_rng())
                 .unwrap()
+                .deref()
                 .clone();
             let (source, _) = source_info.get_mut(&source_key).unwrap().clone();
 
@@ -435,7 +443,7 @@ impl GrpcClientService {
                     {
                         Ok(client) => client,
                         Err(e) => {
-                            warn!("Failed to create grpc client for {}: {}", source_key, e);
+                            debug!("Failed to create grpc client for {}: {}", source_key, e);
                             let (_, bad) = source_info.get_mut(&source_key).unwrap();
                             *bad = true;
                             continue;
@@ -447,7 +455,7 @@ impl GrpcClientService {
                     {
                         Ok(client) => client,
                         Err(e) => {
-                            warn!("Failed to create grpc client for {}: {}", source_key, e);
+                            debug!("Failed to create grpc client for {}: {}", source_key, e);
                             let (_, bad) = source_info.get_mut(&source_key).unwrap();
                             *bad = true;
                             continue;
@@ -461,7 +469,7 @@ impl GrpcClientService {
                     return Ok(result);
                 }
                 Err(e) => {
-                    warn!("Error calling chain for {}: {}", source_key, e);
+                    debug!("Error calling chain for {}: {}", source_key, e);
                     let (_, bad) = source_info.get_mut(&source_key).unwrap();
                     *bad = true;
                     continue;

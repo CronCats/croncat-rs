@@ -94,7 +94,6 @@ async fn run_command(opts: Opts, mut storage: LocalAgentStorage) -> Result<(), R
                     async move {
                         // Print info about the agent about to be registered
                         info!("Account ID: {}", signer.account_id());
-                        info!("Key: {}", signer.key().public_key().to_json());
                         if payable_account_id.is_some() {
                             info!(
                                 "Payable account Id: {}",
@@ -151,7 +150,6 @@ async fn run_command(opts: Opts, mut storage: LocalAgentStorage) -> Result<(), R
                 .execute(|signer| async move {
                     // Print info about the agent about to be registered
                     info!("Account ID: {}", signer.account_id());
-                    info!("Key: {}", signer.key().public_key().to_json());
 
                     // Unregister the agent
                     let query = signer.unregister_agent().await;
@@ -196,7 +194,6 @@ async fn run_command(opts: Opts, mut storage: LocalAgentStorage) -> Result<(), R
                 .execute(|signer| async move {
                     // Print info about the agent about to be registered
                     info!("Account ID: {}", signer.account_id());
-                    info!("Key: {}", signer.key().public_key().to_json());
 
                     // Unregister the agent
                     let query = signer.withdraw_reward().await;
@@ -407,7 +404,6 @@ async fn run_command(opts: Opts, mut storage: LocalAgentStorage) -> Result<(), R
                 .execute(|signer| async move {
                     // Print info about the agent about to be registered
                     info!("Account ID: {}", signer.account_id());
-                    info!("Key: {}", signer.key().public_key().to_json());
 
                     // Unregister the agent
                     let query = signer.update_agent(signer.account_id().to_string()).await;

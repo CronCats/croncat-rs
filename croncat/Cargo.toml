@@ -4,6 +4,7 @@ version = "0.2.0"
 edition = "2021"
 
 [dependencies]
+async-stream = "0.3.3"
 async-trait = "0.1.57"
 bip39 = { version = "~1.0.1", features = ["rand"] }
 chrono = "0.4.19"

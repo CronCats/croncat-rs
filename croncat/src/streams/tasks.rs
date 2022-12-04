@@ -36,11 +36,14 @@ pub async fn tasks_loop(
             if is_active {
                 let account_addr = client.account_id();
                 let tasks = client
-                    .execute(|signer| async move {
-                        signer
-                            .get_agent_tasks(account_addr.as_str())
-                            .await
-                            .map_err(|err| eyre!("Failed to get agent tasks: {}", err))
+                    .execute(move |signer| {
+                        let account_addr = account_addr.clone();
+                        async move {
+                            signer
+                                .get_agent_tasks(account_addr.as_str())
+                                .await
+                                .map_err(|err| eyre!("Failed to get agent tasks: {}", err))
+                        }
                     })
                     .await?;
 

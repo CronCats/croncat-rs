@@ -1,9 +1,9 @@
 chains:
     juno-1:
-        manager: juno1lzkdx44dkvttup0dhmas67rfln4jmu89ms4ew59gwn0kp43wgg0qxl64k0
+        manager: juno13fuh46m0wpc4kgv3e0p7gsax9xh3e74wp58xcu2kzyvrgh87zzeqxdva56
         gas_prices: 0.1
         gas_adjustment: 1.5
     uni-5:
-        manager: juno1878569jt6mfq9254mkq7ecqjljswx5z6u6pdtyse45jnnmnu0ups0ezpwq
+        manager: juno1x4uaf50flf6af8jpean8ruu8q8jdraaqj7e3gg3wemqm5cdw040qk982ec
         gas_prices: 0.1
         gas_adjustment: 1.5

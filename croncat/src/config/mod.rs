@@ -69,6 +69,12 @@ struct RawChainConfigEntry {
     pub gas_adjustment: Option<f32>,
 }
 
+#[derive(Debug, Clone, Serialize)]
+pub struct ChainDataSource {
+    pub grpc: String,
+    pub rpc: String,
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ChainConfig {
     pub info: ChainInfo,
@@ -103,5 +109,43 @@ impl ChainConfig {
             gas_prices,
             gas_adjustment,
         }
+    }
+
+    pub fn data_sources(&self) -> HashMap<String, ChainDataSource> {
+        let mut data_sources = HashMap::new();
+
+        let mut rpc_urls = HashMap::new();
+        let mut grpc_urls = HashMap::new();
+
+        for rpc_endpoint in self.info.apis.rpc.iter() {
+            if rpc_endpoint.provider.is_some() {
+                rpc_urls.insert(
+                    rpc_endpoint.provider.clone().unwrap(),
+                    rpc_endpoint.address.clone(),
+                );
+            }
+        }
+        for grpc_endpoint in self.info.apis.grpc.iter() {
+            if grpc_endpoint.provider.is_some() {
+                grpc_urls.insert(
+                    grpc_endpoint.provider.clone().unwrap(),
+                    grpc_endpoint.address.clone(),
+                );
+            }
+        }
+
+        for (provider, rpc_url) in rpc_urls {
+            if let Some(grpc_url) = grpc_urls.get(&provider) {
+                data_sources.insert(
+                    provider,
+                    ChainDataSource {
+                        grpc: grpc_url.clone(),
+                        rpc: rpc_url.clone(),
+                    },
+                );
+            }
+        }
+
+        data_sources
     }
 }

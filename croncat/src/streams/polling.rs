@@ -4,11 +4,17 @@
 
 use crate::channels::ShutdownTx;
 use crate::utils::Block;
+use async_stream::try_stream;
 use color_eyre::{eyre::eyre, Report};
-use std::time::Duration;
+use futures_util::TryStream;
+use std::{pin::Pin, time::Duration};
 use tendermint_rpc::{Client, HttpClient, Url};
-use tokio::{sync::mpsc, task::JoinHandle, time::sleep};
-use tracing::{debug, log::error};
+use tokio::{
+    sync::mpsc,
+    task::JoinHandle,
+    time::{sleep, timeout},
+};
+use tracing::{debug, error};
 
 ///
 /// Polls the chain using HTTP client calling latest_block
@@ -72,4 +78,34 @@ pub async fn poll(
     }
 
     Ok(())
+}
+
+type BlockStream =
+    Pin<Box<dyn TryStream<Item = Result<Block, Report>, Ok = Block, Error = Report> + Send>>;
+
+///
+/// Stream polled blocks from the given rpc endpoint.
+///
+pub fn poll_stream_blocks(http_rpc_host: String, poll_duration_secs: f64) -> BlockStream {
+    Box::pin(try_stream! {
+        let client = HttpClient::new(http_rpc_host.as_str()).map_err(|source| eyre!("Failed to connect to RPC: {}", source))?;
+
+        let poll_timeout_duration = Duration::from_secs(30);
+        loop {
+            match timeout(poll_timeout_duration, client.latest_block()).await {
+                Ok(Ok(block)) => {
+                    let block = block.block;
+                    debug!("[{}] Polled block {}", block.header().chain_id, block.header().height);
+                    yield block.into();
+                }
+                Ok(Err(err)) => {
+                    debug!("Failed to get latest block: {}", err);
+                }
+                Err(err) => {
+                    debug!("Timed out getting latest block: {}", err);
+                }
+            }
+            sleep(Duration::from_secs_f64(poll_duration_secs)).await;
+        }
+    })
 }

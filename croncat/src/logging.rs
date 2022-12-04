@@ -37,8 +37,6 @@ pub fn setup(chain_id: Option<String>) -> Result<Vec<WorkerGuard>, Report> {
             .with_writer(std::io::stderr)
             .init();
     } else {
-        // Log to a file for the chain.
-
         // Log file for errors.
         let error_file_appender = tracing_appender::rolling::daily(
             format!("{}/logs", get_storage_path().to_str().unwrap()),

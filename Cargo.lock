@@ -611,7 +611,7 @@ dependencies = [
  "hex",
  "schemars",
  "serde",
- "serde-json-wasm",
+ "serde-json-wasm 0.4.1 (registry+https://github.com/rust-lang/crates.io-index)",
  "thiserror",
  "uint",
 ]
@@ -799,29 +799,30 @@ dependencies = [
 
 [[package]]
 name = "cw-croncat-core"
-version = "0.1.2"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "5e038bdd072886caa33b70e12393789e51b4d23da7e528cf52eaf181e9ebea6e"
+version = "0.1.3"
+source = "git+https://github.com/Buckram123/cw-croncat?rev=cec9a1ea9ed9324d7c7ba56fbae84e9805c9bb5a#cec9a1ea9ed9324d7c7ba56fbae84e9805c9bb5a"
 dependencies = [
  "cosmwasm-std",
  "cosmwasm-storage",
  "cron_schedule",
  "cw-rules-core",
- "cw-storage-plus 0.13.4",
- "cw2 0.13.4",
+ "cw-storage-plus",
+ "cw2",
  "cw20 0.13.4",
+ "generic-query",
  "hex",
  "schemars",
  "serde",
- "sha2 0.9.9",
+ "serde-cw-value",
+ "serde-json-wasm 0.4.1 (git+https://github.com/CyberHoward/serde-json-wasm?rev=cdc78130b25d65981b74a5e4a10a9f8667292d36)",
+ "sha2 0.10.6",
  "thiserror",
 ]
 
 [[package]]
 name = "cw-rules-core"
-version = "0.1.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "05b420ce4c2faeaa490370fb737b8806fd4b851d646eda3572ebc772b3216b74"
+version = "0.1.2"
+source = "git+https://github.com/Buckram123/cw-croncat?rev=cec9a1ea9ed9324d7c7ba56fbae84e9805c9bb5a#cec9a1ea9ed9324d7c7ba56fbae84e9805c9bb5a"
 dependencies = [
  "cosmwasm-std",
  "cw20 0.13.4",
@@ -829,17 +830,7 @@ dependencies = [
  "schemars",
  "serde",
  "serde-cw-value",
-]
-
-[[package]]
-name = "cw-storage-plus"
-version = "0.13.4"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "648b1507290bbc03a8d88463d7cd9b04b1fa0155e5eef366c4fa052b9caaac7a"
-dependencies = [
- "cosmwasm-std",
- "schemars",
- "serde",
+ "smart-query",
 ]
 
 [[package]]
@@ -873,23 +864,11 @@ checksum = "d6a84c6c1c0acc3616398eba50783934bd6c964bad6974241eaee3460c8f5b26"
 dependencies = [
  "cosmwasm-schema",
  "cosmwasm-std",
- "cw2 0.16.0",
+ "cw2",
  "schemars",
  "semver 1.0.14",
  "serde",
  "thiserror",
-]
-
-[[package]]
-name = "cw2"
-version = "0.13.4"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "04cf4639517490dd36b333bbd6c4fbd92e325fd0acf4683b41753bc5eb63bfc1"
-dependencies = [
- "cosmwasm-std",
- "cw-storage-plus 0.13.4",
- "schemars",
- "serde",
 ]
 
 [[package]]
@@ -900,7 +879,7 @@ checksum = "91398113b806f4d2a8d5f8d05684704a20ffd5968bf87e3473e1973710b884ad"
 dependencies = [
  "cosmwasm-schema",
  "cosmwasm-std",
- "cw-storage-plus 0.16.0",
+ "cw-storage-plus",
  "schemars",
  "serde",
 ]
@@ -938,9 +917,9 @@ checksum = "61d826fa1084d026d0abdb54faa5956972efa3a9053473bfcefb5388960aab69"
 dependencies = [
  "cosmwasm-schema",
  "cosmwasm-std",
- "cw-storage-plus 0.16.0",
+ "cw-storage-plus",
  "cw-utils 0.16.0",
- "cw2 0.16.0",
+ "cw2",
  "cw20 0.16.0",
  "schemars",
  "semver 1.0.14",
@@ -1336,9 +1315,8 @@ dependencies = [
 
 [[package]]
 name = "generic-query"
-version = "0.1.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "837ed6c3d980676aa4e4666652e5edc0fb94c0f61bd193895fb364eb059fcbe3"
+version = "0.1.1"
+source = "git+https://github.com/Buckram123/cw-croncat?rev=cec9a1ea9ed9324d7c7ba56fbae84e9805c9bb5a#cec9a1ea9ed9324d7c7ba56fbae84e9805c9bb5a"
 dependencies = [
  "cosmwasm-std",
  "schemars",
@@ -2903,6 +2881,14 @@ dependencies = [
 ]
 
 [[package]]
+name = "serde-json-wasm"
+version = "0.4.1"
+source = "git+https://github.com/CyberHoward/serde-json-wasm?rev=cdc78130b25d65981b74a5e4a10a9f8667292d36#cdc78130b25d65981b74a5e4a10a9f8667292d36"
+dependencies = [
+ "serde",
+]
+
+[[package]]
 name = "serde_bytes"
 version = "0.11.7"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -3074,6 +3060,19 @@ name = "smallvec"
 version = "1.9.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "2fd0db749597d91ff862fd1d55ea87f7855a744a8425a64695b6fca237d1dad1"
+
+[[package]]
+name = "smart-query"
+version = "0.1.0"
+source = "git+https://github.com/Buckram123/cw-croncat?rev=cec9a1ea9ed9324d7c7ba56fbae84e9805c9bb5a#cec9a1ea9ed9324d7c7ba56fbae84e9805c9bb5a"
+dependencies = [
+ "cosmwasm-std",
+ "generic-query",
+ "schemars",
+ "serde",
+ "serde-cw-value",
+ "thiserror",
+]
 
 [[package]]
 name = "socket2"

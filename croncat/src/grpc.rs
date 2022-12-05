@@ -9,14 +9,14 @@ use cosmos_sdk_proto::cosmwasm::wasm::v1::query_client::QueryClient;
 use cosmrs::bip32;
 use cosmrs::crypto::secp256k1::SigningKey;
 use cosmrs::AccountId;
+use cw_croncat_core::msg::AgentResponse;
 use cw_croncat_core::msg::AgentTaskResponse;
 use cw_croncat_core::msg::CwCroncatResponse;
 use cw_croncat_core::msg::TaskResponse;
 use cw_croncat_core::msg::TaskWithRulesResponse;
 use cw_croncat_core::msg::{ExecuteMsg, GetConfigResponse, QueryMsg};
-use cw_croncat_core::types::AgentResponse;
 use cw_rules_core::msg::QueryConstruct;
-use cw_rules_core::types::Rule;
+use cw_rules_core::types::CroncatQuery;
 use serde::de::DeserializeOwned;
 use tendermint_rpc::endpoint::broadcast::tx_commit::TxResult;
 use tokio::time::timeout;
@@ -108,7 +108,8 @@ impl GrpcSigner {
     }
 
     pub async fn unregister_agent(&self) -> Result<TxResult, Report> {
-        self.execute_croncat(&ExecuteMsg::UnregisterAgent {}).await
+        self.execute_croncat(&ExecuteMsg::UnregisterAgent { from_behind: None })
+            .await
     }
 
     pub async fn update_agent(&self, payable_account_id: String) -> Result<TxResult, Report> {
@@ -187,7 +188,10 @@ impl GrpcSigner {
         Ok(tasks_with_rules)
     }
 
-    pub async fn check_rules(&self, rules: Vec<Rule>) -> Result<(bool, Option<u64>), Report> {
+    pub async fn check_rules(
+        &self,
+        rules: Vec<CroncatQuery>,
+    ) -> Result<(bool, Option<u64>), Report> {
         let cw_rules_addr = {
             let cfg: GetConfigResponse = self.query_croncat(&QueryMsg::GetConfig {}).await?;
             cfg.cw_rules_addr

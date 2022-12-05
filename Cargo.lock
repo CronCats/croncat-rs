@@ -800,7 +800,7 @@ dependencies = [
 [[package]]
 name = "cw-croncat-core"
 version = "0.1.3"
-source = "git+https://github.com/Buckram123/cw-croncat?rev=cec9a1ea9ed9324d7c7ba56fbae84e9805c9bb5a#cec9a1ea9ed9324d7c7ba56fbae84e9805c9bb5a"
+source = "git+https://github.com/Buckram123/cw-croncat.git?rev=cec9a1ea9ed9324d7c7ba56fbae84e9805c9bb5a#cec9a1ea9ed9324d7c7ba56fbae84e9805c9bb5a"
 dependencies = [
  "cosmwasm-std",
  "cosmwasm-storage",
@@ -822,7 +822,7 @@ dependencies = [
 [[package]]
 name = "cw-rules-core"
 version = "0.1.2"
-source = "git+https://github.com/Buckram123/cw-croncat?rev=cec9a1ea9ed9324d7c7ba56fbae84e9805c9bb5a#cec9a1ea9ed9324d7c7ba56fbae84e9805c9bb5a"
+source = "git+https://github.com/Buckram123/cw-croncat.git?rev=cec9a1ea9ed9324d7c7ba56fbae84e9805c9bb5a#cec9a1ea9ed9324d7c7ba56fbae84e9805c9bb5a"
 dependencies = [
  "cosmwasm-std",
  "cw20 0.13.4",
@@ -1316,7 +1316,7 @@ dependencies = [
 [[package]]
 name = "generic-query"
 version = "0.1.1"
-source = "git+https://github.com/Buckram123/cw-croncat?rev=cec9a1ea9ed9324d7c7ba56fbae84e9805c9bb5a#cec9a1ea9ed9324d7c7ba56fbae84e9805c9bb5a"
+source = "git+https://github.com/Buckram123/cw-croncat.git?rev=cec9a1ea9ed9324d7c7ba56fbae84e9805c9bb5a#cec9a1ea9ed9324d7c7ba56fbae84e9805c9bb5a"
 dependencies = [
  "cosmwasm-std",
  "schemars",
@@ -3064,7 +3064,7 @@ checksum = "2fd0db749597d91ff862fd1d55ea87f7855a744a8425a64695b6fca237d1dad1"
 [[package]]
 name = "smart-query"
 version = "0.1.0"
-source = "git+https://github.com/Buckram123/cw-croncat?rev=cec9a1ea9ed9324d7c7ba56fbae84e9805c9bb5a#cec9a1ea9ed9324d7c7ba56fbae84e9805c9bb5a"
+source = "git+https://github.com/Buckram123/cw-croncat.git?rev=cec9a1ea9ed9324d7c7ba56fbae84e9805c9bb5a#cec9a1ea9ed9324d7c7ba56fbae84e9805c9bb5a"
 dependencies = [
  "cosmwasm-std",
  "generic-query",

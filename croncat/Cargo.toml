@@ -16,8 +16,8 @@ config = { version = "0.13.1", features = ["yaml"] }
 cosmos-sdk-proto = { version = "0.14.0", features = ["grpc", "cosmwasm"] }
 cosmrs = { version = "0.9.0", features = ["bip32", "rpc", "cosmwasm"] }
 cosmwasm-std = { version = "1.1.5" }
-cw-croncat-core = { version = "0.1.3", git = "https://github.com/Buckram123/cw-croncat", rev = "cec9a1ea9ed9324d7c7ba56fbae84e9805c9bb5a" } # TODO: update
-cw-rules-core = { version = "0.1.2", git = "https://github.com/Buckram123/cw-croncat", rev = "cec9a1ea9ed9324d7c7ba56fbae84e9805c9bb5a"  } # TODO: update
+cw-croncat-core = { version = "0.1.3", git = "https://github.com/Buckram123/cw-croncat.git", rev = "cec9a1ea9ed9324d7c7ba56fbae84e9805c9bb5a" } # TODO: update
+cw-rules-core = { version = "0.1.2", git = "https://github.com/Buckram123/cw-croncat.git", rev = "cec9a1ea9ed9324d7c7ba56fbae84e9805c9bb5a"  } # TODO: update
 cw20 = "0.16.0"
 cw20-base = "0.16.0"
 dotenv = "0.15.0"

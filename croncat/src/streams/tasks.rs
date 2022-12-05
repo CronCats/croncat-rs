@@ -6,6 +6,7 @@ use std::sync::Arc;
 
 use cosmos_sdk_proto::tendermint::google::protobuf::Timestamp;
 use cw_croncat_core::types::{AgentStatus, Boundary};
+use cw_rules_core::msg::QueryConstructResponse;
 use tokio::{sync::Mutex, task::JoinHandle};
 use tracing::error;
 
@@ -111,12 +112,15 @@ pub async fn rules_loop(
                         None => true,
                     };
                     if in_boundary {
-                        let (rules_ready, _) = signer
+                        let QueryConstructResponse {
+                            result: rules_ready,
+                            ..
+                        } = signer
                             .check_rules(task.rules.clone().ok_or_else(|| eyre!("No rules"))?)
                             .await
                             .map_err(|err| eyre!("Failed to query rules: {}", err))?;
                         if rules_ready {
-                            match signer.proxy_call(None).await {
+                            match signer.proxy_call(Some(task.task_hash.clone())).await {
                                 Ok(proxy_call_res) => {
                                     info!("Finished task: {}", proxy_call_res.log);
                                 }

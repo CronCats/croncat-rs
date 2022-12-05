@@ -16,6 +16,7 @@ use cw_croncat_core::msg::TaskResponse;
 use cw_croncat_core::msg::TaskWithRulesResponse;
 use cw_croncat_core::msg::{ExecuteMsg, GetConfigResponse, QueryMsg};
 use cw_rules_core::msg::QueryConstruct;
+use cw_rules_core::msg::QueryConstructResponse;
 use cw_rules_core::types::CroncatQuery;
 use serde::de::DeserializeOwned;
 use tendermint_rpc::endpoint::broadcast::tx_commit::TxResult;
@@ -191,12 +192,12 @@ impl GrpcSigner {
     pub async fn check_rules(
         &self,
         rules: Vec<CroncatQuery>,
-    ) -> Result<(bool, Option<u64>), Report> {
+    ) -> Result<QueryConstructResponse, Report> {
         let cw_rules_addr = {
             let cfg: GetConfigResponse = self.query_croncat(&QueryMsg::GetConfig {}).await?;
             cfg.cw_rules_addr
         };
-        let res = self
+        let res: QueryConstructResponse = self
             .client
             .query_client
             .query_contract(

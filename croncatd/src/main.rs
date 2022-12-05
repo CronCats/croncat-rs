@@ -2,8 +2,6 @@
 //! The `croncatd` agent.
 //!
 
-use std::process::exit;
-
 use croncat::{
     channels,
     //    client::{BankQueryClient, QueryBank},
@@ -14,9 +12,11 @@ use croncat::{
     store::{agent::LocalAgentStorage, logs::ErrorLogStorage},
     system,
     tokio,
+    utils::SUPPORTED_CHAIN_IDS,
 };
 use once_cell::sync::OnceCell;
 use opts::Opts;
+use std::process::exit;
 
 mod cli;
 mod opts;
@@ -54,7 +54,7 @@ async fn main() -> Result<(), Report> {
         ErrorLogStorage::write(CHAIN_ID.get().unwrap(), &err)?;
 
         if opts.debug {
-            Err(err)?;
+            return Err(err);
         }
 
         exit(1);
@@ -125,6 +125,30 @@ async fn run_command(opts: Opts, mut storage: LocalAgentStorage) -> Result<(), R
             let config = querier.query_config().await?;
             info!("Config: {config}")
         }
+        opts::Command::GetAgentAccounts {
+            sender_name,
+            chain_id,
+        } => {
+            // IF chain ID, then print the prefix derived account address from chain-id
+            if chain_id != "local" {
+                let config = ChainConfig::new(&chain_id.clone().to_string()).await?;
+                let prefix = config.prefix;
+                let account_addr = storage.get_agent_signing_account_addr(&sender_name, prefix)?;
+
+                println!("{}: {}", chain_id, account_addr);
+            } else {
+                info!("Account Addresses for: {sender_name}");
+                // Loop and print supported accounts for a keypair
+                for chain_id in SUPPORTED_CHAIN_IDS.iter() {
+                    let config = ChainConfig::new(&chain_id.to_string()).await?;
+                    let prefix = config.prefix;
+                    let account_addr =
+                        storage.get_agent_signing_account_addr(&sender_name, prefix)?;
+
+                    println!("{}: {}", chain_id, account_addr);
+                }
+            }
+        }
         opts::Command::GetAgentStatus {
             account_id,
             chain_id,
@@ -160,7 +184,7 @@ async fn run_command(opts: Opts, mut storage: LocalAgentStorage) -> Result<(), R
             info!("Agent Tasks: {agent_tasks}")
         }
         opts::Command::GenerateMnemonic { new_name, mnemonic } => {
-            storage.generate_account(new_name, mnemonic)?
+            storage.generate_account(new_name, mnemonic).await?
         }
         opts::Command::UpdateAgent {
             payable_account_id,
@@ -211,7 +235,7 @@ async fn run_command(opts: Opts, mut storage: LocalAgentStorage) -> Result<(), R
                 .await
                 .map_err(|err| eyre!("Failed to setup GRPC: {}", err))?;
             let initial_status = signer
-                .get_agent(signer.account_id().as_ref())
+                .get_agent(signer.account_id.as_ref())
                 .await?
                 .ok_or(eyre!("Agent must be registered to start the loop"))?
                 .status;

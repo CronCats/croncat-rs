@@ -10,7 +10,11 @@ use serde::{Deserialize, Serialize};
 use std::{collections::HashMap, fs, path::PathBuf};
 use tracing::log::info;
 
-use crate::{errors::Report, utils};
+use crate::{
+    config::ChainConfig,
+    errors::Report,
+    utils::{DERIVATION_PATH, SUPPORTED_CHAIN_IDS},
+};
 
 use super::get_storage_path;
 
@@ -41,27 +45,15 @@ impl std::fmt::Debug for KeyPair {
 /// Store the keypair and the payable account idea for a stored agent
 #[derive(Serialize, Deserialize, Clone)]
 pub struct LocalAgentStorageEntry {
-    pub account_addr: String,
     keypair: KeyPair, // TODO (SeedyROM): This should probably point to a file, not store in memory
     pub mnemonic: String,
     pub payable_account_id: Option<String>,
-}
-
-impl LocalAgentStorageEntry {
-    /// Get the account to pay rewards to from a [`LocalAgentStorageEntry`]
-    pub fn get_payable_account_id(&self) -> &str {
-        match &self.payable_account_id {
-            Some(account_id) => account_id.as_str(),
-            None => self.account_addr.as_str(),
-        }
-    }
 }
 
 /// Hide the user mnemonic from the user when debug printing.
 impl std::fmt::Debug for LocalAgentStorageEntry {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.debug_struct("LocalAgentStorageEntry")
-            .field("account_addr", &self.account_addr)
             .field("keypair", &self.keypair)
             .field("payable_account_id", &self.payable_account_id)
             .finish()
@@ -127,7 +119,7 @@ impl LocalAgentStorage {
         } else {
             let key = cosmrs::bip32::XPrv::derive_from_path(
                 mnemonic.to_seed(""),
-                &utils::DERIVATION_PATH.parse()?,
+                &DERIVATION_PATH.parse()?,
             )?;
             let public_key = key.public_key().to_string(cosmrs::bip32::Prefix::XPRV);
             let private_key = key.to_string(cosmrs::bip32::Prefix::XPRV).to_string();
@@ -135,13 +127,10 @@ impl LocalAgentStorage {
                 public_key,
                 private_key,
             };
-            let signing_key: SigningKey = key.try_into()?;
 
             let mnemonic = mnemonic.to_string();
 
-            let account_addr = signing_key.public_key().account_id("juno")?.to_string();
             let new_key = LocalAgentStorageEntry {
-                account_addr,
                 keypair,
                 mnemonic,
                 payable_account_id: None,
@@ -152,7 +141,7 @@ impl LocalAgentStorage {
     }
 
     /// Generate a new account_id to the local storage.
-    pub fn generate_account(
+    pub async fn generate_account(
         &mut self,
         account_id: AccountId,
         mnemonic: Option<String>,
@@ -166,8 +155,8 @@ impl LocalAgentStorage {
                     Mnemonic::generate(24)
                 }?;
                 self.insert(account_id.clone(), validated_mnemonic)?;
-                self.display_account(&account_id);
                 self.write_to_disk()?;
+                self.display_addrs(&account_id).await?;
                 Ok(())
             }
         }
@@ -181,6 +170,23 @@ impl LocalAgentStorage {
         );
     }
 
+    pub async fn display_addrs(&self, account_id: &str) -> Result<bool, Report> {
+        println!("Account Addresses for: {account_id}");
+        // Loop and print supported accounts for a keypair
+        for chain_id in SUPPORTED_CHAIN_IDS.iter() {
+            let config = ChainConfig::new(&chain_id.to_string()).await?;
+            let prefix = config.prefix;
+            let account_addr =
+                self.get_agent_signing_account_addr(&account_id.to_string(), prefix)?;
+
+            println!("{}: {}", chain_id, account_addr);
+        }
+
+        println!("\n\nPlease fund the above accounts with their native token!\nYou will need enough funds to cover several transactions before rewards will start covering costs.\nYou only need to fund the address for the network you plan to run an agent on.\n\n");
+
+        Ok(true)
+    }
+
     pub fn get_agent_signing_key(&self, account_id: &AccountId) -> Result<bip32::XPrv, Report> {
         let entry = if let Some(entry) = self.get(account_id) {
             entry
@@ -188,11 +194,23 @@ impl LocalAgentStorage {
             return Err(eyre!("No agent key by this id"));
         };
         let mnemonic: Mnemonic = entry.mnemonic.parse()?;
-        let key = cosmrs::bip32::XPrv::derive_from_path(
-            mnemonic.to_seed(""),
-            &utils::DERIVATION_PATH.parse()?,
-        )?;
+        let key =
+            cosmrs::bip32::XPrv::derive_from_path(mnemonic.to_seed(""), &DERIVATION_PATH.parse()?)?;
         Ok(key)
+    }
+
+    pub fn get_agent_signing_account_addr(
+        &self,
+        account_id: &AccountId,
+        prefix: String,
+    ) -> Result<String, Report> {
+        let key = self.get_agent_signing_key(account_id)?;
+        let signing_key: SigningKey = key.try_into()?;
+
+        Ok(signing_key
+            .public_key()
+            .account_id(prefix.as_str())?
+            .to_string())
     }
 
     /// Retrieve an agent based on the key

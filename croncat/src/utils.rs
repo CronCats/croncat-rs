@@ -15,6 +15,17 @@ use cw_croncat_core::msg::AgentTaskResponse;
 pub const DEFAULT_AGENT_ID: &str = "agent";
 pub const DERIVATION_PATH: &str = "m/44'/118'/0'/0/0";
 
+// TODO: Change to request from deployed registries
+pub const SUPPORTED_CHAIN_IDS: [&str; 7] = [
+    "juno-1",
+    "osmosis-1",
+    "stargaze-1",
+    "uni-5",
+    "elfagar-1",
+    "titus-1",
+    "constantine-1",
+];
+
 ///
 /// Count block received from the stream.
 ///

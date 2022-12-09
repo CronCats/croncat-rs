@@ -22,17 +22,3 @@ pub fn print_banner() {
 pub fn get_opts() -> Result<Opts, Report> {
     Ok(Opts::from_args_safe()?)
 }
-// pub async fn deposit_junox(address: &str) -> Result<Response, Report> {
-//     let json = json!({
-//         "denom": "ujunox",
-//         "address": address
-//     });
-
-//     let client = reqwest::Client::new();
-//     let res = client
-//         .post("https://faucet.uni.juno.deuslabs.fi/credit")
-//         .json(&json)
-//         .send()
-//         .await?;
-//     Ok(res)
-// }

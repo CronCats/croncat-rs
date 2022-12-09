@@ -14,7 +14,7 @@ pub struct ChainConfig {
     pub chain_id: String,
     pub rpc_endpoint: String,
     pub grpc_endpoint: String,
-    pub wsrpc_endpoint: String,
+    pub wsrpc_endpoint: Option<String>,
     pub contract_address: Option<String>,
     pub gas_prices: f64,
     pub gas_adjustment: f64,

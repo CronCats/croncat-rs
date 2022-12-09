@@ -207,8 +207,8 @@ impl GrpcSigner {
         self.client.key()
     }
 
-    pub fn wsrpc(&self) -> &str {
-        &self.client.cfg.wsrpc_endpoint
+    pub fn wsrpc(&self) -> Option<String> {
+        self.client.cfg.wsrpc_endpoint.clone()
     }
 
     pub fn grpc(&self) -> &str {

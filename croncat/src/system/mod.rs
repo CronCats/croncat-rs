@@ -12,7 +12,7 @@ use tokio::{
     sync::{broadcast, mpsc, Mutex},
     task::JoinHandle,
 };
-use tracing::log::error;
+use tracing::{debug, log::error};
 
 use crate::{
     channels::ShutdownTx,
@@ -68,10 +68,14 @@ pub async fn run(
     let _provider_system_handle = tokio::spawn(async move { provider_system.produce().await });
     let _provider_system_monitor_handle =
         tokio::spawn(async move { provider_system_monitor.monitor(6000).await });
+    let provider_system_monitor_display_chain_id = chain_id.clone();
     let _provider_system_monitor_display_handle = tokio::spawn(async move {
         let mut provider_system_monitor_rx = _provider_system_monitor_rx;
         while let Some(provider_states) = provider_system_monitor_rx.recv().await {
-            info!("Provider states: {:#?}", provider_states);
+            debug!(
+                "[{}] Provider states: {:#?}",
+                provider_system_monitor_display_chain_id, provider_states
+            );
         }
     });
 

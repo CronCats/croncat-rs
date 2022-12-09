@@ -57,19 +57,23 @@ pub async fn run(
     //
     // This should be repeated for all the other tasks probably?
     //
-    let retry_block_stream_strategy = retry_strategy.clone();
-    let retry_block_stream_handle = tokio::task::spawn(async move {
-        Retry::spawn(retry_block_stream_strategy, || async {
-            // Stream blocks
-            ws::stream_blocks_loop(&wsrpc, &ws_block_stream_tx, &block_stream_shutdown_rx)
-                .await
-                .map_err(|err| {
-                    error!("Error streaming blocks: {}", err);
-                    err
-                })
+    let retry_block_stream_handle = if let Some(wsrpc) = wsrpc {
+        let retry_block_stream_strategy = retry_strategy.clone();
+        tokio::task::spawn(async move {
+            Retry::spawn(retry_block_stream_strategy, || async {
+                // Stream blocks
+                ws::stream_blocks_loop(&wsrpc, &ws_block_stream_tx, &block_stream_shutdown_rx)
+                    .await
+                    .map_err(|err| {
+                        error!("Error streaming blocks: {}", err);
+                        err
+                    })
+            })
+            .await
         })
-        .await
-    });
+    } else {
+        tokio::task::spawn(async { Ok(()) })
+    };
 
     // Set up polling
     let block_polling_shutdown_rx = shutdown_rx.clone();

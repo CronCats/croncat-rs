@@ -2,6 +2,8 @@
 //! Setup tracing/logging/backtraces and re-export tracing log macros.
 //!
 
+use std::str::FromStr;
+
 use crate::{errors::Report, store::get_storage_path};
 use tracing::Level;
 use tracing_appender::non_blocking::WorkerGuard;
@@ -65,7 +67,10 @@ pub fn setup(chain_id: Option<String>) -> Result<Vec<WorkerGuard>, Report> {
                     fmt::Layer::new().with_writer(error_file_writer.with_max_level(Level::ERROR)),
                 )
                 .and_then(
-                    fmt::Layer::new().with_writer(std::io::stderr.with_max_level(Level::INFO)),
+                    fmt::Layer::new().with_writer(
+                        std::io::stderr
+                            .with_max_level(Level::from_str(std::env::var("RUST_LOG")?.as_str())?),
+                    ),
                 ),
         );
         // Set the subscriber as the global default.

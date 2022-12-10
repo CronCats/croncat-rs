@@ -42,7 +42,7 @@ pub async fn run(
     let (block_source_tx, block_source_rx) = mpsc::unbounded_channel();
 
     // Create a provider system for the polling streams.
-    let mut provider_system = ProviderSystem::new(block_source_tx);
+    let mut provider_system = ProviderSystem::new(block_source_tx, shutdown_tx.clone());
 
     // For each RPC endpoint, spawn a task to stream blocks from it
     for (provider, data_source) in &config.data_sources() {
@@ -65,7 +65,7 @@ pub async fn run(
     );
 
     // Monitor the provider system for updates.
-    let _provider_system_handle = tokio::spawn(async move { provider_system.produce().await });
+    let provider_system_handle = tokio::spawn(async move { provider_system.produce().await });
     let _provider_system_monitor_handle =
         tokio::spawn(async move { provider_system_monitor.monitor(6000).await });
     let provider_system_monitor_display_chain_id = chain_id.clone();
@@ -82,13 +82,13 @@ pub async fn run(
     // Sequence the blocks we receive from the block stream. This is necessary because we may receive
     // blocks from multiple sources, and we need to ensure that we process them in order.
     let (sequencer_tx, sequencer_rx) = mpsc::unbounded_channel();
-    let mut sequencer = Sequencer::new(block_source_rx, sequencer_tx, 512)?;
-    let _sequencer_handle = tokio::task::spawn(async move { sequencer.consume().await });
+    let sequencer = Sequencer::new(block_source_rx, sequencer_tx, shutdown_tx.subscribe(), 512)?;
+    let sequencer_handle = tokio::task::spawn(async move { sequencer.consume().await });
 
     // Dispatch blocks to anybody who is listening.
     let (dispatcher_tx, _dispatcher_rx) = broadcast::channel(32);
-    let mut dispatcher = Dispatcher::new(sequencer_rx, dispatcher_tx.clone());
-    let _dispatcher_handle = tokio::task::spawn(async move { dispatcher.fanout().await });
+    let dispatcher = Dispatcher::new(sequencer_rx, dispatcher_tx.clone(), shutdown_tx.subscribe());
+    let dispatcher_handle = tokio::task::spawn(async move { dispatcher.fanout().await });
 
     // Task to show blocks from the block stream
     let mut block_stream_info_rx = dispatcher_tx.subscribe();
@@ -187,6 +187,9 @@ pub async fn run(
     // Try to join all the system tasks.
     let system_status = try_flat_join!(
         ctrl_c_handle,
+        sequencer_handle,
+        dispatcher_handle,
+        provider_system_handle,
         account_status_check_handle,
         task_runner_handle,
         rules_runner_handle,

@@ -577,12 +577,13 @@ dependencies = [
 
 [[package]]
 name = "croncat-pipeline"
-version = "0.1.0"
-source = "git+https://github.com/CronCats/croncat-pipeline#9ca8f36b28cf8bb4ca9c933c7d07c3b110132ee2"
+version = "0.1.1"
+source = "git+https://github.com/CronCats/croncat-pipeline#91d6f14ac6de38ceff27717688e50b4345731ebd"
 dependencies = [
  "async-stream",
  "color-eyre",
  "futures",
+ "mutants",
  "tokio",
 ]
 
@@ -1637,6 +1638,12 @@ dependencies = [
  "wasi 0.11.0+wasi-snapshot-preview1",
  "windows-sys 0.42.0",
 ]
+
+[[package]]
+name = "mutants"
+version = "0.0.3"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "bc0287524726960e07b119cebd01678f852f147742ae0d925e6a520dca956126"
 
 [[package]]
 name = "native-tls"

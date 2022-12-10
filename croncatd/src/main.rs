@@ -379,7 +379,8 @@ async fn run_command(opts: Opts, mut storage: LocalAgentStorage) -> Result<(), R
                 .await?;
         }
         opts::Command::GenerateMnemonic { new_name, mnemonic } => {
-            storage.generate_account(new_name, mnemonic).await?
+            storage.generate_account(new_name.clone(), mnemonic).await?;
+            println!("Generated agent for {}", new_name);
         }
         opts::Command::Update => {
             // Make sure we have a chain id to run on

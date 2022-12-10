@@ -83,7 +83,7 @@ pub enum Command {
         mnemonic: Option<String>,
     },
 
-    /// Sensitive. Shows all details about agents on this machine
+    /// [SENSITIVE!] Shows all details about agents on this machine
     GetAgent {
         #[structopt(long, default_value = "agent", env = "CRONCAT_AGENT")]
         name: String,

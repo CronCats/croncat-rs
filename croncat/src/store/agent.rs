@@ -8,7 +8,6 @@ use color_eyre::eyre::eyre;
 use cosmrs::{bip32, crypto::secp256k1::SigningKey};
 use serde::{Deserialize, Serialize};
 use std::{collections::HashMap, fs, path::PathBuf};
-use tracing::log::info;
 
 use crate::{errors::Report, utils::DERIVATION_PATH};
 
@@ -157,9 +156,9 @@ impl LocalAgentStorage {
 
     pub fn display_account(&self, account_id: &str) {
         let new_account = self.get(account_id);
-        info!(
+        println!(
             "Agent JSON: {}",
-            serde_json::to_string_pretty(&serde_json::json!({ account_id: new_account })).unwrap()
+            serde_json::to_string_pretty(&new_account).unwrap()
         );
     }
 

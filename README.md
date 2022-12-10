@@ -93,66 +93,16 @@ cargo run register --agent mainnet --chain-id uni-5
 cargo run go --agent mainnet --chain-id uni-5
 ```
 
-## Contributing
-
--   Please see [CONTRIBUTING.md](./CONTRIBUTING.md)
-
 ## Code of Conduct
 
 -   Please see [CODE_OF_CONDUCT.md](./CODE_OF_CONDUCT.md)
 
-## Maintainers
+## Contributing
 
-<!-- prettier-ignore-start -->
-<!-- markdownlint-disable -->
-<table>
-  <tr>
-    <td align="center">
-      <a href="http://seedyrom.io"
-        ><img
-          src="https://avatars.githubusercontent.com/u/11783357?v=4&s=100"
-          width="100px;"
-          alt=""
-        /><br /><sub><b>Zack Kollar</b></sub></a
-      >
-    </td>
-    <td align="center">
-      <a href="http://gitlab.com/TrevorJTClarke"
-        ><img
-          src="https://avatars.githubusercontent.com/u/2633184?v=4&s=100"
-          width="100px;"
-          alt=""
-        /><br /><sub><b>Trevor Clarke</b></sub></a
-      >
-    </td>
-    <td align="center">
-      <a href="http://gitlab.com/mikedotexe"
-        ><img
-          src="https://avatars.githubusercontent.com/u/1042667?v=4&s=100"
-          width="100px;"
-          alt=""
-        /><br /><sub><b>Mike Pervis</b></sub></a
-      >
-    </td>
-    <td align="center">
-      <a href="http://github.com/deveusss"
-        ><img
-          src="https://avatars.githubusercontent.com/u/42238266?v=4&s=100"
-          width="100px;"
-          alt=""
-        /><br /><sub><b>Raf Deveus</b></sub></a
-      >
-    </td>
-    <td align="center">
-      <a href="http://github.com/Buckram123"
-        ><img
-          src="https://avatars.githubusercontent.com/u/91957742?v=4&s=100"
-          width="100px;"
-          alt=""
-        /><br /><sub><b>Mykhailo Donchenko</b></sub></a
-      >
-    </td>
-  </tr>
-</table>
-<!-- markdownlint-restore -->
-<!-- prettier-ignore-end -->
+-   Please see [CONTRIBUTING.md](./CONTRIBUTING.md)
+
+### This project is made possible by these awesome contributors!
+
+<a href="https://github.com/CronCats/croncat-rs/graphs/contributors">
+  <img src="https://contrib.rocks/image?repo=CronCats/croncat-rs" />
+</a>

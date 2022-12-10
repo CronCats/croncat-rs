@@ -27,7 +27,7 @@
 ```
 $ cargo run help
 ...
-croncatd 0.1.0
+croncatd 0.2.0
 The croncat agent daemon.
 
 USAGE:
@@ -40,22 +40,20 @@ FLAGS:
     -V, --version      Prints version information
 
 OPTIONS:
-        --agent <agent>          ID of the agent config to use [env: CRONCAT_AGENT=mainnet]  [default: agent]
-        --chain-id <chain-id>    Chain ID of the chain to connect to [env: CRONCAT_CHAIN_ID=uni-5]
+        --agent <agent>          ID of the agent config to use [env: CRONCAT_AGENT=]  [default: agent]
+        --chain-id <chain-id>    Chain ID of the chain to connect to [env: CRONCAT_CHAIN_ID=]
 
 SUBCOMMANDS:
-    deposit-ujunox       (in progress) Send native tokens to an address
+    all-tasks            Get contract's state Show all task(s) information
     generate-mnemonic    Generates a new keypair and agent account (good first step)
-    get-agent            Sensitive. Shows all details about agents on this machine
+    get-agent            [SENSITIVE!] Shows all details about agents on this machine
     get-tasks            Get the agent's tasks they're assigned to fulfill
     go                   Starts the Croncat agent, allowing it to fulfill tasks
     help                 Prints this message or the help of the given subcommand(s)
-    info                 Gets the configuration from the Croncat manager contract
     list-accounts        Get the agent's supported bech32 accounts
     register             Registers an agent, placing them in the pending queue unless it's the first agent
     setup-service        Setup an agent as a system service (systemd)
     status               Get the agent's status (pending/active)
-    tasks                Show all task(s) information
     unregister           Unregisters the agent from being in the queue with other agents
     update               Update the agent's configuration
     withdraw             Withdraw the agent's funds to the payable account ID
@@ -68,7 +66,9 @@ SUBCOMMANDS:
 cargo doc --no-deps
 ```
 
--   Set contract address in config.local.yaml
+## Setup
+
+-   Set a contract address for each chain in config.yaml
 -   Add agent into local keystore
 
 ```bash

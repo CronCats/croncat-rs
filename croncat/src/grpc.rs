@@ -409,6 +409,7 @@ impl GrpcClientService {
         F: Fn(GrpcClient) -> Fut,
     {
         let f = Box::new(f);
+        let mut last_error = None;
 
         loop {
             let mut source_info = self.source_info.lock().await;
@@ -418,6 +419,11 @@ impl GrpcClientService {
                 .collect::<Vec<_>>();
 
             if source_keys.is_empty() {
+                if last_error.is_some() {
+                    return Err(last_error.unwrap());
+                }
+
+                // TODO: This should be a more specific error
                 return Err(eyre!("No valid data sources available"));
             }
 
@@ -446,6 +452,7 @@ impl GrpcClientService {
                             debug!("Failed to create grpc client for {}: {}", source_key, e);
                             let (_, bad) = source_info.get_mut(&source_key).unwrap();
                             *bad = true;
+                            last_error = Some(e);
                             continue;
                         }
                     },
@@ -458,6 +465,7 @@ impl GrpcClientService {
                             debug!("Failed to create grpc client for {}: {}", source_key, e);
                             let (_, bad) = source_info.get_mut(&source_key).unwrap();
                             *bad = true;
+                            last_error = Some(e);
                             continue;
                         }
                     },
@@ -472,6 +480,7 @@ impl GrpcClientService {
                     debug!("Error calling chain for {}: {}", source_key, e);
                     let (_, bad) = source_info.get_mut(&source_key).unwrap();
                     *bad = true;
+                    last_error = Some(e);
                     continue;
                 }
             }

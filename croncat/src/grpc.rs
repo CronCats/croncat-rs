@@ -290,7 +290,11 @@ impl GrpcQuerier {
             grpc_url
         };
 
-        let client = CosmosQueryClient::new(grpc_url, &cfg.info.fees.fee_tokens[0].denom).await?;
+        let client = timeout(
+            Duration::from_secs(10),
+            CosmosQueryClient::new(grpc_url, &cfg.info.fees.fee_tokens[0].denom),
+        )
+        .await??;
 
         Ok(Self {
             client,

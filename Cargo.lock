@@ -562,6 +562,7 @@ dependencies = [
  "serde",
  "serde_json",
  "serde_yaml",
+ "speedracer",
  "tendermint",
  "tendermint-rpc",
  "tokio",
@@ -2659,6 +2660,16 @@ checksum = "02e2d2db9033d13a1567121ddd7a095ee144db4e1ca1b1bda3419bc0da294ebd"
 dependencies = [
  "libc",
  "winapi",
+]
+
+[[package]]
+name = "speedracer"
+version = "0.1.2"
+source = "git+https://github.com/SeedyROM/speedracer#24277fd1ac3c8c75a41b5978e208f0c8495ade95"
+dependencies = [
+ "eyre",
+ "futures",
+ "tokio",
 ]
 
 [[package]]

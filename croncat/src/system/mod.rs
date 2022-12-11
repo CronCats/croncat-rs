@@ -38,6 +38,30 @@ pub async fn run(
     key: &ExtendedPrivateKey<SigningKey>,
     with_rules: bool,
 ) -> Result<(), Report> {
+    // Setup the chain client.
+    let client = GrpcClientService::new(config.clone(), key.clone()).await;
+
+    // Get the status of the agent
+    let account_id = client.account_id();
+    let status = client
+        .execute(move |signer| {
+            let account_id = account_id.clone();
+            async move {
+                signer
+                    .get_agent(&account_id)
+                    .await
+                    .map_err(|err| eyre!("Failed to get agent status: {}", err))?
+                    .ok_or_else(|| eyre!("Agent account {} is not registered", account_id))
+                    .map(|agent| agent.status)
+            }
+        })
+        .await?;
+
+    let account_id = client.account_id();
+    info!("[{}] Agent account id: {}", chain_id, account_id);
+    info!("[{}] Initial agent status: {:?}", chain_id, status);
+    let status = Arc::new(Mutex::new(status));
+
     // Create a channel for block sources
     let (block_source_tx, block_source_rx) = mpsc::unbounded_channel();
 
@@ -102,30 +126,6 @@ pub async fn run(
             );
         }
     });
-
-    // Setup the chain client.
-    let client = GrpcClientService::new(config.clone(), key.clone());
-
-    // Get the status of the agent
-    let account_id = client.account_id();
-    let status = client
-        .execute(move |signer| {
-            let account_id = account_id.clone();
-            async move {
-                signer
-                    .get_agent(&account_id)
-                    .await
-                    .map_err(|err| eyre!("Failed to get agent status: {}", err))?
-                    .ok_or_else(|| eyre!("Agent account {} is not registered", account_id))
-                    .map(|agent| agent.status)
-            }
-        })
-        .await?;
-
-    let account_id = client.account_id();
-    info!("[{}] Agent account id: {}", chain_id, account_id);
-    info!("[{}] Initial agent status: {:?}", chain_id, status);
-    let status = Arc::new(Mutex::new(status));
 
     // Account status checks
     let account_status_check_shutdown_rx = shutdown_tx.subscribe();

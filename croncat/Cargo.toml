@@ -28,6 +28,7 @@ reqwest = "0.11.12"
 serde = { version = "~1.0.136", features = ["derive"] }
 serde_json = "1.0.81"
 serde_yaml = "0.9.14"
+speedracer = { version = "0.1.2", git = "https://github.com/SeedyROM/speedracer" } 
 tendermint = "0.23.9"
 tendermint-rpc = { version = "0.23.9", features = ["websocket-client", "http-client"] }
 tokio = { version = "1.18.0", features = ["macros", "rt-multi-thread", "signal", "sync", "time"] }

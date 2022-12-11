@@ -86,15 +86,18 @@ impl GrpcSigner {
             rpc_url
         };
 
-        let client = CosmosFullClient::new(
-            rpc_url,
-            grpc_url,
-            chain_info,
-            key,
-            gas_prices,
-            gas_adjustment,
+        let client = timeout(
+            Duration::from_secs(10),
+            CosmosFullClient::new(
+                rpc_url,
+                grpc_url,
+                chain_info,
+                key,
+                gas_prices,
+                gas_adjustment,
+            ),
         )
-        .await?;
+        .await??;
         let account_id = client
             .key()
             .public_key()
@@ -269,6 +272,14 @@ pub struct GrpcQuerier {
     croncat_addr: String,
 }
 
+impl std::fmt::Debug for GrpcQuerier {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("GrpcQuerier")
+            .field("croncat_addr", &self.croncat_addr)
+            .finish()
+    }
+}
+
 impl GrpcQuerier {
     pub async fn new(cfg: ChainConfig, grpc_url: String) -> Result<Self, Report> {
         // TODO: How should we handle this? Is the hack okay?
@@ -377,18 +388,71 @@ pub struct GrpcClientService {
 }
 
 impl GrpcClientService {
-    pub fn new(chain_config: ChainConfig, key: bip32::XPrv) -> Self {
-        let data_sources = chain_config
-            .data_sources()
-            .iter()
-            .map(|ds| (ds.0.clone(), (ds.1.clone(), false)))
-            .collect();
+    pub async fn new(chain_config: ChainConfig, key: bip32::XPrv) -> Self {
+        let data_sources =
+            Self::pick_best_sources(&chain_config, &chain_config.data_sources()).await;
 
         Self {
             key,
             chain_config,
             source_info: Arc::new(Mutex::new(data_sources)),
         }
+    }
+
+    async fn pick_best_sources(
+        chain_config: &ChainConfig,
+        sources: &HashMap<String, ChainDataSource>,
+    ) -> HashMap<String, (ChainDataSource, bool)> {
+        use speedracer::RaceTrack;
+
+        info!(
+            "[{}] Picking best source for chain...",
+            chain_config.info.chain_id
+        );
+
+        // Create a racetrack for testing sources.
+        let mut race_track = RaceTrack::disqualify_after(Duration::from_secs(2));
+
+        // Race all the sources and check that they connect to GRPC.
+        for (name, source) in sources {
+            let source = source.clone();
+            let chain_config = chain_config.clone();
+            race_track.add_racer(name, async move {
+                let grpc_client = GrpcQuerier::new(chain_config, source.grpc.clone()).await?;
+                let _ = grpc_client.query_config().await?;
+
+                Ok(source)
+            });
+        }
+
+        // Run our racers.
+        race_track.run().await;
+
+        // Get the rankings
+        let rankings = race_track.rankings();
+        // Get the data sources
+        let data_sources = chain_config.data_sources();
+
+        // Create a map of data sources with their rankings and disqualified status
+        let data_sources: HashMap<String, (ChainDataSource, bool)> = rankings
+            .into_iter()
+            .map(|result| {
+                let source = data_sources.get(&result.name).unwrap();
+                (result.name, (source.clone(), result.disqualified))
+            })
+            .collect();
+
+        // Log how many available sources we have
+        info!(
+            "[{}] {} source(s) available!",
+            chain_config.info.chain_id,
+            data_sources
+                .iter()
+                .filter(|(_, (_, disqualified))| !disqualified)
+                .count()
+        );
+
+        data_sources
     }
 
     pub fn key(&self) -> SigningKey {

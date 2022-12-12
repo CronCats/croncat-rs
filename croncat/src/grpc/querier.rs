@@ -4,11 +4,11 @@
 
 use std::time::Duration;
 
+use cw_croncat_core::msg::AgentResponse;
 use cw_croncat_core::msg::AgentTaskResponse;
 use cw_croncat_core::msg::CwCroncatResponse;
 use cw_croncat_core::msg::TaskResponse;
 use cw_croncat_core::msg::{GetConfigResponse, QueryMsg};
-use cw_croncat_core::types::AgentResponse;
 use serde::de::DeserializeOwned;
 use tokio::time::timeout;
 

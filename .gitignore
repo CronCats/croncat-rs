@@ -6,4 +6,4 @@ Cargo.lock
 .idea/
 .DS_Store
 .config.local.yaml
-
+.cosmos-chain-registry/

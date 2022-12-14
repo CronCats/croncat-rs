@@ -395,8 +395,8 @@ checksum = "5827cebf4670468b8772dd191856768aedcb1b0278a04f989f7766351917b9dc"
 
 [[package]]
 name = "cosmos-chain-registry"
-version = "0.1.0"
-source = "git+https://github.com/CronCats/cosmos-chain-registry#0c28665de8892c923e2109ebcc6b2103315452e9"
+version = "0.1.1"
+source = "git+https://github.com/CronCats/cosmos-chain-registry#8c0f03958715194fed8052a113947f6b34811028"
 dependencies = [
  "git2",
  "glob",

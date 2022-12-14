@@ -5,4 +5,3 @@
 
 pub use color_eyre::eyre::eyre;
 pub use color_eyre::Report;
-// TODO: Implement custom error types

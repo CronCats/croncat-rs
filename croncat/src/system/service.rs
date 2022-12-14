@@ -19,6 +19,14 @@ pub struct DaemonService;
 impl DaemonService {
     /// Create a new daemon service file at the given path with chain ID.
     pub fn create(path: Option<String>, chain_id: &String, no_frills: bool) -> Result<(), Report> {
+        // Check the platform to make sure we're on Linux.
+        if cfg!(not(target_os = "linux")) {
+            return Err(eyre!(
+                "croncatd daemon service is only supported on Linux with systemd."
+            ));
+        }
+
+        // Get the source path for the daemon service directory.
         let storage_path = match path {
             Some(path) => PathBuf::from(path),
             None => get_storage_path(),

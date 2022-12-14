@@ -1,70 +1,151 @@
 //! Agent configuration.
 
-/// TODO: Move to chain registry
-/// Right now juno testnet missing grpc's, so we keeping it like `cosm-orc`'s chain config
-use color_eyre::{eyre::eyre, Report};
-use config::Config;
-use serde::{Deserialize, Serialize};
-use std::path::Path;
+use std::collections::HashMap;
 
-#[derive(Debug, Serialize, Deserialize, Clone)]
+use color_eyre::Result;
+use cosmos_chain_registry::{ChainInfo, ChainRegistry};
+use serde::{Deserialize, Serialize};
+use url::Url;
+
+#[derive(Debug, Clone, Serialize)]
+pub struct Config {
+    pub chains: HashMap<String, ChainConfig>,
+}
+
+impl Config {
+    pub fn from_pwd() -> Result<Self> {
+        let pwd = std::env::current_dir()?;
+        let config_path = pwd.join("config.yaml");
+        let config = std::fs::read_to_string(config_path)?;
+        let config = serde_yaml::from_str(&config)?;
+        Ok(config)
+    }
+}
+
+impl<'de> Deserialize<'de> for Config {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: serde::Deserializer<'de>,
+    {
+        // Deserialize the raw config entry so we can get info from the chain registry.
+        let config_yaml =
+            HashMap::<String, HashMap<String, RawChainConfigEntry>>::deserialize(deserializer)?;
+        let chains = config_yaml
+            .get("chains")
+            .ok_or_else(|| serde::de::Error::custom("missing 'chains' key"))?;
+        let registry =
+            ChainRegistry::from_remote().map_err(|e| serde::de::Error::custom(e.to_string()))?;
+
+        // Collect the chain configs from the registry.
+        #[allow(clippy::unnecessary_to_owned)]
+        let chain_configs = chains
+            .to_owned()
+            .into_iter()
+            .map(|(chain_id, entry)| {
+                let chain_info = registry
+                    .get_by_chain_id(&chain_id)
+                    .map_err(|e| serde::de::Error::custom(e.to_string()))?;
+                let chain_config = ChainConfig::from_entry(chain_info, entry);
+                Ok((chain_id, chain_config))
+            })
+            .collect::<Result<Vec<_>, D::Error>>()?;
+        let chain_configs: HashMap<String, ChainConfig> = chain_configs.into_iter().collect();
+
+        Ok(Self {
+            chains: chain_configs,
+        })
+    }
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+struct RawChainConfigEntry {
+    pub manager: String,
+    pub registry: Option<String>,
+    pub block_polling_seconds: Option<f64>,
+    pub block_polling_timeout_seconds: Option<f64>,
+    pub websocket_timeout_seconds: Option<f64>,
+    pub uptime_ping_url: Option<Url>,
+    pub gas_prices: Option<f32>,
+    pub gas_adjustment: Option<f32>,
+}
+
+#[derive(Debug, Clone, Serialize)]
+pub struct ChainDataSource {
+    pub grpc: String,
+    pub rpc: String,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ChainConfig {
-    pub denom: String,
-    pub prefix: String,
-    pub chain_id: String,
-    pub rpc_endpoint: String,
-    pub grpc_endpoint: String,
-    pub wsrpc_endpoint: Option<String>,
-    pub contract_address: Option<String>,
-    pub gas_prices: f64,
-    pub gas_adjustment: f64,
-    pub polling_duration_secs: u64,
+    pub info: ChainInfo,
+    pub manager: String,
+    pub registry: Option<String>,
+    pub block_polling_seconds: f64,
+    pub block_polling_timeout_seconds: f64,
+    pub websocket_timeout_seconds: f64,
+    pub uptime_ping_url: Option<Url>,
+    pub gas_prices: f32,
+    pub gas_adjustment: f32,
 }
 
 impl ChainConfig {
-    pub fn is_chain_registry_enabled() -> bool {
-        true
-    }
-    pub async fn new(chain_id: &String) -> Result<Self, Report> {
-        let config_file = &format!("config.{}.yaml", chain_id);
-        let config_override_file = &format!("config.{}.override.yaml", chain_id);
-        if Path::new(config_override_file).is_file() {
-            return Self::from_file(config_override_file);
+    fn from_entry(info: ChainInfo, entry: RawChainConfigEntry) -> Self {
+        let gas_prices = entry
+            .gas_prices
+            .unwrap_or(info.fees.fee_tokens[0].fixed_min_gas_price);
+        let gas_adjustment = entry.gas_adjustment.unwrap_or(1.5);
+        let block_polling_seconds = entry.block_polling_seconds.unwrap_or(5.0);
+        let block_polling_timeout_seconds = entry.block_polling_timeout_seconds.unwrap_or(30.0);
+        let websocket_timeout_seconds = entry.websocket_timeout_seconds.unwrap_or(30.0);
+
+        Self {
+            info,
+            manager: entry.manager,
+            registry: entry.registry,
+            block_polling_seconds,
+            block_polling_timeout_seconds,
+            websocket_timeout_seconds,
+            uptime_ping_url: entry.uptime_ping_url,
+            gas_prices,
+            gas_adjustment,
         }
-        let config = Self::from_file(config_file)?;
-        // if Self::is_chain_registry_enabled() {
-        //     return Ok(Self::from_chain_registry(config).await?);
-        // }
-        Ok(config)
     }
-    pub fn from_file(file_name: &str) -> Result<Self, Report> {
-        let settings = Config::builder()
-            .add_source(config::File::with_name(file_name))
-            .build()?;
 
-        let mut config = settings.try_deserialize::<ChainConfig>()?;
+    pub fn data_sources(&self) -> HashMap<String, ChainDataSource> {
+        let mut data_sources = HashMap::new();
 
-        // Override config contract address if env var is set
-        if let Ok(contract_address) = std::env::var("CRONCAT_CONTRACT_ADDRESS") {
-            config.contract_address = Some(contract_address);
-        } else if config.contract_address.is_none() {
-            return Err(eyre!(
-                "Contract address is not set via config or environment variable"
-            ));
+        let mut rpc_urls = HashMap::new();
+        let mut grpc_urls = HashMap::new();
+
+        for rpc_endpoint in self.info.apis.rpc.iter() {
+            if rpc_endpoint.provider.is_some() {
+                rpc_urls.insert(
+                    rpc_endpoint.provider.clone().unwrap(),
+                    rpc_endpoint.address.clone(),
+                );
+            }
+        }
+        for grpc_endpoint in self.info.apis.grpc.iter() {
+            if grpc_endpoint.provider.is_some() {
+                grpc_urls.insert(
+                    grpc_endpoint.provider.clone().unwrap(),
+                    grpc_endpoint.address.clone(),
+                );
+            }
         }
 
-        Ok(config)
-    }
-    pub async fn from_chain_registry(fallback: ChainConfig) -> Result<Self, Report> {
-        let result = chain_registry::get::get_chain("juno").await?;
-        let apis = result.ok_or_else(|| eyre!("No chain info found"))?.apis;
+        for (provider, rpc_url) in rpc_urls {
+            if let Some(grpc_url) = grpc_urls.get(&provider) {
+                data_sources.insert(
+                    provider,
+                    ChainDataSource {
+                        grpc: grpc_url.clone(),
+                        rpc: rpc_url.clone(),
+                    },
+                );
+            }
+        }
 
-        let config = ChainConfig {
-            rpc_endpoint: apis.rpc[0].address.clone(),
-            grpc_endpoint: apis.grpc[0].address.clone(),
-            ..fallback
-        };
-
-        Ok(config)
+        data_sources
     }
 }

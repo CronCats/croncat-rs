@@ -143,12 +143,12 @@ If you do so, reference it here in the description. -->
 <!--
 ### Your First Code Contribution
 
-<!-- TODO
+<!-- 
 include Setup of env, IDE and typical getting started instructions?
 
 ### Improving The Documentation
 
-<!-- TODO
+<!-- 
 Updating, improving and correcting the documentation
 
 
@@ -156,12 +156,12 @@ Updating, improving and correcting the documentation
 
 ### Commit Messages
 
-<!-- TODO
+<!-- 
 
 
 ## Join The Project Team
 
-<!-- TODO
+<!-- 
 
 omit in toc
 

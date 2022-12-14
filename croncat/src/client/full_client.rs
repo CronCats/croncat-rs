@@ -1,4 +1,5 @@
-use color_eyre::Report;
+use color_eyre::{eyre::eyre, Report};
+use cosmos_chain_registry::ChainInfo;
 use cosmos_sdk_proto::cosmos::tx::v1beta1::service_client::ServiceClient;
 
 use cosmrs::bip32;
@@ -9,8 +10,6 @@ use serde::Serialize;
 use tendermint_rpc::endpoint::broadcast::tx_commit::Response;
 use tonic::transport::Channel;
 
-use crate::config::ChainConfig;
-
 use super::auth_query::QueryBaseAccount;
 use super::query_client::CosmosQueryClient;
 use super::wasm_execute::{
@@ -19,21 +18,44 @@ use super::wasm_execute::{
 
 #[derive(Clone)]
 pub struct CosmosFullClient {
+    pub(crate) chain_info: ChainInfo,
+    pub(crate) key: bip32::XPrv,
+    pub(crate) native_denom: String,
+    pub(crate) gas_prices: f32,
+    pub(crate) gas_adjustment: f32,
     http_client: HttpClient,
-    key: bip32::XPrv,
     service_client: ServiceClient<Channel>,
-    pub query_client: CosmosQueryClient,
-    pub cfg: ChainConfig,
+    pub(crate) query_client: CosmosQueryClient,
 }
 
 impl CosmosFullClient {
-    pub async fn new(cfg: ChainConfig, key: bip32::XPrv) -> Result<Self, Report> {
+    pub async fn new(
+        rpc_url: String,
+        grpc_url: String,
+        chain_info: ChainInfo,
+        key: bip32::XPrv,
+        gas_prices: f32,
+        gas_adjustment: f32,
+    ) -> Result<Self, Report> {
+        let native_denom = chain_info.fees.fee_tokens[0].denom.clone();
+        let http_client = HttpClient::new(rpc_url.as_str())
+            .map_err(|err| eyre!("Failed to create http client: {}", err))?;
+        let service_client = ServiceClient::connect(grpc_url.clone())
+            .await
+            .map_err(|err| eyre!("Failed to create GRPC service client: {}", err))?;
+        let query_client = CosmosQueryClient::new(&grpc_url, &native_denom)
+            .await
+            .map_err(|err| eyre!("Failed to create GRPC query client: {}", err))?;
+
         Ok(Self {
-            http_client: HttpClient::new(cfg.rpc_endpoint.as_ref())?,
+            chain_info,
             key,
-            service_client: ServiceClient::connect(cfg.grpc_endpoint.clone()).await?,
-            query_client: CosmosQueryClient::new(&cfg.grpc_endpoint, &cfg.denom).await?,
-            cfg,
+            native_denom,
+            http_client,
+            service_client,
+            query_client,
+            gas_prices,
+            gas_adjustment,
         })
     }
 
@@ -42,15 +64,26 @@ impl CosmosFullClient {
         msg: &impl Serialize,
         contract_name: &str,
     ) -> Result<Response, Report> {
-        let sender = self.key().public_key().account_id(&self.cfg.prefix)?;
+        let sender = self
+            .key()
+            .public_key()
+            .account_id(&self.chain_info.bech32_prefix)?;
         let tx_body = generate_wasm_body(sender.as_ref(), contract_name, msg)?;
         let base_account = self
             .query_client
             .query_base_account(sender.as_ref().to_owned())
             .await?;
-        let simulate_tx_raw = prepare_simulate_tx(&tx_body, &self.cfg, &self.key(), &base_account)?;
-        let fee = simulate_gas_fee(self.service_client.clone(), simulate_tx_raw, &self.cfg).await?;
-        let raw = prepare_send(&tx_body, &self.cfg, &self.key(), &base_account, fee)?;
+        let simulate_tx_raw =
+            prepare_simulate_tx(&tx_body, &self.chain_info, &self.key(), &base_account)?;
+        let fee = simulate_gas_fee(
+            self.service_client.clone(),
+            simulate_tx_raw,
+            &self.native_denom,
+            self.gas_prices,
+            self.gas_adjustment,
+        )
+        .await?;
+        let raw = prepare_send(&tx_body, &self.chain_info, &self.key(), &base_account, fee)?;
         let tx_result = send_tx(&self.http_client, raw).await?;
         Ok(tx_result)
     }

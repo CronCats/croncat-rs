@@ -12,7 +12,7 @@ use tracing::info;
 
 use crate::{
     channels::{BlockStreamRx, ShutdownRx},
-    grpc::GrpcSigner,
+    grpc::GrpcClientService,
     utils::AtomicIntervalCounter,
 };
 
@@ -24,7 +24,7 @@ pub async fn check_account_status_loop(
     mut block_stream_rx: BlockStreamRx,
     mut shutdown_rx: ShutdownRx,
     block_status: Arc<Mutex<AgentStatus>>,
-    signer: GrpcSigner,
+    client: GrpcClientService,
 ) -> Result<(), Report> {
     let block_counter = AtomicIntervalCounter::new(10);
     let task_handle: tokio::task::JoinHandle<Result<(), Report>> = tokio::task::spawn(async move {
@@ -33,18 +33,42 @@ pub async fn check_account_status_loop(
             if block_counter.is_at_interval() {
                 info!(
                     "Checking agents statuses for block (height: {})",
-                    block.header.height
+                    block.header().height
                 );
-                let account_addr = signer.account_id().as_ref();
-                let agent = signer.get_agent(account_addr).await?;
+                let account_id = client.account_id();
+                let agent = client
+                    .execute(move |signer| {
+                        let account_id = account_id.clone();
+                        async move {
+                            let agent = signer.get_agent(account_id.as_str()).await?;
+                            Ok(agent)
+                        }
+                    })
+                    .await?;
                 let mut locked_status = block_status.lock().await;
                 *locked_status = agent
                     .ok_or(eyre!("Agent unregistered during the loop"))?
                     .status;
                 info!("Agent status: {:?}", *locked_status);
                 if *locked_status == AgentStatus::Nominated {
-                    info!("Checking in agent: {}", signer.check_in_agent().await?.log);
-                    let agent = signer.get_agent(account_addr).await?;
+                    info!(
+                        "Checking in agent: {}",
+                        client
+                            .execute(|signer| async move {
+                                signer.check_in_agent().await.map(|result| result.log)
+                            })
+                            .await?
+                    );
+                    let account_id = client.account_id();
+                    let agent = client
+                        .execute(|signer| {
+                            let account_id = account_id.clone();
+                            async move {
+                                let agent = signer.get_agent(account_id.as_str()).await?;
+                                Ok(agent)
+                            }
+                        })
+                        .await?;
                     *locked_status = agent
                         .ok_or(eyre!("Agent unregistered during the loop"))?
                         .status;

@@ -7,27 +7,27 @@ chains:
         manager: juno1x4uaf50flf6af8jpean8ruu8q8jdraaqj7e3gg3wemqm5cdw040qk982ec
         gas_prices: 0.1
         gas_adjustment: 1.5
-    osmosis-1:
-        manager: 
-        gas_prices: 0.1
-        gas_adjustment: 1.5
+    # osmosis-1:
+    #     manager: 
+    #     gas_prices: 0.1
+    #     gas_adjustment: 1.5
     osmo-test-4:
         manager: osmo1gydw3jdmhye7qzj80xesz457llhx4djhsf99m82xaq63e0yjfsaqafsy6v
         gas_prices: 0.1
         gas_adjustment: 1.5
-    stargaze-1:
-        manager: 
-        gas_prices: 0.1
-        gas_adjustment: 1.5
-    elfagar-1:
+    # stargaze-1:
+    #     manager: 
+    #     gas_prices: 0.1
+    #     gas_adjustment: 1.5
+    elgafar-1:
         manager: stars1w4s4s73s6jugynyv5q80a6ame2avpzv4ymaz64d3m75kq46r6dmqr6026u
         gas_prices: 0.1
         gas_adjustment: 1.5
-    titus-1:
-        manager: 
-        gas_prices: 0.1
-        gas_adjustment: 1.5
-    constantine-1:
-        manager: 
-        gas_prices: 0.1
-        gas_adjustment: 1.5
+    # titus-1:
+    #     manager: 
+    #     gas_prices: 0.1
+    #     gas_adjustment: 1.5
+    # constantine-1:
+    #     manager: 
+    #     gas_prices: 0.1
+    #     gas_adjustment: 1.5

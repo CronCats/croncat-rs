@@ -84,9 +84,6 @@ impl<'de> Deserialize<'de> for Config {
             }
         }
 
-        println!("Loaded {} chains.", chain_configs.len());
-        println!("{:#?}", chain_configs);
-
         // Return the config.
         Ok(Self {
             chains: chain_configs,

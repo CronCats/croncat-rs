@@ -3,7 +3,10 @@
 use std::collections::HashMap;
 
 use color_eyre::Result;
-use cosmos_chain_registry::{ChainInfo, ChainRegistry};
+use cosmos_chain_registry::{
+    chain::{Grpc, Rpc},
+    ChainInfo, ChainRegistry,
+};
 use serde::{Deserialize, Serialize};
 use url::Url;
 
@@ -49,8 +52,42 @@ impl<'de> Deserialize<'de> for Config {
                 Ok((chain_id, chain_config))
             })
             .collect::<Result<Vec<_>, D::Error>>()?;
-        let chain_configs: HashMap<String, ChainConfig> = chain_configs.into_iter().collect();
+        let mut chain_configs: HashMap<String, ChainConfig> = chain_configs.into_iter().collect();
 
+        // Get custom sources from the config.
+        #[allow(clippy::unnecessary_to_owned)]
+        let custom_sources = chains.to_owned().into_iter().fold(
+            HashMap::<String, ChainDataSource>::new(),
+            |mut acc, (_, entry)| {
+                if let Some(custom_sources) = entry.custom_sources {
+                    acc.extend(custom_sources);
+                }
+                acc
+            },
+        );
+
+        // Merge custom sources into the chain configs.
+        for (provider, source) in custom_sources {
+            for chain_config in chain_configs.values_mut() {
+                let apis = &mut chain_config.info.apis;
+                // Add the custom RPC source.
+                apis.rpc.push(Rpc {
+                    provider: Some(provider.clone()),
+                    address: source.rpc.clone(),
+                });
+
+                // Add the custom gRPC source.
+                apis.grpc.push(Grpc {
+                    provider: Some(provider.clone()),
+                    address: source.grpc.clone(),
+                });
+            }
+        }
+
+        println!("Loaded {} chains.", chain_configs.len());
+        println!("{:#?}", chain_configs);
+
+        // Return the config.
         Ok(Self {
             chains: chain_configs,
         })
@@ -67,9 +104,10 @@ struct RawChainConfigEntry {
     pub uptime_ping_url: Option<Url>,
     pub gas_prices: Option<f32>,
     pub gas_adjustment: Option<f32>,
+    pub custom_sources: Option<HashMap<String, ChainDataSource>>,
 }
 
-#[derive(Debug, Clone, Serialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ChainDataSource {
     pub grpc: String,
     pub rpc: String,

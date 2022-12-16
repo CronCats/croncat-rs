@@ -7,3 +7,7 @@ chains:
         manager: juno1x4uaf50flf6af8jpean8ruu8q8jdraaqj7e3gg3wemqm5cdw040qk982ec
         gas_prices: 0.1
         gas_adjustment: 1.5
+        custom_sources:
+            "Mikeachu 🙀":
+                rpc: http://45.79.96.94
+                grpc: http://45.79.96.94:12690

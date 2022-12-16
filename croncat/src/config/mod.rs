@@ -19,6 +19,7 @@ pub struct ChainConfig {
     pub gas_prices: f64,
     pub gas_adjustment: f64,
     pub polling_duration_secs: u64,
+    pub threshold: Option<u64>,
 }
 
 impl ChainConfig {

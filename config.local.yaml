@@ -8,3 +8,4 @@ contract_address: null # This can be set via CRONCAT_CONTRACT_ADDRESS, committin
 gas_prices: 0.07
 gas_adjustment: 1.5
 polling_duration_secs: 2
+threshold: 100000

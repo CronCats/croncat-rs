@@ -89,7 +89,7 @@ impl GrpcClientService {
             let chain_config = chain_config.clone();
             race_track.add_racer(name, async move {
                 let grpc_client = GrpcQuerier::new(chain_config, source.grpc.clone()).await?;
-                let _ = grpc_client.query_config().await?;
+                //let _ = grpc_client.query_config().await?; // TODO: why fails
 
                 Ok(source)
             });

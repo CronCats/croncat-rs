@@ -141,6 +141,7 @@ pub async fn check_account_status_loop(
                     let account_id = client.account_id();
                     let account_str = account_id.as_str();
                     if agent_native_balance < threshold as u128 {
+                        println!("balance {} < threshold {}", agent_native_balance, threshold);
                         let agent = client
                             .execute(move |signer| {
                                 async move {
@@ -155,15 +156,12 @@ pub async fn check_account_status_loop(
                             .native
                             .into_iter()
                             .find(|c| c.denom == *denom)
-                            .unwrap()
+                            .unwrap_or_default()
                             .amount;
                         if !reward_balance.is_zero() {
-                            println!("balance {} < threshold {}", agent_native_balance, threshold);
                             info!("Automatically withdrawing agent reward");
-                            //let result = client.withdraw_reward().await?;
                             let result = client
                                 .execute(move |signer| {
-                                    //let account_id = client.account_id();
                                     async move {
                                         let agent = signer.withdraw_reward().await?;
                                         Ok(agent)
@@ -173,6 +171,9 @@ pub async fn check_account_status_loop(
                             let log = result.log;
                             info!("Log: {log}");
                         } else {
+                            println!("reward_balance: {}", reward_balance);
+                            info!("Not enough balance to continue, the agent in required to have {} {}", threshold, denom);
+                            info!("Stopping the agent");
                             exit(1);
                         }
                     }

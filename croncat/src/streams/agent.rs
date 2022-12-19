@@ -13,7 +13,7 @@ use tendermint::abci::Path;
 use tendermint_rpc::endpoint::abci_query::AbciQuery;
 use tendermint_rpc::{Client, HttpClient, Url};
 use tokio::sync::Mutex;
-use tracing::info;
+use tracing::{info, error};
 
 use crate::{
     channels::{BlockStreamRx, ShutdownRx},
@@ -79,18 +79,14 @@ pub async fn check_account_status_loop(
                     info!("Agent status: {:?}", *locked_status);
                 }
 
-                println!("threshold status: {:?}", client.chain_config.threshold);
                 if let Some(threshold) = client.chain_config.threshold {
-                    println!("aloha threshold: {}", threshold);
                     // Check the agent's balance to make sure it's not falling below a threshold
                     let msg_request = QueryAllBalancesRequest {
                         address: client.account_id(),
                         pagination: None,
                     };
-                    println!("aloha msg_request {}", msg_request.address);
                     let encoded_msg_request = Message::encode_to_vec(&msg_request);
 
-                    // TODO: Change this to choosing rpc
                     let rpc_address = &client.chain_config.info.apis.rpc[0].address;
                     // let rpc_address = client.client.cfg.rpc_endpoint.clone();
                     let node_address: Url = rpc_address.parse()?;
@@ -100,7 +96,6 @@ pub async fn check_account_status_loop(
                             err.detail()
                         )
                     })?;
-                    println!("aloha1");
                     let agent_balance: AbciQuery = rpc_client
                         .abci_query(
                             Some(Path::from(
@@ -111,19 +106,15 @@ pub async fn check_account_status_loop(
                             false,
                         )
                         .await?;
-                    println!("aloha2");
                     let msg_response: Result<QueryAllBalancesResponse, DecodeError> =
                         Message::decode(&*agent_balance.value);
-                    println!("aloha3");
                     if msg_response.is_err() {
                         // Eventually pipe a good error to whatever APM we choose
                         println!("Error: unexpected result when querying the balance of the agent. Moving on…");
                         continue;
                     }
-                    println!("aloha4");
 
                     let denom = &client.chain_config.info.fees.fee_tokens[0].denom;
-                    println!("aloha denom {}", denom);
                     let agent_native_balance = msg_response
                         .unwrap()
                         .balances
@@ -134,14 +125,12 @@ pub async fn check_account_status_loop(
                         .parse::<u128>()
                         .unwrap();
 
-                    println!("aloha agent_native_balance {}", agent_native_balance);
                     // If agent balance is too low and the agent has some native coins in the manager contract
                     // call withdraw_reward
                     // If manager balance is zero, exit
                     let account_id = client.account_id();
                     let account_str = account_id.as_str();
                     if agent_native_balance < threshold as u128 {
-                        println!("balance {} < threshold {}", agent_native_balance, threshold);
                         let agent = client
                             .execute(move |signer| {
                                 async move {
@@ -171,9 +160,8 @@ pub async fn check_account_status_loop(
                             let log = result.log;
                             info!("Log: {log}");
                         } else {
-                            println!("reward_balance: {}", reward_balance);
-                            info!("Not enough balance to continue, the agent in required to have {} {}", threshold, denom);
-                            info!("Stopping the agent");
+                            error!("Not enough balance to continue, the agent in required to have {} {}", threshold, denom);
+                            error!("Stopping the agent");
                             exit(1);
                         }
                     }

@@ -5,7 +5,6 @@
 // Features
 
 // Export tokio and async-broadcast for convenience and version management
-pub use async_broadcast;
 pub use tokio;
 
 // Our modules

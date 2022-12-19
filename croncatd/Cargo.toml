@@ -1,25 +1,16 @@
 [package]
 name = "croncatd"
-version = "0.1.0"
+version = "0.2.0"
 edition = "2021"
 
-# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
-
 [dependencies]
-structopt = "0.3.26"
 croncat = { path = "../croncat" }
-
+enum-display = "0.1.3"
+futures = "0.3"
 reqwest = { version = "0.11.11", features = ["json"] }
 serde = { version = "1", features = ["derive"] }
 serde_json = "1.0"
-futures = "0.3"
-
-anyhow = "1.0.62"
-async-compat = "0.2.1"
-tokio-compat = "0.1.6"
-enum-display = "0.1.3"
-once_cell = "1.15.0"
-
+structopt = "0.3.26"
 
 [features]
 debug = []

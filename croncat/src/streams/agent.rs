@@ -83,49 +83,13 @@ pub async fn check_account_status_loop(
 
                 if let Some(threshold) = chain_config.threshold {
                     // Check the agent's balance to make sure it's not falling below a threshold
-                    let msg_request = QueryAllBalancesRequest {
-                        address: client.account_id(),
-                        pagination: None,
-                    };
-                    let encoded_msg_request = Message::encode_to_vec(&msg_request);
-
-                    let rpc_address = &chain_config.info.apis.rpc[0].address;
-                    // let rpc_address = client.client.cfg.rpc_endpoint.clone();
-                    let node_address: Url = rpc_address.parse()?;
-                    let rpc_client = HttpClient::new(node_address).map_err(|err| {
-                        eyre!(
-                            "Could not get http client for RPC node for polling: {}",
-                            err.detail()
-                        )
-                    })?;
-                    let agent_balance: AbciQuery = rpc_client
-                        .abci_query(
-                            Some(Path::from(
-                                "/cosmos.bank.v1beta1.Query/AllBalances".parse()?,
-                            )),
-                            encoded_msg_request,
-                            None,
-                            false,
-                        )
-                        .await?;
-                    let msg_response: Result<QueryAllBalancesResponse, DecodeError> =
-                        Message::decode(&*agent_balance.value);
-                    if msg_response.is_err() {
-                        // Eventually pipe a good error to whatever APM we choose
-                        println!("Error: unexpected result when querying the balance of the agent. Moving on…");
-                        continue;
-                    }
-
                     let denom = &chain_config.info.fees.fee_tokens[0].denom;
-                    let agent_native_balance = msg_response
-                        .unwrap()
-                        .balances
-                        .into_iter()
-                        .find(|c| c.denom == *denom)
-                        .unwrap()
-                        .amount
-                        .parse::<u128>()
-                        .unwrap();
+                    let agent_native_balance = get_agent_balance(
+                        client.account_id(),
+                        &chain_config.info.apis.rpc[0].address,
+                        denom.to_string(),
+                    )
+                    .await?;
 
                     // If agent balance is too low and the agent has some native coins in the manager contract
                     // call withdraw_reward
@@ -157,8 +121,20 @@ pub async fn check_account_status_loop(
                                 .await?;
                             let log = result.log;
                             info!("Log: {log}");
+
+                            let native_balance_after_withdraw = get_agent_balance(
+                                client.account_id(),
+                                &chain_config.info.apis.rpc[0].address,
+                                denom.to_string(),
+                            )
+                            .await?;
+                            if native_balance_after_withdraw < threshold as u128 {
+                                error!("Not enough balance to continue, the agent in required to have {} {}, current balance: {} {}", threshold, denom, native_balance_after_withdraw, denom);
+                                error!("Stopping the agent");
+                                exit(1);
+                            }
                         } else {
-                            error!("Not enough balance to continue, the agent in required to have {} {}", threshold, denom);
+                            error!("Not enough balance to continue, the agent in required to have {} {}, current balance: {} {}", threshold, denom, agent_native_balance, denom);
                             error!("Stopping the agent");
                             exit(1);
                         }
@@ -175,4 +151,53 @@ pub async fn check_account_status_loop(
     }
 
     Ok(())
+}
+
+async fn get_agent_balance(
+    account_id: String,
+    rpc_address: &str,
+    denom: String,
+) -> Result<u128, Report> {
+    let msg_request = QueryAllBalancesRequest {
+        address: account_id.clone(),
+        pagination: None,
+    };
+    let encoded_msg_request = Message::encode_to_vec(&msg_request);
+
+    let node_address: Url = rpc_address.parse()?;
+    let rpc_client = HttpClient::new(node_address).map_err(|err| {
+        eyre!(
+            "Could not get http client for RPC node for polling: {}",
+            err.detail()
+        )
+    })?;
+    let agent_balance: AbciQuery = rpc_client
+        .abci_query(
+            Some(Path::from(
+                "/cosmos.bank.v1beta1.Query/AllBalances".parse()?,
+            )),
+            encoded_msg_request,
+            None,
+            false,
+        )
+        .await?;
+    let msg_response: Result<QueryAllBalancesResponse, DecodeError> =
+        Message::decode(&*agent_balance.value);
+    msg_response
+        .map(|result| {
+            result
+                .balances
+                .into_iter()
+                .find(|c| c.denom == *denom)
+                .unwrap()
+                .amount
+                .parse::<u128>()
+                .unwrap()
+        })
+        .map_err(|err| {
+            eyre!(
+                "Error: unexpected error when querying the balance of the agent: {}",
+                err
+            )
+        })
 }

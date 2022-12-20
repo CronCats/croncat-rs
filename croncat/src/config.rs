@@ -40,48 +40,15 @@ impl<'de> Deserialize<'de> for Config {
             ChainRegistry::from_remote().map_err(|e| serde::de::Error::custom(e.to_string()))?;
 
         // Collect the chain configs from the registry.
-        #[allow(clippy::unnecessary_to_owned)]
-        let chain_configs = chains
-            .to_owned()
-            .into_iter()
-            .map(|(chain_id, entry)| {
-                let chain_info = registry
-                    .get_by_chain_id(&chain_id)
-                    .map_err(|e| serde::de::Error::custom(e.to_string()))?;
-                let chain_config = ChainConfig::from_entry(chain_info, entry);
-                Ok((chain_id, chain_config))
-            })
-            .collect::<Result<Vec<_>, D::Error>>()?;
-        let mut chain_configs: HashMap<String, ChainConfig> = chain_configs.into_iter().collect();
+        let mut chain_configs = HashMap::new();
 
-        // Get custom sources from the config.
-        #[allow(clippy::unnecessary_to_owned)]
-        let custom_sources = chains.to_owned().into_iter().fold(
-            HashMap::<String, ChainDataSource>::new(),
-            |mut acc, (_, entry)| {
-                if let Some(custom_sources) = entry.custom_sources {
-                    acc.extend(custom_sources);
-                }
-                acc
-            },
-        );
-
-        // Merge custom sources into the chain configs.
-        for (provider, source) in custom_sources {
-            for chain_config in chain_configs.values_mut() {
-                let apis = &mut chain_config.info.apis;
-                // Add the custom RPC source.
-                apis.rpc.push(Rpc {
-                    provider: Some(provider.clone()),
-                    address: source.rpc.clone(),
-                });
-
-                // Add the custom gRPC source.
-                apis.grpc.push(Grpc {
-                    provider: Some(provider.clone()),
-                    address: source.grpc.clone(),
-                });
-            }
+        #[allow(clippy::unnecessary-to-owned)]
+        for (chain_id, entry) in chains.to_owned() {
+            let chain_info = registry
+                .get_by_chain_id(&chain_id)
+                .map_err(|e| serde::de::Error::custom(e.to_string()))?;
+            let chain_config = ChainConfig::from_entry(chain_info, entry);
+            chain_configs.insert(chain_id.to_owned(), chain_config);
         }
 
         // Return the config.
@@ -124,7 +91,7 @@ pub struct ChainConfig {
 }
 
 impl ChainConfig {
-    fn from_entry(info: ChainInfo, entry: RawChainConfigEntry) -> Self {
+    fn from_entry(mut info: ChainInfo, entry: RawChainConfigEntry) -> Self {
         let gas_prices = entry
             .gas_prices
             .unwrap_or(info.fees.fee_tokens[0].fixed_min_gas_price);
@@ -132,6 +99,23 @@ impl ChainConfig {
         let block_polling_seconds = entry.block_polling_seconds.unwrap_or(5.0);
         let block_polling_timeout_seconds = entry.block_polling_timeout_seconds.unwrap_or(30.0);
         let websocket_timeout_seconds = entry.websocket_timeout_seconds.unwrap_or(30.0);
+
+        // Add optional custom sources to the chain info.
+        if let Some(custom_sources) = entry.custom_sources {
+            for (provider, source) in custom_sources {
+                // Add the custom RPC source.
+                info.apis.rpc.push(Rpc {
+                    provider: Some(provider.clone()),
+                    address: source.rpc.clone(),
+                });
+
+                // Add the custom gRPC source.
+                info.apis.grpc.push(Grpc {
+                    provider: Some(provider.clone()),
+                    address: source.grpc.clone(),
+                });
+            }
+        }
 
         Self {
             info,

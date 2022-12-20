@@ -59,7 +59,7 @@ impl DaemonService {
         // Get the current user's name.
         let user = whoami::username();
         // Get the full path to the croncatd service directory.
-        let full_service_dir_path = fs::canonicalize(&path)?;
+        let full_service_dir_path = fs::canonicalize(path)?;
         // File path for the croncatd service file.
         let service_file_path = full_service_dir_path
             .join(format!("croncatd-{}.service", chain_id))

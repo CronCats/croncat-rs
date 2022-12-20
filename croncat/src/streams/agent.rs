@@ -9,7 +9,6 @@ use cw_croncat_core::types::AgentStatus;
 use prost::{DecodeError, Message};
 use std::process::exit;
 use std::sync::Arc;
-use tendermint::abci::Path;
 use tendermint_rpc::endpoint::abci_query::AbciQuery;
 use tendermint_rpc::{Client, HttpClient, Url};
 use tokio::sync::Mutex;
@@ -173,9 +172,7 @@ async fn get_agent_balance(
     })?;
     let agent_balance: AbciQuery = rpc_client
         .abci_query(
-            Some(Path::from(
-                "/cosmos.bank.v1beta1.Query/AllBalances".parse()?,
-            )),
+            Some("/cosmos.bank.v1beta1.Query/AllBalances".parse()?),
             encoded_msg_request,
             None,
             false,

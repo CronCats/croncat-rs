@@ -44,9 +44,9 @@ impl<'de> Deserialize<'de> for Config {
 
         #[allow(clippy::unnecessary_to_owned)]
         for (chain_id, entry) in chains.to_owned() {
-            let chain_info = registry
-                .get_by_chain_id(&chain_id)
-                .map_err(|e| serde::de::Error::custom(e.to_string()))?;
+            let chain_info = registry.get_by_chain_id(&chain_id).map_err(|e| {
+                serde::de::Error::custom(format!("Registry get_by_chain_id error: {}", e))
+            })?;
             let chain_config = ChainConfig::from_entry(chain_info, entry);
             chain_configs.insert(chain_id.to_owned(), chain_config);
         }

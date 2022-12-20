@@ -9,8 +9,8 @@ chains:
         gas_adjustment: 1.5
         custom_sources:
             "Mikeachu 🙀":
-                rpc: http://45.79.96.94
-                grpc: http://45.79.96.94:12690
+                rpc: https://rpc-testnet-uni.cron.cat
+                grpc: https://grpc-testnet-uni.cron.cat
     # osmosis-1:
     #     manager: 
     #     gas_prices: 0.1

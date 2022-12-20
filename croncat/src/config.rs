@@ -42,7 +42,7 @@ impl<'de> Deserialize<'de> for Config {
         // Collect the chain configs from the registry.
         let mut chain_configs = HashMap::new();
 
-        #[allow(clippy::unnecessary-to-owned)]
+        #[allow(clippy::unnecessary_to_owned)]
         for (chain_id, entry) in chains.to_owned() {
             let chain_info = registry
                 .get_by_chain_id(&chain_id)

@@ -138,6 +138,7 @@ pub async fn run(
         account_status_check_shutdown_rx,
         block_status_accounts_loop,
         block_status_client,
+        config.clone(),
     ));
 
     // Process blocks coming in from the blockchain

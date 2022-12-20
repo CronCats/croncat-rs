@@ -13,8 +13,9 @@ use tendermint::abci::Path;
 use tendermint_rpc::endpoint::abci_query::AbciQuery;
 use tendermint_rpc::{Client, HttpClient, Url};
 use tokio::sync::Mutex;
-use tracing::{info, error};
+use tracing::{error, info};
 
+use crate::config::ChainConfig;
 use crate::{
     channels::{BlockStreamRx, ShutdownRx},
     grpc::GrpcClientService,
@@ -30,6 +31,7 @@ pub async fn check_account_status_loop(
     mut shutdown_rx: ShutdownRx,
     block_status: Arc<Mutex<AgentStatus>>,
     client: GrpcClientService,
+    chain_config: ChainConfig,
 ) -> Result<(), Report> {
     let block_counter = AtomicIntervalCounter::new(10);
     let task_handle: tokio::task::JoinHandle<Result<(), Report>> = tokio::task::spawn(async move {
@@ -79,7 +81,7 @@ pub async fn check_account_status_loop(
                     info!("Agent status: {:?}", *locked_status);
                 }
 
-                if let Some(threshold) = client.chain_config.threshold {
+                if let Some(threshold) = chain_config.threshold {
                     // Check the agent's balance to make sure it's not falling below a threshold
                     let msg_request = QueryAllBalancesRequest {
                         address: client.account_id(),
@@ -87,7 +89,7 @@ pub async fn check_account_status_loop(
                     };
                     let encoded_msg_request = Message::encode_to_vec(&msg_request);
 
-                    let rpc_address = &client.chain_config.info.apis.rpc[0].address;
+                    let rpc_address = &chain_config.info.apis.rpc[0].address;
                     // let rpc_address = client.client.cfg.rpc_endpoint.clone();
                     let node_address: Url = rpc_address.parse()?;
                     let rpc_client = HttpClient::new(node_address).map_err(|err| {
@@ -114,7 +116,7 @@ pub async fn check_account_status_loop(
                         continue;
                     }
 
-                    let denom = &client.chain_config.info.fees.fee_tokens[0].denom;
+                    let denom = &chain_config.info.fees.fee_tokens[0].denom;
                     let agent_native_balance = msg_response
                         .unwrap()
                         .balances
@@ -132,11 +134,9 @@ pub async fn check_account_status_loop(
                     let account_str = account_id.as_str();
                     if agent_native_balance < threshold as u128 {
                         let agent = client
-                            .execute(move |signer| {
-                                async move {
-                                    let agent = signer.get_agent(account_str).await?;
-                                    Ok(agent)
-                                }
+                            .execute(move |signer| async move {
+                                let agent = signer.get_agent(account_str).await?;
+                                Ok(agent)
                             })
                             .await?;
                         let reward_balance = agent
@@ -150,11 +150,9 @@ pub async fn check_account_status_loop(
                         if !reward_balance.is_zero() {
                             info!("Automatically withdrawing agent reward");
                             let result = client
-                                .execute(move |signer| {
-                                    async move {
-                                        let agent = signer.withdraw_reward().await?;
-                                        Ok(agent)
-                                    }
+                                .execute(move |signer| async move {
+                                    let agent = signer.withdraw_reward().await?;
+                                    Ok(agent)
                                 })
                                 .await?;
                             let log = result.log;

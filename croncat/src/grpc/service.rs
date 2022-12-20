@@ -52,7 +52,7 @@ pub enum GrpcClient {
 
 #[derive(Clone, Debug)]
 pub struct GrpcClientService {
-    pub chain_config: ChainConfig,
+    chain_config: ChainConfig,
     key: bip32::XPrv,
     source_info: Arc<Mutex<HashMap<String, (ChainDataSource, bool)>>>,
 }
@@ -88,7 +88,7 @@ impl GrpcClientService {
             let source = source.clone();
             let chain_config = chain_config.clone();
             race_track.add_racer(name, async move {
-                let grpc_client = GrpcQuerier::new(chain_config, source.grpc.clone()).await?;
+                let _grpc_client = GrpcQuerier::new(chain_config, source.grpc.clone()).await?;
                 //let _ = grpc_client.query_config().await?; // TODO: why fails
 
                 Ok(source)

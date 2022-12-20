@@ -67,7 +67,7 @@ struct RawChainConfigEntry {
     pub uptime_ping_url: Option<Url>,
     pub gas_prices: Option<f32>,
     pub gas_adjustment: Option<f32>,
-    pub threshold: Option<u64>
+    pub threshold: Option<u64>,
 }
 
 #[derive(Debug, Clone, Serialize)]

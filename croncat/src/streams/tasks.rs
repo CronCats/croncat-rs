@@ -142,7 +142,7 @@ pub async fn rules_loop(
                             .execute(|signer| async move {
                                 signer
                                     .check_rules(
-                                        task.rules.clone().ok_or_else(|| eyre!("No rules"))?,
+                                        task.queries.clone().ok_or_else(|| eyre!("No rules"))?,
                                     )
                                     .await
                                     .map_err(|err| eyre!("Failed to query rules: {}", err))

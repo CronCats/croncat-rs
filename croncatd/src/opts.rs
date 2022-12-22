@@ -68,9 +68,9 @@ pub enum Command {
 
     /// Starts the Croncat agent, allowing it to fulfill tasks
     Go {
-        /// Allow agent to do tasks with rules, uses more computer resources
-        #[structopt(long, short = "r")]
-        with_rules: bool,
+        /// Allow agent to do tasks with queries, uses more computer resources
+        #[structopt(long, short = "q")]
+        with_queries: bool,
     },
 
     /// Generates a new keypair and agent account (good first step)

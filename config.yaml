@@ -7,6 +7,10 @@ chains:
         manager: juno1x4uaf50flf6af8jpean8ruu8q8jdraaqj7e3gg3wemqm5cdw040qk982ec
         gas_prices: 0.1
         gas_adjustment: 1.5
+        custom_sources:
+            "Mikeachu 🙀":
+                rpc: https://rpc-testnet-uni.cron.cat
+                grpc: https://grpc-testnet-uni.cron.cat
     # osmosis-1:
     #     manager: 
     #     gas_prices: 0.1

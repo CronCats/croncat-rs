@@ -6,7 +6,6 @@ use std::time::Duration;
 
 use cw_croncat_core::msg::AgentResponse;
 use cw_croncat_core::msg::AgentTaskResponse;
-use cw_croncat_core::msg::CwCroncatResponse;
 use cw_croncat_core::msg::TaskResponse;
 use cw_croncat_core::msg::{GetConfigResponse, QueryMsg};
 use serde::de::DeserializeOwned;
@@ -93,15 +92,4 @@ impl GrpcQuerier {
         Ok(json)
     }
 
-    pub async fn get_contract_state(
-        &self,
-        from_index: Option<u64>,
-        limit: Option<u64>,
-    ) -> Result<String, Report> {
-        let response: CwCroncatResponse = self
-            .query_croncat(&QueryMsg::GetState { from_index, limit })
-            .await?;
-        let json = serde_json::to_string_pretty(&response)?;
-        Ok(json)
-    }
 }

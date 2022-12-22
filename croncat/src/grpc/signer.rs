@@ -177,7 +177,7 @@ impl GrpcSigner {
         Ok(res)
     }
 
-    pub async fn query_get_tasks_with_rules(
+    pub async fn query_get_tasks_with_queries(
         &self,
         from_index: Option<u64>,
         limit: Option<u64>,
@@ -192,25 +192,25 @@ impl GrpcSigner {
         Ok(res)
     }
 
-    pub async fn fetch_rules(&self) -> Result<Vec<TaskWithQueriesResponse>, Report> {
-        let mut tasks_with_rules = Vec::new();
+    pub async fn fetch_queries(&self) -> Result<Vec<TaskWithQueriesResponse>, Report> {
+        let mut tasks_with_queries = Vec::new();
         let mut start_index = 0;
         let limit = 20;
         loop {
             let current_iteration = self
-                .query_get_tasks_with_rules(Some(start_index), Some(limit))
+                .query_get_tasks_with_queries(Some(start_index), Some(limit))
                 .await?;
             let last_iteration = current_iteration.len() < limit as usize;
-            tasks_with_rules.extend(current_iteration);
+            tasks_with_queries.extend(current_iteration);
             if last_iteration {
                 break;
             }
             start_index += limit;
         }
-        Ok(tasks_with_rules)
+        Ok(tasks_with_queries)
     }
 
-    pub async fn check_rules(
+    pub async fn check_queries(
         &self,
         queries: Vec<CroncatQuery>,
     ) -> Result<(bool, Option<u64>), Report> {

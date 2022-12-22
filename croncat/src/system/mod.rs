@@ -36,7 +36,7 @@ pub async fn run(
     shutdown_tx: &ShutdownTx,
     config: &ChainConfig,
     key: &ExtendedPrivateKey<SigningKey>,
-    with_rules: bool,
+    with_queries: bool,
 ) -> Result<(), Report> {
     // Setup the chain client.
     let client = GrpcClientService::new(config.clone(), key.clone()).await;
@@ -153,9 +153,9 @@ pub async fn run(
         block_status_tasks,
     ));
 
-    // Check rules if enabled
-    let rules_runner_handle = if with_rules {
-        tokio::task::spawn(tasks::rules_loop(
+    // Check queries if enabled
+    let queries_runner_handle = if with_queries {
+        tokio::task::spawn(tasks::queries_loop(
             dispatcher_tx.subscribe(),
             shutdown_tx.subscribe(),
             client,
@@ -193,7 +193,7 @@ pub async fn run(
         provider_system_handle,
         account_status_check_handle,
         task_runner_handle,
-        rules_runner_handle,
+        queries_runner_handle,
     );
 
     // If any of the tasks failed, we need to propagate the error.
@@ -211,13 +211,13 @@ pub async fn run_retry(
     shutdown_tx: &ShutdownTx,
     config: &ChainConfig,
     key: &ExtendedPrivateKey<SigningKey>,
-    with_rules: bool,
+    with_queries: bool,
 ) -> Result<(), Report> {
     // TODO: Rethink this retry logic
     // let retry_strategy = FixedInterval::from_millis(5000).take(1200);
 
     // Retry::spawn(retry_strategy, || async {
-    run(chain_id, shutdown_tx, config, key, with_rules).await?;
+    run(chain_id, shutdown_tx, config, key, with_queries).await?;
     // .map_err(|err| {
     //     error!("[{}] System crashed: {}", &chain_id, err);
     //     error!("[{}] Retrying...", &chain_id);

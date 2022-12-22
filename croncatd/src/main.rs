@@ -430,7 +430,7 @@ async fn run_command(opts: Opts, mut storage: LocalAgentStorage) -> Result<(), R
                 .await?;
         }
         opts::Command::GetAgent { name } => storage.display_account(&name),
-        opts::Command::Go { with_rules } => {
+        opts::Command::Go { with_queries } => {
             // Make sure we have a chain id to run on
             if opts.chain_id.is_none() {
                 return Err(eyre!("chain-id is required for go command"));
@@ -450,7 +450,7 @@ async fn run_command(opts: Opts, mut storage: LocalAgentStorage) -> Result<(), R
             let (shutdown_tx, _shutdown_rx) = create_shutdown_channel();
 
             // Run the agent on the chain
-            system::run_retry(&chain_id, &shutdown_tx, chain_config, &key, with_rules).await?;
+            system::run_retry(&chain_id, &shutdown_tx, chain_config, &key, with_queries).await?;
         }
         opts::Command::SetupService { output } => {
             for (chain_id, _) in config.chains {

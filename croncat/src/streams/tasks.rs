@@ -98,7 +98,7 @@ pub async fn tasks_loop(
     Ok(())
 }
 
-pub async fn rules_loop(
+pub async fn queries_loop(
     mut block_stream_rx: BlockStreamRx,
     mut shutdown_rx: ShutdownRx,
     client: GrpcClientService,
@@ -106,12 +106,12 @@ pub async fn rules_loop(
 ) -> Result<(), Report> {
     let block_consumer_stream: JoinHandle<Result<(), Report>> = tokio::task::spawn(async move {
         while let Ok(block) = block_stream_rx.recv().await {
-            let tasks_with_rules = client
+            let tasks_with_queries = client
                 .execute(|signer| async move {
                     signer
-                        .fetch_rules()
+                        .fetch_queries()
                         .await
-                        .map_err(|err| eyre!("Failed to fetch rules: {}", err))
+                        .map_err(|err| eyre!("Failed to fetch croncat query: {}", err))
                 })
                 .await?;
 
@@ -124,7 +124,7 @@ pub async fn rules_loop(
                 let time: Timestamp = block.header().time.into();
                 let time_nanos = time.seconds as u64 * 1_000_000_000 + time.nanos as u64;
 
-                for task in tasks_with_rules.iter() {
+                for task in tasks_with_queries.iter() {
                     let in_boundary = match task.boundary {
                         Some(Boundary::Height { start, end }) => {
                             let height = block.header().height.value();
@@ -138,22 +138,25 @@ pub async fn rules_loop(
                         None => true,
                     };
                     if in_boundary {
-                        let (rules_ready, _) = client
+                        let (queries_ready, _) = client
                             .execute(|signer| async move {
                                 signer
-                                    .check_rules(
-                                        task.queries.clone().ok_or_else(|| eyre!("No rules"))?,
+                                    .check_queries(
+                                        task.queries
+                                            .clone()
+                                            .ok_or_else(|| eyre!("No croncat query"))?,
                                     )
                                     .await
-                                    .map_err(|err| eyre!("Failed to query rules: {}", err))
+                                    .map_err(|err| eyre!("Failed to query croncat query: {}", err))
                             })
                             .await?;
-                        if rules_ready {
+                        if queries_ready {
                             client
                                 .execute(|signer| {
                                     let tasks_failed = tasks_failed.clone();
                                     async move {
-                                        match signer.proxy_call(None).await {
+                                        match signer.proxy_call(Some(task.task_hash.clone())).await
+                                        {
                                             Ok(proxy_call_res) => {
                                                 info!("Finished task: {}", proxy_call_res.log);
                                             }

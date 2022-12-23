@@ -91,5 +91,4 @@ impl GrpcQuerier {
         let json = serde_json::to_string_pretty(&response)?;
         Ok(json)
     }
-
 }

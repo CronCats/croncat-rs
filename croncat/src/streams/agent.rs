@@ -4,13 +4,9 @@
 //!
 
 use color_eyre::{eyre::eyre, Report};
-use cosmos_sdk_proto::cosmos::bank::v1beta1::{QueryAllBalancesRequest, QueryAllBalancesResponse};
 use cw_croncat_core::types::AgentStatus;
-use prost::{DecodeError, Message};
 use std::process::exit;
 use std::sync::Arc;
-use tendermint_rpc::endpoint::abci_query::AbciQuery;
-use tendermint_rpc::{Client, HttpClient, Url};
 use tokio::sync::Mutex;
 use tracing::{error, info};
 
@@ -82,19 +78,20 @@ pub async fn check_account_status_loop(
 
                 if let Some(threshold) = chain_config.threshold {
                     // Check the agent's balance to make sure it's not falling below a threshold
-                    let denom = &chain_config.info.fees.fee_tokens[0].denom;
-                    let agent_native_balance = get_agent_balance(
-                        client.account_id(),
-                        &chain_config.info.apis.rpc[0].address,
-                        denom.to_string(),
-                    )
-                    .await?;
+                    let account_id = client.account_id();
+                    let account_str = account_id.as_str();
+                    let agent_balance = client
+                        .execute(move |signer| async move {
+                            let agent = signer.query_native_balance(account_str).await?;
+                            Ok(agent)
+                        })
+                        .await?;
+                    let agent_native_balance = agent_balance.amount.parse::<u128>().unwrap();
+                    let denom = agent_balance.denom;
 
                     // If agent balance is too low and the agent has some native coins in the manager contract
                     // call withdraw_reward
                     // If manager balance is zero, exit
-                    let account_id = client.account_id();
-                    let account_str = account_id.as_str();
                     if agent_native_balance < threshold as u128 {
                         let agent = client
                             .execute(move |signer| async move {
@@ -121,12 +118,15 @@ pub async fn check_account_status_loop(
                             let log = result.log;
                             info!("Log: {log}");
 
-                            let native_balance_after_withdraw = get_agent_balance(
-                                client.account_id(),
-                                &chain_config.info.apis.rpc[0].address,
-                                denom.to_string(),
-                            )
-                            .await?;
+                            let native_balance_after_withdraw = client
+                                .execute(move |signer| async move {
+                                    let agent = signer.query_native_balance(account_str).await?;
+                                    Ok(agent)
+                                })
+                                .await?
+                                .amount
+                                .parse::<u128>()
+                                .unwrap();
                             if native_balance_after_withdraw < threshold as u128 {
                                 error!("Not enough balance to continue, the agent in required to have {} {}, current balance: {} {}", threshold, denom, native_balance_after_withdraw, denom);
                                 error!("Stopping the agent");
@@ -150,51 +150,4 @@ pub async fn check_account_status_loop(
     }
 
     Ok(())
-}
-
-async fn get_agent_balance(
-    account_id: String,
-    rpc_address: &str,
-    denom: String,
-) -> Result<u128, Report> {
-    let msg_request = QueryAllBalancesRequest {
-        address: account_id.clone(),
-        pagination: None,
-    };
-    let encoded_msg_request = Message::encode_to_vec(&msg_request);
-
-    let node_address: Url = rpc_address.parse()?;
-    let rpc_client = HttpClient::new(node_address).map_err(|err| {
-        eyre!(
-            "Could not get http client for RPC node for polling: {}",
-            err.detail()
-        )
-    })?;
-    let agent_balance: AbciQuery = rpc_client
-        .abci_query(
-            Some("/cosmos.bank.v1beta1.Query/AllBalances".parse()?),
-            encoded_msg_request,
-            None,
-            false,
-        )
-        .await?;
-    let msg_response: Result<QueryAllBalancesResponse, DecodeError> =
-        Message::decode(&*agent_balance.value);
-    msg_response
-        .map(|result| {
-            result
-                .balances
-                .into_iter()
-                .find(|c| c.denom == *denom)
-                .unwrap()
-                .amount
-                .parse::<u128>()
-                .unwrap()
-        })
-        .map_err(|err| {
-            eyre!(
-                "Error: unexpected error when querying the balance of the agent: {}",
-                err
-            )
-        })
 }

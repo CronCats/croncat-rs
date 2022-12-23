@@ -68,6 +68,7 @@ struct RawChainConfigEntry {
     pub uptime_ping_url: Option<Url>,
     pub gas_prices: Option<f32>,
     pub gas_adjustment: Option<f32>,
+    pub threshold: Option<u64>,
     pub custom_sources: Option<HashMap<String, ChainDataSource>>,
 }
 
@@ -88,6 +89,7 @@ pub struct ChainConfig {
     pub uptime_ping_url: Option<Url>,
     pub gas_prices: f32,
     pub gas_adjustment: f32,
+    pub threshold: Option<u64>,
 }
 
 impl ChainConfig {
@@ -127,6 +129,7 @@ impl ChainConfig {
             uptime_ping_url: entry.uptime_ping_url,
             gas_prices,
             gas_adjustment,
+            threshold: entry.threshold,
         }
     }
 

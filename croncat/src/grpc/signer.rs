@@ -5,6 +5,7 @@
 use std::time::Duration;
 
 use cosmos_chain_registry::ChainInfo;
+use cosmos_sdk_proto::cosmos::base::v1beta1::Coin;
 use cosmrs::bip32;
 use cosmrs::crypto::secp256k1::SigningKey;
 use cosmrs::AccountId;
@@ -20,6 +21,7 @@ use tendermint_rpc::endpoint::broadcast::tx_commit::TxResult;
 use tokio::time::timeout;
 
 use crate::client::full_client::CosmosFullClient;
+use crate::client::QueryBank;
 use crate::config::ChainConfig;
 use crate::errors::{eyre, Report};
 
@@ -235,5 +237,12 @@ impl GrpcSigner {
 
     pub fn chain_info(&self) -> &ChainInfo {
         &self.client.chain_info
+    }
+
+    pub async fn query_native_balance(&self, account_id: &str) -> Result<Coin, Report> {
+        self.client
+            .query_client
+            .query_native_balance(account_id)
+            .await
     }
 }

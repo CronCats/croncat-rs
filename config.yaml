@@ -3,10 +3,12 @@ chains:
         manager: juno13fuh46m0wpc4kgv3e0p7gsax9xh3e74wp58xcu2kzyvrgh87zzeqxdva56
         gas_prices: 0.04
         gas_adjustment: 1.3
+        threshold: 1000000
     uni-5:
         manager: juno174ncqgapq7fudqj64ut4ue47gevlqp93guecjelnkquruvnpjdgsuk046w
         gas_prices: 0.04
         gas_adjustment: 1.3
+        threshold: 1000000
 #        custom_sources:
 #            "CronCat":
 #                rpc: https://rpc-testnet-uni.cron.cat
@@ -19,6 +21,7 @@ chains:
         manager: osmo1gydw3jdmhye7qzj80xesz457llhx4djhsf99m82xaq63e0yjfsaqafsy6v
         gas_prices: 0.04
         gas_adjustment: 1.3
+        threshold: 1000000
     # stargaze-1:
     #     manager: 
     #     gas_prices: 0.04
@@ -27,6 +30,7 @@ chains:
         manager: stars1w4s4s73s6jugynyv5q80a6ame2avpzv4ymaz64d3m75kq46r6dmqr6026u
         gas_prices: 0.04
         gas_adjustment: 1.3
+        threshold: 1000000
     # titus-1:
     #     manager: 
     #     gas_prices: 0.04

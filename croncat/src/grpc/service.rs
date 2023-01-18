@@ -174,7 +174,7 @@ impl GrpcClientService {
                     match GrpcSigner::new(
                         source.rpc.to_string(),
                         "".to_string(),
-                        self.chain_config.info.clone(),
+                        self.chain_config.clone(),
                         self.chain_config.manager.clone(),
                         self.key.clone(),
                         self.chain_config.gas_prices,

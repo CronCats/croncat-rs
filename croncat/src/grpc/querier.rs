@@ -3,15 +3,24 @@
 //!
 
 use std::collections::HashMap;
+use std::str::FromStr;
 
 use cosm_orc::config::cfg::Config as CosmOrcConfig;
 use cosm_orc::config::ChainConfig as CosmOrcChainConfig;
 use cosm_orc::orchestrator::cosm_orc::CosmOrc;
 use cosm_orc::orchestrator::deploy::DeployInfo;
+use cosm_orc::orchestrator::Coin;
+use cosm_orc::orchestrator::Denom;
+use cosm_orc::orchestrator::Key;
+use cosm_orc::orchestrator::SigningKey;
 use cosm_orc::orchestrator::TendermintRPC;
+use cosm_tome::chain::request::TxOptions;
 use cosm_tome::modules::auth::model::Address;
 
+use cosm_tome::modules::cosmwasm::model::ExecRequest;
+use cosmrs::crypto::secp256k1;
 use cw_croncat_core::msg::AgentTaskResponse;
+use cw_croncat_core::msg::ExecuteMsg;
 use cw_croncat_core::msg::TaskResponse;
 use cw_croncat_core::msg::{GetConfigResponse, QueryMsg};
 use cw_croncat_core::types::AgentStatus;
@@ -22,9 +31,12 @@ use crate::config::ChainConfig;
 use crate::errors::{eyre, Report};
 
 /// An RPC client for querying the croncat contract.
+#[derive(Clone)]
 pub struct RpcClient {
     client: CosmOrc<TendermintRPC>,
     contract_addr: Address,
+    key: Option<SigningKey>,
+    denom: String,
 }
 
 impl RpcClient {
@@ -58,7 +70,20 @@ impl RpcClient {
         Ok(Self {
             client: CosmOrc::new_tendermint_rpc(config, true)?,
             contract_addr,
+            key: None,
+            denom: cfg.info.fees.fee_tokens[0].denom.clone(),
         })
+    }
+
+    /// Set the signing key for this client.
+    pub fn set_key(&mut self, key_bytes: &[u8]) {
+        let mnemonic = bip39::Mnemonic::from_entropy(&key_bytes).unwrap();
+        let key = Key::Mnemonic(mnemonic.to_string());
+
+        self.key = Some(SigningKey {
+            name: "".to_string(),
+            key,
+        });
     }
 
     /// Query the contract via RPC.
@@ -72,6 +97,38 @@ impl RpcClient {
             .client
             .client
             .wasm_query(self.contract_addr.clone(), &msg.into())
+            .await?;
+
+        // Deserialize the response
+        let data = response
+            .data()
+            .map_err(|e| eyre!("Failed to deserialize response data: {}", e))?;
+
+        Ok(data)
+    }
+
+    pub async fn wasm_execute<S, R>(&self, msg: S) -> Result<R, Report>
+    where
+        S: Into<ExecuteMsg>,
+        R: DeserializeOwned,
+    {
+        if self.key.is_none() {
+            return Err(eyre!("No signing key set"));
+        }
+
+        // Query the chain
+        let response = self
+            .client
+            .client
+            .wasm_execute(
+                ExecRequest {
+                    address: self.contract_addr.clone(),
+                    msg: &msg.into(),
+                    funds: vec![],
+                },
+                self.key.as_ref().unwrap(),
+                &TxOptions::default(),
+            )
             .await?;
 
         // Deserialize the response
@@ -152,5 +209,14 @@ impl GrpcQuerier {
             .await?;
         let json = serde_json::to_string_pretty(&response)?;
         Ok(json)
+    }
+}
+
+impl std::fmt::Debug for RpcClient {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("RpcClient")
+            .field("contract_addr", &self.contract_addr)
+            .field("client", &self.client)
+            .finish()
     }
 }

@@ -45,6 +45,7 @@ pub enum GrpcCallType {
     Query,
 }
 
+#[derive(Debug)]
 pub enum GrpcClient {
     Execute(Box<GrpcSigner>),
     Query(Box<GrpcQuerier>),
@@ -88,8 +89,8 @@ impl GrpcClientService {
             let source = source.clone();
             let chain_config = chain_config.clone();
             race_track.add_racer(name, async move {
-                let grpc_client = GrpcQuerier::new(chain_config, source.grpc.clone()).await?;
-                let _ = grpc_client.query_config().await?;
+                let rpc_client = GrpcQuerier::new(chain_config, source.grpc.clone(), source.rpc.clone()).await?;
+                let _ = rpc_client.query_config().await?;
 
                 Ok(source)
             });
@@ -100,6 +101,7 @@ impl GrpcClientService {
 
         // Get the rankings
         let rankings = race_track.rankings();
+        println!("TODO: rankings need to not disqualify if gRPC fails {:?}", rankings);
         // Get the data sources
         let data_sources = chain_config.data_sources();
 
@@ -149,7 +151,9 @@ impl GrpcClientService {
             let mut source_info = self.source_info.lock().await;
             let source_keys = source_info
                 .keys()
-                .filter(|k| !source_info.get(*k).unwrap().1)
+                .filter(|k| {
+                    !source_info.get(*k).unwrap().1
+                })
                 .collect::<Vec<_>>();
 
             if source_keys.is_empty() {
@@ -169,41 +173,48 @@ impl GrpcClientService {
             let (source, _) = source_info.get_mut(&source_key).unwrap().clone();
 
             let grpc_client = match kind {
-                GrpcCallType::Execute => GrpcClient::Execute(Box::new(
-                    match GrpcSigner::new(
-                        source.rpc.to_string(),
-                        source.grpc.to_string(),
-                        self.chain_config.info.clone(),
-                        self.chain_config.manager.clone(),
-                        self.key.clone(),
-                        self.chain_config.gas_prices,
-                        self.chain_config.gas_adjustment,
-                    )
-                    .await
-                    {
-                        Ok(client) => client,
-                        Err(e) => {
-                            debug!("Failed to create grpc client for {}: {}", source_key, e);
-                            let (_, bad) = source_info.get_mut(&source_key).unwrap();
-                            *bad = true;
-                            last_error = Some(e);
-                            continue;
-                        }
-                    },
-                )),
-                GrpcCallType::Query => GrpcClient::Query(Box::new(
-                    match GrpcQuerier::new(self.chain_config.clone(), source.grpc.to_string()).await
-                    {
-                        Ok(client) => client,
-                        Err(e) => {
-                            debug!("Failed to create grpc client for {}: {}", source_key, e);
-                            let (_, bad) = source_info.get_mut(&source_key).unwrap();
-                            *bad = true;
-                            last_error = Some(e);
-                            continue;
-                        }
-                    },
-                )),
+                GrpcCallType::Execute => {
+                    GrpcClient::Execute(Box::new(
+                        match GrpcSigner::new(
+                            source.rpc.to_string(),
+                            source.grpc.to_string(),
+                            self.chain_config.info.clone(),
+                            self.chain_config.manager.clone(),
+                            self.key.clone(),
+                            self.chain_config.gas_prices,
+                            self.chain_config.gas_adjustment,
+                        )
+                          .await
+                        {
+                            Ok(client) => client,
+                            Err(e) => {
+                                debug!("Failed to create grpc client for {}: {}", source_key, e);
+                                let (_, bad) = source_info.get_mut(&source_key).unwrap();
+                                *bad = true;
+                                last_error = Some(e);
+                                continue;
+                            }
+                        },
+                    ))
+                },
+                GrpcCallType::Query => {
+                    GrpcClient::Query(Box::new(
+                        match GrpcQuerier::new(self.chain_config.clone(), source.grpc.to_string(), "https://juno-testnet-rpc.polkachu.com:443".to_string()).await
+                        // match GrpcQuerier::new(self.chain_config.clone(), source.grpc.to_string(), source.rpc.to_string()).await
+                        {
+                            Ok(client) => {
+                                client
+                            },
+                            Err(e) => {
+                                debug!("Failed to create grpc client for {}: {}", source_key, e);
+                                let (_, bad) = source_info.get_mut(&source_key).unwrap();
+                                *bad = true;
+                                last_error = Some(e);
+                                continue;
+                            }
+                        },
+                    ))
+                },
             };
 
             match f(grpc_client).await {

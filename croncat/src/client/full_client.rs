@@ -16,7 +16,7 @@ use super::wasm_execute::{
     generate_wasm_body, prepare_send, prepare_simulate_tx, send_tx, simulate_gas_fee,
 };
 
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub struct CosmosFullClient {
     pub(crate) chain_info: ChainInfo,
     pub(crate) key: bip32::XPrv,
@@ -43,7 +43,7 @@ impl CosmosFullClient {
         let service_client = ServiceClient::connect(grpc_url.clone())
             .await
             .map_err(|err| eyre!("Failed to create GRPC service client: {}", err))?;
-        let query_client = CosmosQueryClient::new(&grpc_url, &native_denom)
+        let query_client = CosmosQueryClient::new(&grpc_url, &rpc_url, &native_denom)
             .await
             .map_err(|err| eyre!("Failed to create GRPC query client: {}", err))?;
 

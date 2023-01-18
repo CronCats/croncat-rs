@@ -1,5 +1,7 @@
 use async_trait::async_trait;
 use color_eyre::Report;
+use cosm_orc::orchestrator::cosm_orc::CosmOrc;
+use cosm_tome::clients::tendermint_rpc::TendermintRPC;
 use cosmos_sdk_proto::cosmwasm::wasm::v1::query_client::QueryClient;
 use cosmos_sdk_proto::cosmwasm::wasm::v1::QuerySmartContractStateRequest;
 use serde::de::DeserializeOwned;
@@ -7,6 +9,7 @@ use tonic::transport::Channel;
 
 pub trait GetWasmQueryClient {
     fn wasm_query_client(&self) -> QueryClient<Channel>;
+    fn tm_wasm_query_client(&self) -> CosmOrc<TendermintRPC>;
 }
 
 #[async_trait]

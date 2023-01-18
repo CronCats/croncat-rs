@@ -25,7 +25,7 @@ use crate::client::QueryBank;
 use crate::config::ChainConfig;
 use crate::errors::{eyre, Report};
 
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub struct GrpcSigner {
     client: CosmosFullClient,
     pub manager: String,

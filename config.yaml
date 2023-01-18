@@ -5,7 +5,7 @@ chains:
         gas_adjustment: 1.3
         threshold: 1000000
     uni-5:
-        manager: juno174ncqgapq7fudqj64ut4ue47gevlqp93guecjelnkquruvnpjdgsuk046w
+        manager: juno1gqkv06dxrccavckw8ydwaxm353pvlrtx0cgxfehvn0gjvlwjfscq58nn8w
         gas_prices: 0.04
         gas_adjustment: 1.3
         threshold: 1000000

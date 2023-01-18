@@ -5,7 +5,7 @@ use cosmos_sdk_proto::cosmos::bank::v1beta1::QueryBalanceRequest;
 use cosmos_sdk_proto::cosmos::base::v1beta1::Coin;
 use tonic::transport::Channel;
 
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub struct BankQueryClient {
     bank_query_client: QueryClient<Channel>,
     native_denom: String,

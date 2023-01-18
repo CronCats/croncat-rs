@@ -101,10 +101,6 @@ impl GrpcClientService {
 
         // Get the rankings
         let rankings = race_track.rankings();
-        println!(
-            "TODO: rankings need to not disqualify if gRPC fails {:?}",
-            rankings
-        );
         // Get the data sources
         let data_sources = chain_config.data_sources();
 
@@ -214,6 +210,10 @@ impl GrpcClientService {
             match f(grpc_client).await {
                 Ok(result) => {
                     return Ok(result);
+                }
+                Err(e) if e.to_string().contains("Agent not registered") => {
+                    debug!("Agent not registered for {}: {}", source_key, e);
+                    break Err(e);
                 }
                 Err(e) => {
                     debug!("Error calling chain for {}: {}", source_key, e);

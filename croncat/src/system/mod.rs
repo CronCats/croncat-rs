@@ -54,7 +54,7 @@ pub async fn run(
         .await?;
 
     if raw_status.is_none() {
-        return Err(eyre!("Agent is not registered"))
+        return Err(eyre!("Agent is not registered"));
     }
 
     let account_id = client.account_id();

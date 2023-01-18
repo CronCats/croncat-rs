@@ -2,13 +2,13 @@
 //! This module contains the code for querying the croncat contract via gRPC.
 //!
 
-use std::time::Duration;
 use cosm_tome::modules::auth::model::Address;
 use cw_croncat_core::msg::AgentTaskResponse;
 use cw_croncat_core::msg::TaskResponse;
 use cw_croncat_core::msg::{GetConfigResponse, QueryMsg};
 use cw_croncat_core::types::AgentStatus;
 use serde::de::DeserializeOwned;
+use std::time::Duration;
 use tokio::time::timeout;
 
 use crate::client::query_client::CosmosQueryClient;
@@ -70,29 +70,41 @@ impl GrpcQuerier {
         Ok(json)
     }
 
-    pub async fn get_agent_status(&self, account_id: String) -> Result<Option<AgentStatus>, Report> {
+    pub async fn get_agent_status(
+        &self,
+        account_id: String,
+    ) -> Result<Option<AgentStatus>, Report> {
         let croncat_address: Address = self.croncat_addr.parse()?;
         let client = self.client.tm_wasm_query_client().client;
 
         // TODO: remove this funsies block
         'funsies_remove_me_haha: {
             // For funsies, try it with Trevor's agent
-            let funsies = client.wasm_query(croncat_address.clone(), &QueryMsg::GetAgent { account_id: "juno1rez0cc8zx8u75wqaz04xzcr83f79lw4hk62z7t".to_string()}).await?;
+            let funsies = client
+                .wasm_query(
+                    croncat_address.clone(),
+                    &QueryMsg::GetAgent {
+                        account_id: "juno1rez0cc8zx8u75wqaz04xzcr83f79lw4hk62z7t".to_string(),
+                    },
+                )
+                .await?;
             println!("(remove this demo) funsies {:?}", funsies);
         }
 
-        let agent = client.wasm_query(croncat_address, &QueryMsg::GetAgent { account_id }).await;
+        let agent = client
+            .wasm_query(croncat_address, &QueryMsg::GetAgent { account_id })
+            .await;
         let agent_status_decoded = String::from_utf8(agent.unwrap().res.data.clone().unwrap());
         let agent_status_readable = match agent_status_decoded {
             Ok(status) => status,
-            Err(e) => return Err(eyre!("Could not turn agent status into string. {:?}", e))
+            Err(e) => return Err(eyre!("Could not turn agent status into string. {:?}", e)),
         };
         let status: Option<AgentStatus> = match agent_status_readable.to_lowercase().as_str() {
             "active" => Some(AgentStatus::Active),
             "pending" => Some(AgentStatus::Pending),
             "nominated" => Some(AgentStatus::Nominated),
             "null" => None,
-            _ => return Err(eyre!("Unknown agent status"))
+            _ => return Err(eyre!("Unknown agent status")),
         };
 
         Ok(status)

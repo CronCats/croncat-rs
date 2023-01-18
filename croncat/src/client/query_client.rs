@@ -1,12 +1,12 @@
 use color_eyre::Report;
-use serde::{de::DeserializeOwned, Serialize};
-use tonic::transport::Channel;
-use cosm_orc::orchestrator::cosm_orc::CosmOrc;
-use cosm_orc::orchestrator::deploy::DeployInfo;
 use cosm_orc::config::cfg::Config as CosmOrcConfig;
 use cosm_orc::config::ChainConfig;
-use std::collections::HashMap;
+use cosm_orc::orchestrator::cosm_orc::CosmOrc;
+use cosm_orc::orchestrator::deploy::DeployInfo;
 use cosm_tome::clients::tendermint_rpc::TendermintRPC;
+use serde::{de::DeserializeOwned, Serialize};
+use std::collections::HashMap;
+use tonic::transport::Channel;
 
 use super::{
     auth_query::GetAuthQueryClient,
@@ -34,10 +34,15 @@ impl CosmosQueryClient {
         let native_denom = native_denom.into();
         let mut contract_deploy_info = HashMap::new();
         // TODO: remove super-hardcore-hardcoding
-        contract_deploy_info.insert("croncat-manager".to_string(), DeployInfo {
-            code_id: Some(4239),
-            address: Some("juno1gqkv06dxrccavckw8ydwaxm353pvlrtx0cgxfehvn0gjvlwjfscq58nn8w".to_string()),
-        });
+        contract_deploy_info.insert(
+            "croncat-manager".to_string(),
+            DeployInfo {
+                code_id: Some(4239),
+                address: Some(
+                    "juno1gqkv06dxrccavckw8ydwaxm353pvlrtx0cgxfehvn0gjvlwjfscq58nn8w".to_string(),
+                ),
+            },
+        );
         let config = CosmOrcConfig {
             chain_cfg: ChainConfig {
                 denom: native_denom.clone(),
@@ -54,7 +59,7 @@ impl CosmosQueryClient {
             wasm_query_client: WasmQueryClient::connect(grpc.clone()).await?,
             auth_query_client: AuthQueryClient::connect(grpc.clone()).await?,
             bank_query_client: BankQueryClient::new(grpc, native_denom).await?,
-            tm_query_client: CosmOrc::new_tendermint_rpc(config, true)?
+            tm_query_client: CosmOrc::new_tendermint_rpc(config, true)?,
         })
     }
 

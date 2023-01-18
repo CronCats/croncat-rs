@@ -261,10 +261,9 @@ async fn run_command(opts: Opts, mut storage: LocalAgentStorage) -> Result<(), R
 
                         // Handle the result of the query
                         match query {
-                            Ok(result) => match result {
-                                None => info!("Agent is not registered…"),
-                                Some(status) => info!("Status Result: {:?}", status),
-                            },
+                            Ok(result) => {
+                                info!("Result: {:?}", result);
+                            }
                             Err(err) if err.to_string().contains("Agent not registered") => {
                                 Err(eyre!("Agent not registered"))?;
                             }

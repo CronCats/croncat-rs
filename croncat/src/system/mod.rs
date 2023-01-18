@@ -43,22 +43,14 @@ pub async fn run(
 
     // Get the status of the agent
     let account_id = client.account_id();
-    let raw_status = client
+    let status = client
         .query(move |querier| {
             let account_id = account_id.clone();
-            async move {
-                let agent_status = querier.get_agent_status(account_id).await;
-                agent_status
-            }
+            async move { querier.get_agent_status(account_id).await }
         })
         .await?;
 
-    if raw_status.is_none() {
-        return Err(eyre!("Agent is not registered"));
-    }
-
     let account_id = client.account_id();
-    let status = raw_status.unwrap(); // We know we can
     info!("[{}] Agent account id: {}", chain_id, account_id);
     info!("[{}] Initial agent status: {:?}", chain_id, status);
     let status = Arc::new(Mutex::new(status));

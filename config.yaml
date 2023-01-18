@@ -9,12 +9,12 @@ chains:
         gas_prices: 0.04
         gas_adjustment: 1.3
         threshold: 1000000
-#        custom_sources:
-#            "CronCat":
-#                rpc: https://rpc-testnet-uni.cron.cat
-#                grpc: https://grpc-testnet-uni.cron.cat
+    #        custom_sources:
+    #            "CronCat":
+    #                rpc: https://rpc-testnet-uni.cron.cat
+    #                grpc: https://grpc-testnet-uni.cron.cat
     # osmosis-1:
-    #     manager: 
+    #     manager:
     #     gas_prices: 0.04
     #     gas_adjustment: 1.3
     osmo-test-4:
@@ -23,7 +23,7 @@ chains:
         gas_adjustment: 1.3
         threshold: 1000000
     # stargaze-1:
-    #     manager: 
+    #     manager:
     #     gas_prices: 0.04
     #     gas_adjustment: 1.3
     elgafar-1:
@@ -32,10 +32,10 @@ chains:
         gas_adjustment: 1.3
         threshold: 1000000
     # titus-1:
-    #     manager: 
+    #     manager:
     #     gas_prices: 0.04
     #     gas_adjustment: 1.3
     # constantine-1:
-    #     manager: 
+    #     manager:
     #     gas_prices: 0.04
     #     gas_adjustment: 1.3

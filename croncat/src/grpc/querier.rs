@@ -2,22 +2,89 @@
 //! This module contains the code for querying the croncat contract via gRPC.
 //!
 
+use std::collections::HashMap;
+
+use cosm_orc::config::cfg::Config as CosmOrcConfig;
+use cosm_orc::config::ChainConfig as CosmOrcChainConfig;
+use cosm_orc::orchestrator::cosm_orc::CosmOrc;
+use cosm_orc::orchestrator::deploy::DeployInfo;
+use cosm_orc::orchestrator::TendermintRPC;
 use cosm_tome::modules::auth::model::Address;
+
 use cw_croncat_core::msg::AgentTaskResponse;
 use cw_croncat_core::msg::TaskResponse;
 use cw_croncat_core::msg::{GetConfigResponse, QueryMsg};
 use cw_croncat_core::types::AgentStatus;
-use serde::de::DeserializeOwned;
-use std::time::Duration;
-use tokio::time::timeout;
 
-use crate::client::query_client::CosmosQueryClient;
-use crate::client::GetWasmQueryClient;
+use serde::de::DeserializeOwned;
+
 use crate::config::ChainConfig;
 use crate::errors::{eyre, Report};
 
+/// An RPC client for querying the croncat contract.
+pub struct RpcClient {
+    client: CosmOrc<TendermintRPC>,
+    contract_addr: Address,
+}
+
+impl RpcClient {
+    /// Create a new [`RpcClient`].
+    pub fn new(cfg: &ChainConfig, rpc_url: &str) -> Result<Self, Report> {
+        // Build the contract info map.
+        let mut contract_deploy_info = HashMap::new();
+        contract_deploy_info.insert(
+            "croncat-manager".to_string(),
+            DeployInfo {
+                code_id: None,
+                address: Some(cfg.manager.clone()),
+            },
+        );
+
+        // Convert our config into a CosmOrc config with the specified rpc url.
+        let config = CosmOrcConfig {
+            chain_cfg: CosmOrcChainConfig {
+                denom: cfg.info.fees.fee_tokens[0].denom.clone(),
+                prefix: cfg.info.bech32_prefix.clone(),
+                chain_id: cfg.info.chain_id.clone(),
+                rpc_endpoint: Some(rpc_url.to_string()),
+                grpc_endpoint: None,
+                gas_prices: cfg.gas_prices as f64,
+                gas_adjustment: cfg.gas_adjustment as f64,
+            },
+            contract_deploy_info,
+        };
+        let contract_addr = cfg.manager.parse::<Address>()?;
+
+        Ok(Self {
+            client: CosmOrc::new_tendermint_rpc(config, true)?,
+            contract_addr,
+        })
+    }
+
+    /// Query the contract via RPC.
+    pub async fn wasm_query<S, R>(&self, msg: S) -> Result<R, Report>
+    where
+        S: Into<QueryMsg>,
+        R: DeserializeOwned,
+    {
+        // Query the chain
+        let response = self
+            .client
+            .client
+            .wasm_query(self.contract_addr.clone(), &msg.into())
+            .await?;
+
+        // Deserialize the response
+        let data = response
+            .data()
+            .map_err(|e| eyre!("Failed to deserialize response data: {}", e))?;
+
+        Ok(data)
+    }
+}
+
 pub struct GrpcQuerier {
-    client: CosmosQueryClient,
+    rpc_client: RpcClient,
     croncat_addr: String,
 }
 
@@ -30,84 +97,41 @@ impl std::fmt::Debug for GrpcQuerier {
 }
 
 impl GrpcQuerier {
-    pub async fn new(cfg: ChainConfig, grpc_url: String, rpc_url: String) -> Result<Self, Report> {
-        // TODO: How should we handle this? Is the hack okay?
-        // Quick hack to add https:// to the url if it is missing
-        let grpc_url = if !grpc_url.starts_with("https://") {
-            format!("https://{}", grpc_url)
-        } else {
-            grpc_url
-        };
+    pub async fn new(cfg: ChainConfig, rpc_url: String) -> Result<Self, Report> {
         let rpc_url = if !rpc_url.starts_with("https://") {
             format!("https://{}", rpc_url)
         } else {
             rpc_url
         };
 
-        let client = timeout(
-            Duration::from_secs(10),
-            CosmosQueryClient::new(grpc_url, rpc_url, &cfg.info.fees.fee_tokens[0].denom),
-        )
-        .await??;
+        let rpc_client = RpcClient::new(&cfg, &rpc_url)?;
 
         Ok(Self {
-            client,
+            rpc_client,
             croncat_addr: cfg.manager,
         })
     }
 
-    pub async fn query_croncat<T>(&self, msg: &QueryMsg) -> Result<T, Report>
+    pub async fn query_croncat<S, T>(&self, msg: S) -> Result<T, Report>
     where
+        S: Into<QueryMsg>,
         T: DeserializeOwned,
     {
-        let out = self.client.query_contract(&self.croncat_addr, msg).await?;
-        Ok(out)
+        self.rpc_client.wasm_query(msg).await
     }
 
     pub async fn query_config(&self) -> Result<String, Report> {
-        let config: GetConfigResponse = self.query_croncat(&QueryMsg::GetConfig {}).await?;
+        let config: GetConfigResponse = self.query_croncat(QueryMsg::GetConfig {}).await?;
         let json = serde_json::to_string_pretty(&config)?;
         Ok(json)
     }
 
-    pub async fn get_agent_status(
-        &self,
-        account_id: String,
-    ) -> Result<Option<AgentStatus>, Report> {
-        let croncat_address: Address = self.croncat_addr.parse()?;
-        let client = self.client.tm_wasm_query_client().client;
+    pub async fn get_agent_status(&self, account_id: String) -> Result<AgentStatus, Report> {
+        let status: Option<AgentStatus> = self
+            .query_croncat(QueryMsg::GetAgent { account_id })
+            .await?;
 
-        // TODO: remove this funsies block
-        'funsies_remove_me_haha: {
-            // For funsies, try it with Trevor's agent
-            let funsies = client
-                .wasm_query(
-                    croncat_address.clone(),
-                    &QueryMsg::GetAgent {
-                        account_id: "juno1rez0cc8zx8u75wqaz04xzcr83f79lw4hk62z7t".to_string(),
-                    },
-                )
-                .await?;
-            println!("(remove this demo) funsies {:?}", funsies);
-        }
-
-        let agent = client
-            .wasm_query(croncat_address, &QueryMsg::GetAgent { account_id })
-            .await;
-        let agent_status_decoded = String::from_utf8(agent.unwrap().res.data.clone().unwrap());
-        let agent_status_readable = match agent_status_decoded {
-            Ok(status) => status,
-            Err(e) => return Err(eyre!("Could not turn agent status into string. {:?}", e)),
-        };
-        let status: Option<AgentStatus> = match agent_status_readable.to_lowercase().as_str() {
-            "active" => Some(AgentStatus::Active),
-            "pending" => Some(AgentStatus::Pending),
-            "nominated" => Some(AgentStatus::Nominated),
-            "null" => None,
-            _ => return Err(eyre!("Unknown agent status")),
-        };
-
-        Ok(status)
+        status.ok_or_else(|| eyre!("Agent not registered"))
     }
 
     pub async fn get_tasks(
@@ -116,7 +140,7 @@ impl GrpcQuerier {
         limit: Option<u64>,
     ) -> Result<String, Report> {
         let response: Vec<TaskResponse> = self
-            .query_croncat(&QueryMsg::GetTasks { from_index, limit })
+            .query_croncat(QueryMsg::GetTasks { from_index, limit })
             .await?;
         let json = serde_json::to_string_pretty(&response)?;
         Ok(json)
@@ -124,7 +148,7 @@ impl GrpcQuerier {
 
     pub async fn get_agent_tasks(&self, account_id: String) -> Result<String, Report> {
         let response: Option<AgentTaskResponse> = self
-            .query_croncat(&QueryMsg::GetAgentTasks { account_id })
+            .query_croncat(QueryMsg::GetAgentTasks { account_id })
             .await?;
         let json = serde_json::to_string_pretty(&response)?;
         Ok(json)

@@ -4,7 +4,7 @@
 
 use cw_croncat_core::msg::AgentTaskResponse;
 use cw_croncat_core::msg::TaskResponse;
-use cw_croncat_core::msg::{GetConfigResponse, QueryMsg};
+use cw_croncat_core::msg::{GetConfigResponse, QueryMsg, AgentResponse};
 use cw_croncat_core::types::AgentStatus;
 
 use serde::de::DeserializeOwned;
@@ -59,11 +59,15 @@ impl Querier {
     }
 
     pub async fn get_agent_status(&self, account_id: String) -> Result<AgentStatus, Report> {
-        let status: Option<AgentStatus> = self
+        let agent_info: Option<AgentResponse> = self
             .query_croncat(QueryMsg::GetAgent { account_id })
             .await?;
 
-        status.ok_or_else(|| eyre!("Agent not registered"))
+        if agent_info.is_none() {
+            Err(eyre!("Agent not registered"))
+        } else {
+            Ok(agent_info.unwrap().status)
+        }
     }
 
     pub async fn get_tasks(

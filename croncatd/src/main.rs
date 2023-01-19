@@ -83,9 +83,11 @@ async fn run_command(opts: Opts, mut storage: LocalAgentStorage) -> Result<(), R
 
             // Get the key and create a signer
             let key = storage.get_agent_signing_key(&opts.agent)?;
+            let mnemonic = storage.get_agent_mnemonic(&opts.agent)?;
 
             // Get a grpc client
-            let client = GrpcClientService::new(chain_config.clone(), key).await;
+            let client =
+                GrpcClientService::new(chain_config.clone(), mnemonic.to_string(), key).await;
 
             client
                 .execute(|signer| {
@@ -118,6 +120,7 @@ async fn run_command(opts: Opts, mut storage: LocalAgentStorage) -> Result<(), R
                                 if err.to_string().contains("account")
                                     && err.to_string().contains("not found") =>
                             {
+                                println!("{:?}", err);
                                 Err(eyre!("Agent account not found on chain"))?;
                             }
                             Err(err) => Err(eyre!("Failed to register agent: {}", err))?,
@@ -142,9 +145,11 @@ async fn run_command(opts: Opts, mut storage: LocalAgentStorage) -> Result<(), R
 
             // Get the key and create a signer
             let key = storage.get_agent_signing_key(&opts.agent)?;
+            let mnemonic = storage.get_agent_mnemonic(&opts.agent)?;
 
             // Get a grpc client
-            let client = GrpcClientService::new(chain_config.clone(), key).await;
+            let client =
+                GrpcClientService::new(chain_config.clone(), mnemonic.to_string(), key).await;
 
             client
                 .execute(|signer| async move {
@@ -186,9 +191,11 @@ async fn run_command(opts: Opts, mut storage: LocalAgentStorage) -> Result<(), R
 
             // Get the key and create a signer
             let key = storage.get_agent_signing_key(&opts.agent)?;
+            let mnemonic = storage.get_agent_mnemonic(&opts.agent)?;
 
             // Get a grpc client
-            let client = GrpcClientService::new(chain_config.clone(), key).await;
+            let client =
+                GrpcClientService::new(chain_config.clone(), mnemonic.to_string(), key).await;
 
             client
                 .execute(|signer| async move {
@@ -239,9 +246,11 @@ async fn run_command(opts: Opts, mut storage: LocalAgentStorage) -> Result<(), R
 
             // Get the key and create a signer
             let key = storage.get_agent_signing_key(&opts.agent)?;
+            let mnemonic = storage.get_agent_mnemonic(&opts.agent)?;
 
             // Get a grpc client
-            let client = GrpcClientService::new(chain_config.clone(), key).await;
+            let client =
+                GrpcClientService::new(chain_config.clone(), mnemonic.to_string(), key).await;
 
             // Get the account id
             let account_addr = storage.get_agent_signing_account_addr(
@@ -290,9 +299,11 @@ async fn run_command(opts: Opts, mut storage: LocalAgentStorage) -> Result<(), R
 
             // Get the key and create a signer
             let key = storage.get_agent_signing_key(&opts.agent)?;
+            let mnemonic = storage.get_agent_mnemonic(&opts.agent)?;
 
             // Get a grpc client
-            let client = GrpcClientService::new(chain_config.clone(), key).await;
+            let client =
+                GrpcClientService::new(chain_config.clone(), mnemonic.to_string(), key).await;
 
             // Get the account id
             let account_addr = storage.get_agent_signing_account_addr(
@@ -341,9 +352,11 @@ async fn run_command(opts: Opts, mut storage: LocalAgentStorage) -> Result<(), R
 
             // Get the key and create a signer
             let key = storage.get_agent_signing_key(&opts.agent)?;
+            let mnemonic = storage.get_agent_mnemonic(&opts.agent)?;
 
             // Get a grpc client
-            let client = GrpcClientService::new(chain_config.clone(), key).await;
+            let client =
+                GrpcClientService::new(chain_config.clone(), mnemonic.to_string(), key).await;
 
             // Get the account id
             let account_addr = storage.get_agent_signing_account_addr(
@@ -397,9 +410,11 @@ async fn run_command(opts: Opts, mut storage: LocalAgentStorage) -> Result<(), R
 
             // Get the key and create a signer
             let key = storage.get_agent_signing_key(&opts.agent)?;
+            let mnemonic = storage.get_agent_mnemonic(&opts.agent)?;
 
             // Get a grpc client
-            let client = GrpcClientService::new(chain_config.clone(), key).await;
+            let client =
+                GrpcClientService::new(chain_config.clone(), mnemonic.to_string(), key).await;
 
             client
                 .execute(|signer| async move {
@@ -439,6 +454,7 @@ async fn run_command(opts: Opts, mut storage: LocalAgentStorage) -> Result<(), R
 
             // Get the key for the agent signing account
             let key = storage.get_agent_signing_key(&opts.agent)?;
+            let mnemonic = storage.get_agent_mnemonic(&opts.agent)?.to_string();
 
             // Get the chain config for the chain we're going to run on
             let chain_config = config
@@ -450,7 +466,15 @@ async fn run_command(opts: Opts, mut storage: LocalAgentStorage) -> Result<(), R
             let (shutdown_tx, _shutdown_rx) = create_shutdown_channel();
 
             // Run the agent on the chain
-            system::run_retry(&chain_id, &shutdown_tx, chain_config, &key, with_queries).await?;
+            system::run_retry(
+                &chain_id,
+                &shutdown_tx,
+                chain_config,
+                &key,
+                &mnemonic,
+                with_queries,
+            )
+            .await?;
         }
         opts::Command::SetupService { output } => {
             for (chain_id, _) in config.chains {

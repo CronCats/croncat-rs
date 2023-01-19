@@ -6,9 +6,6 @@ use std::time::Duration;
 
 use cosm_orc::orchestrator::Coin;
 use cosmrs::bip32;
-use cosmrs::bip32::secp256k1::sha2;
-use cosmrs::bip32::secp256k1::sha2::Digest;
-use cosmrs::bip32::secp256k1::sha2::Sha256;
 use cosmrs::crypto::secp256k1::SigningKey;
 use cosmrs::AccountId;
 use cw_croncat_core::msg::AgentResponse;
@@ -41,6 +38,7 @@ impl GrpcSigner {
         cfg: ChainConfig,
         manager: String,
         key: bip32::XPrv,
+        mnemonic: String,
     ) -> Result<Self, Report> {
         // TODO: How should we handle this? Is the hack okay?
         // Quick hack to add https:// to the url if it is missing
@@ -54,15 +52,16 @@ impl GrpcSigner {
         //     .public_key()
         //     .account_id(&client.chain_info.bech32_prefix)?;
 
-        let account_id: SigningKey = key.clone().into();
-        let account_id = account_id
+        let signing_key: SigningKey = key.into();
+        let account_id = signing_key
             .public_key()
             .account_id(&cfg.info.bech32_prefix)?;
 
         // Create a new RPC client
         let mut rpc_client = RpcClient::new(&cfg, rpc_url.as_str())?;
-        // Get the bytes of the private key and pass it to the RPC client
-        rpc_client.set_key(key.private_key().clone().to_bytes().to_vec().as_slice());
+        // TODO: This is a hack to get around the fact that cosm-tome doesn't
+        // let us pass an xprv.
+        rpc_client.set_mnemonic(mnemonic);
 
         Ok(Self {
             account_id,
@@ -74,12 +73,14 @@ impl GrpcSigner {
     pub fn from_chain_config(
         chain_config: &ChainConfig,
         key: bip32::XPrv,
+        mnemonic: String,
     ) -> impl Future<Output = Result<Self, Report>> {
         GrpcSigner::new(
             chain_config.info.apis.rpc[0].address.clone(),
             chain_config.clone(),
             chain_config.manager.clone(),
             key,
+            mnemonic,
         )
     }
 

@@ -174,6 +174,16 @@ impl LocalAgentStorage {
         Ok(key)
     }
 
+    pub fn get_agent_mnemonic(&self, account_id: &AccountId) -> Result<Mnemonic, Report> {
+        let entry = if let Some(entry) = self.get(account_id) {
+            entry
+        } else {
+            return Err(eyre!("Agent not found: {}", account_id));
+        };
+        let mnemonic: Mnemonic = entry.mnemonic.parse()?;
+        Ok(mnemonic)
+    }
+
     pub fn get_agent_signing_account_addr(
         &self,
         account_id: &AccountId,

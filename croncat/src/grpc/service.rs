@@ -55,16 +55,18 @@ pub enum GrpcClient {
 pub struct GrpcClientService {
     chain_config: ChainConfig,
     key: bip32::XPrv,
+    mnemonic: String,
     source_info: Arc<Mutex<HashMap<String, (ChainDataSource, bool)>>>,
 }
 
 impl GrpcClientService {
-    pub async fn new(chain_config: ChainConfig, key: bip32::XPrv) -> Self {
+    pub async fn new(chain_config: ChainConfig, mnemonic: String, key: bip32::XPrv) -> Self {
         let data_sources =
             Self::pick_best_sources(&chain_config, &chain_config.data_sources()).await;
 
         Self {
             key,
+            mnemonic,
             chain_config,
             source_info: Arc::new(Mutex::new(data_sources)),
         }
@@ -176,6 +178,7 @@ impl GrpcClientService {
                         self.chain_config.clone(),
                         self.chain_config.manager.clone(),
                         self.key.clone(),
+                        self.mnemonic.clone(),
                     )
                     .await
                     {
@@ -208,7 +211,7 @@ impl GrpcClientService {
                 Ok(result) => {
                     return Ok(result);
                 }
-                Err(e) if e.to_string().contains("Agent not registered") => {
+                Err(e) if break_loop_errors(&e) => {
                     debug!("Agent not registered for {}: {}", source_key, e);
                     break Err(e);
                 }
@@ -252,4 +255,11 @@ impl GrpcClientService {
         })
         .await
     }
+}
+
+fn break_loop_errors(e: &Report) -> bool {
+    let msg = e.to_string().to_lowercase();
+    msg.contains("agent not registered")
+        || msg.contains("account not found")
+        || msg.contains("already registered")
 }

@@ -76,13 +76,10 @@ impl RpcClient {
     }
 
     /// Set the signing key for this client.
-    pub fn set_key(&mut self, key_bytes: &[u8]) {
-        let mnemonic = bip39::Mnemonic::from_entropy(&key_bytes).unwrap();
-        let key = Key::Mnemonic(mnemonic.to_string());
-
+    pub fn set_mnemonic(&mut self, mnemonic: String) {
         self.key = Some(SigningKey {
             name: "".to_string(),
-            key,
+            key: Key::Mnemonic(mnemonic),
         });
     }
 

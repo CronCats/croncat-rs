@@ -19,7 +19,7 @@ use crate::{
     config::ChainConfig,
     errors::{eyre, Report},
     logging::info,
-    rpc::GrpcClientService,
+    rpc::RpcClientService,
     streams::{agent, polling::poll_stream_blocks, tasks},
     tokio,
 };
@@ -40,7 +40,7 @@ pub async fn run(
     with_queries: bool,
 ) -> Result<(), Report> {
     // Setup the chain client.
-    let client = GrpcClientService::new(config.clone(), mnemonic.clone(), key.clone()).await;
+    let client = RpcClientService::new(config.clone(), mnemonic.clone(), key.clone()).await;
 
     // Get the status of the agent
     let account_id = client.account_id();

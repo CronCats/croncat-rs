@@ -9,5 +9,5 @@ pub mod signer;
 
 pub use client::RpcClient;
 pub use querier::Querier;
-pub use service::GrpcClientService;
+pub use service::RpcClientService;
 pub use signer::Signer;

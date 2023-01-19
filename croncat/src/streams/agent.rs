@@ -13,7 +13,7 @@ use tracing::{error, info};
 use crate::config::ChainConfig;
 use crate::{
     channels::{BlockStreamRx, ShutdownRx},
-    rpc::GrpcClientService,
+    rpc::RpcClientService,
     utils::AtomicIntervalCounter,
 };
 
@@ -25,7 +25,7 @@ pub async fn check_account_status_loop(
     mut block_stream_rx: BlockStreamRx,
     mut shutdown_rx: ShutdownRx,
     block_status: Arc<Mutex<AgentStatus>>,
-    client: GrpcClientService,
+    client: RpcClientService,
     chain_config: ChainConfig,
 ) -> Result<(), Report> {
     let block_counter = AtomicIntervalCounter::new(10);

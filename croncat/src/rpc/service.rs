@@ -30,15 +30,6 @@ pub enum ServiceFailure {
     Other(Report),
 }
 
-#[derive(Debug, Default)]
-#[allow(dead_code)]
-struct GrpcClientStatus {
-    bad: bool,
-    last_success_timestamp: Option<u64>,
-    last_failure_timestamp: Option<u64>,
-    last_failure: Option<ServiceFailure>,
-}
-
 #[derive(Clone, PartialEq, Hash, Eq, Debug)]
 pub enum GrpcCallType {
     Execute,
@@ -52,14 +43,14 @@ pub enum GrpcClient {
 }
 
 #[derive(Clone, Debug)]
-pub struct GrpcClientService {
+pub struct RpcClientService {
     chain_config: ChainConfig,
     key: bip32::XPrv,
     mnemonic: String,
     source_info: Arc<Mutex<HashMap<String, (ChainDataSource, bool)>>>,
 }
 
-impl GrpcClientService {
+impl RpcClientService {
     pub async fn new(chain_config: ChainConfig, mnemonic: String, key: bip32::XPrv) -> Self {
         let data_sources =
             Self::pick_best_sources(&chain_config, &chain_config.data_sources()).await;

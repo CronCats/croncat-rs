@@ -17,7 +17,7 @@ use crate::{
     errors::{eyre, Report},
     logging::info,
     monitor::ping_uptime_monitor,
-    rpc::GrpcClientService,
+    rpc::RpcClientService,
     utils::sum_num_tasks,
 };
 
@@ -27,7 +27,7 @@ use crate::{
 pub async fn tasks_loop(
     mut block_stream_rx: BlockStreamRx,
     mut shutdown_rx: ShutdownRx,
-    client: GrpcClientService,
+    client: RpcClientService,
     block_status: Arc<Mutex<AgentStatus>>,
 ) -> Result<(), Report> {
     let block_consumer_stream: JoinHandle<Result<(), Report>> = tokio::task::spawn(async move {
@@ -101,7 +101,7 @@ pub async fn tasks_loop(
 pub async fn queries_loop(
     mut block_stream_rx: BlockStreamRx,
     mut shutdown_rx: ShutdownRx,
-    client: GrpcClientService,
+    client: RpcClientService,
     block_status: Arc<Mutex<AgentStatus>>,
 ) -> Result<(), Report> {
     let block_consumer_stream: JoinHandle<Result<(), Report>> = tokio::task::spawn(async move {

@@ -4,9 +4,11 @@
 
 use std::time::Duration;
 
-use cosmos_chain_registry::ChainInfo;
-use cosmos_sdk_proto::cosmos::base::v1beta1::Coin;
+use cosm_orc::orchestrator::Coin;
 use cosmrs::bip32;
+use cosmrs::bip32::secp256k1::sha2;
+use cosmrs::bip32::secp256k1::sha2::Digest;
+use cosmrs::bip32::secp256k1::sha2::Sha256;
 use cosmrs::crypto::secp256k1::SigningKey;
 use cosmrs::AccountId;
 use cw_croncat_core::msg::AgentResponse;
@@ -17,11 +19,10 @@ use cw_rules_core::msg::QueryConstruct;
 use cw_rules_core::types::CroncatQuery;
 use futures_util::Future;
 use serde::de::DeserializeOwned;
+use serde::Serialize;
 use tendermint_rpc::endpoint::broadcast::tx_commit::TxResult;
 use tokio::time::timeout;
 
-use crate::client::full_client::CosmosFullClient;
-use crate::client::QueryBank;
 use crate::config::ChainConfig;
 use crate::errors::{eyre, Report};
 
@@ -29,7 +30,6 @@ use super::querier::RpcClient;
 
 #[derive(Clone, Debug)]
 pub struct GrpcSigner {
-    client: CosmosFullClient,
     rpc_client: RpcClient,
     pub manager: String,
     pub account_id: AccountId,
@@ -38,42 +38,26 @@ pub struct GrpcSigner {
 impl GrpcSigner {
     pub async fn new(
         rpc_url: String,
-        grpc_url: String,
         cfg: ChainConfig,
         manager: String,
         key: bip32::XPrv,
-        gas_prices: f32,
-        gas_adjustment: f32,
     ) -> Result<Self, Report> {
         // TODO: How should we handle this? Is the hack okay?
         // Quick hack to add https:// to the url if it is missing
-        let grpc_url = if !grpc_url.starts_with("https://") {
-            format!("https://{}", grpc_url)
-        } else {
-            grpc_url
-        };
         let rpc_url = if !rpc_url.starts_with("https://") {
             format!("https://{}", rpc_url)
         } else {
             rpc_url
         };
+        // let account_id = client
+        //     .key()
+        //     .public_key()
+        //     .account_id(&client.chain_info.bech32_prefix)?;
 
-        let client = timeout(
-            Duration::from_secs(10),
-            CosmosFullClient::new(
-                rpc_url.clone(),
-                grpc_url,
-                cfg.info.clone(),
-                key.clone(),
-                gas_prices,
-                gas_adjustment,
-            ),
-        )
-        .await??;
-        let account_id = client
-            .key()
+        let account_id: SigningKey = key.clone().into();
+        let account_id = account_id
             .public_key()
-            .account_id(&client.chain_info.bech32_prefix)?;
+            .account_id(&cfg.info.bech32_prefix)?;
 
         // Create a new RPC client
         let mut rpc_client = RpcClient::new(&cfg, rpc_url.as_str())?;
@@ -81,7 +65,6 @@ impl GrpcSigner {
         rpc_client.set_key(key.private_key().clone().to_bytes().to_vec().as_slice());
 
         Ok(Self {
-            client,
             account_id,
             manager,
             rpc_client,
@@ -94,18 +77,15 @@ impl GrpcSigner {
     ) -> impl Future<Output = Result<Self, Report>> {
         GrpcSigner::new(
             chain_config.info.apis.rpc[0].address.clone(),
-            chain_config.info.apis.grpc[0].address.clone(),
             chain_config.clone(),
             chain_config.manager.clone(),
             key,
-            chain_config.gas_prices,
-            chain_config.gas_adjustment,
         )
     }
 
     pub async fn query_croncat<R, S>(&self, msg: S) -> Result<R, Report>
     where
-        S: Into<QueryMsg>,
+        S: Serialize,
         R: DeserializeOwned,
     {
         let out = timeout(Duration::from_secs(30), self.rpc_client.wasm_query(msg))
@@ -117,7 +97,7 @@ impl GrpcSigner {
 
     pub async fn execute_croncat<S, R>(&self, msg: S) -> Result<R, Report>
     where
-        S: Into<ExecuteMsg>,
+        S: Serialize,
         R: DeserializeOwned,
     {
         let res = timeout(Duration::from_secs(30), self.rpc_client.wasm_execute(msg))
@@ -227,28 +207,15 @@ impl GrpcSigner {
             cfg.cw_rules_addr
         };
         let res = self
-            .client
-            .query_client
-            .query_contract(
-                &cw_rules_addr,
-                cw_rules_core::msg::QueryMsg::QueryConstruct(QueryConstruct { queries }),
-            )
+            .rpc_client
+            .wasm_query(cw_rules_core::msg::QueryMsg::QueryConstruct(
+                QueryConstruct { queries },
+            ))
             .await?;
         Ok(res)
     }
 
-    pub fn key(&self) -> SigningKey {
-        self.client.key()
-    }
-
-    pub fn chain_info(&self) -> &ChainInfo {
-        &self.client.chain_info
-    }
-
     pub async fn query_native_balance(&self, account_id: &str) -> Result<Coin, Report> {
-        self.client
-            .query_client
-            .query_native_balance(account_id)
-            .await
+        self.rpc_client.query_balance(account_id).await
     }
 }

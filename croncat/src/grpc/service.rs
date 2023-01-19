@@ -173,12 +173,9 @@ impl GrpcClientService {
                 GrpcCallType::Execute => GrpcClient::Execute(Box::new(
                     match GrpcSigner::new(
                         source.rpc.to_string(),
-                        "".to_string(),
                         self.chain_config.clone(),
                         self.chain_config.manager.clone(),
                         self.key.clone(),
-                        self.chain_config.gas_prices,
-                        self.chain_config.gas_adjustment,
                     )
                     .await
                     {

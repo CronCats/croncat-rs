@@ -14,18 +14,18 @@ use cosm_orc::orchestrator::Denom;
 use cosm_orc::orchestrator::Key;
 use cosm_orc::orchestrator::SigningKey;
 use cosm_orc::orchestrator::TendermintRPC;
+
 use cosm_tome::chain::request::TxOptions;
 use cosm_tome::modules::auth::model::Address;
-
 use cosm_tome::modules::cosmwasm::model::ExecRequest;
-use cosmrs::crypto::secp256k1;
+
 use cw_croncat_core::msg::AgentTaskResponse;
-use cw_croncat_core::msg::ExecuteMsg;
 use cw_croncat_core::msg::TaskResponse;
 use cw_croncat_core::msg::{GetConfigResponse, QueryMsg};
 use cw_croncat_core::types::AgentStatus;
 
 use serde::de::DeserializeOwned;
+use serde::Serialize;
 
 use crate::config::ChainConfig;
 use crate::errors::{eyre, Report};
@@ -33,10 +33,10 @@ use crate::errors::{eyre, Report};
 /// An RPC client for querying the croncat contract.
 #[derive(Clone)]
 pub struct RpcClient {
-    client: CosmOrc<TendermintRPC>,
+    pub(crate) client: CosmOrc<TendermintRPC>,
     contract_addr: Address,
     key: Option<SigningKey>,
-    denom: String,
+    denom: Option<Denom>,
 }
 
 impl RpcClient {
@@ -71,7 +71,7 @@ impl RpcClient {
             client: CosmOrc::new_tendermint_rpc(config, true)?,
             contract_addr,
             key: None,
-            denom: cfg.info.fees.fee_tokens[0].denom.clone(),
+            denom: None,
         })
     }
 
@@ -86,17 +86,22 @@ impl RpcClient {
         });
     }
 
+    /// Set the denom for this client.
+    pub fn set_denom(&mut self, denom: &str) {
+        self.denom = Some(Denom::from_str(denom).unwrap());
+    }
+
     /// Query the contract via RPC.
     pub async fn wasm_query<S, R>(&self, msg: S) -> Result<R, Report>
     where
-        S: Into<QueryMsg>,
+        S: Serialize,
         R: DeserializeOwned,
     {
         // Query the chain
         let response = self
             .client
             .client
-            .wasm_query(self.contract_addr.clone(), &msg.into())
+            .wasm_query(self.contract_addr.clone(), &msg)
             .await?;
 
         // Deserialize the response
@@ -109,7 +114,7 @@ impl RpcClient {
 
     pub async fn wasm_execute<S, R>(&self, msg: S) -> Result<R, Report>
     where
-        S: Into<ExecuteMsg>,
+        S: Serialize,
         R: DeserializeOwned,
     {
         if self.key.is_none() {
@@ -123,7 +128,7 @@ impl RpcClient {
             .wasm_execute(
                 ExecRequest {
                     address: self.contract_addr.clone(),
-                    msg: &msg.into(),
+                    msg: &msg,
                     funds: vec![],
                 },
                 self.key.as_ref().unwrap(),
@@ -137,6 +142,23 @@ impl RpcClient {
             .map_err(|e| eyre!("Failed to deserialize response data: {}", e))?;
 
         Ok(data)
+    }
+
+    /// Query the balance of an address.
+    /// Returns the balance in the denom set for this client.
+    pub async fn query_balance(&self, address: &str) -> Result<Coin, Report> {
+        if self.denom.is_none() {
+            return Err(eyre!("No denom set"));
+        }
+
+        let address = address.parse::<Address>()?;
+        let balance = self
+            .client
+            .client
+            .bank_query_balance(address, self.denom.as_ref().unwrap().clone())
+            .await?;
+
+        Ok(balance.balance)
     }
 }
 
@@ -171,7 +193,7 @@ impl GrpcQuerier {
 
     pub async fn query_croncat<S, T>(&self, msg: S) -> Result<T, Report>
     where
-        S: Into<QueryMsg>,
+        S: Serialize,
         T: DeserializeOwned,
     {
         self.rpc_client.wasm_query(msg).await

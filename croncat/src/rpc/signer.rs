@@ -112,6 +112,7 @@ impl Signer {
         &self,
         payable_account_id: &Option<String>,
     ) -> Result<TxResult, Report> {
+        println!("aloha top of register_agent");
         self.execute_croncat(ExecuteMsg::RegisterAgent {
             payable_account_id: payable_account_id.clone(),
         })
@@ -119,6 +120,7 @@ impl Signer {
     }
 
     pub async fn unregister_agent(&self) -> Result<TxResult, Report> {
+        println!("aloha top of unregister_agent");
         self.execute_croncat(ExecuteMsg::UnregisterAgent { from_behind: None })
             .await
     }

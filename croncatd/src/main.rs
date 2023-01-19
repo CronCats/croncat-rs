@@ -66,6 +66,7 @@ async fn main() -> Result<(), Report> {
 async fn run_command(opts: Opts, mut storage: LocalAgentStorage) -> Result<(), Report> {
     // Get the key for the agent signing account
     let config = Config::from_pwd()?;
+    println!("aloha top of run_command");
 
     match opts.cmd {
         opts::Command::Register { payable_account_id } => {
@@ -85,7 +86,7 @@ async fn run_command(opts: Opts, mut storage: LocalAgentStorage) -> Result<(), R
             let key = storage.get_agent_signing_key(&opts.agent)?;
             let mnemonic = storage.get_agent_mnemonic(&opts.agent)?;
 
-            // Get a grpc client
+            // Get an RPC client
             let client =
                 RpcClientService::new(chain_config.clone(), mnemonic.to_string(), key).await;
 
@@ -102,7 +103,7 @@ async fn run_command(opts: Opts, mut storage: LocalAgentStorage) -> Result<(), R
                                 serde_json::to_string_pretty(&payable_account_id)?
                             );
                         }
-
+                        println!("aloha calling register_agent");
                         // Register the agent
                         let query = signer.register_agent(&payable_account_id).await;
 

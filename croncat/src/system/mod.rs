@@ -208,6 +208,7 @@ pub async fn run_retry(
     mnemonic: &String,
     with_queries: bool,
 ) -> Result<(), Report> {
+    println!("aloha top of run_retry");
     // TODO: Rethink this retry logic
     // let retry_strategy = FixedInterval::from_millis(5000).take(1200);
 

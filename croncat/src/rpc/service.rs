@@ -136,10 +136,12 @@ impl RpcClientService {
         Fut: Future<Output = Result<T, Report>>,
         F: Fn(GrpcClient) -> Fut,
     {
+        println!("aloha top of call");
         let f = Box::new(f);
         let mut last_error = None;
 
         loop {
+            println!("aloha call loop");
             let mut source_info = self.source_info.lock().await;
             let source_keys = source_info
                 .keys()
@@ -221,8 +223,10 @@ impl RpcClientService {
         Fut: Future<Output = Result<T, Report>>,
         F: Fn(Box<Signer>) -> Fut,
     {
+        println!("aloha top of execute");
         self.call(GrpcCallType::Execute, |client| async {
             if let GrpcClient::Execute(client) = client {
+                println!("aloha about to await {:?}", client);
                 f(client).await
             } else {
                 unreachable!()

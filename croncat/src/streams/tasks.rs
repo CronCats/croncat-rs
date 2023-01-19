@@ -15,9 +15,9 @@ use tracing::error;
 use crate::{
     channels::{BlockStreamRx, ShutdownRx},
     errors::{eyre, Report},
-    grpc::GrpcClientService,
     logging::info,
     monitor::ping_uptime_monitor,
+    rpc::GrpcClientService,
     utils::sum_num_tasks,
 };
 

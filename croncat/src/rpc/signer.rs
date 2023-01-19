@@ -23,7 +23,7 @@ use tokio::time::timeout;
 use crate::config::ChainConfig;
 use crate::errors::{eyre, Report};
 
-use super::querier::RpcClient;
+use super::RpcClient;
 
 #[derive(Clone, Debug)]
 pub struct GrpcSigner {

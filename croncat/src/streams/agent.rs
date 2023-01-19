@@ -13,7 +13,7 @@ use tracing::{error, info};
 use crate::config::ChainConfig;
 use crate::{
     channels::{BlockStreamRx, ShutdownRx},
-    grpc::GrpcClientService,
+    rpc::GrpcClientService,
     utils::AtomicIntervalCounter,
 };
 

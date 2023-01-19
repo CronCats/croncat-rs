@@ -18,8 +18,8 @@ use crate::{
     channels::ShutdownTx,
     config::ChainConfig,
     errors::{eyre, Report},
-    grpc::GrpcClientService,
     logging::info,
+    rpc::GrpcClientService,
     streams::{agent, polling::poll_stream_blocks, tasks},
     tokio,
 };

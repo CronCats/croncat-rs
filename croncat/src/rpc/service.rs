@@ -20,8 +20,8 @@ use crate::config::ChainDataSource;
 use crate::errors::{eyre, Report};
 use crate::logging::info;
 
-use super::GrpcQuerier;
-use super::GrpcSigner;
+use super::Querier;
+use super::Signer;
 
 #[derive(Debug)]
 pub enum ServiceFailure {
@@ -47,8 +47,8 @@ pub enum GrpcCallType {
 
 #[derive(Debug)]
 pub enum GrpcClient {
-    Execute(Box<GrpcSigner>),
-    Query(Box<GrpcQuerier>),
+    Execute(Box<Signer>),
+    Query(Box<Querier>),
 }
 
 #[derive(Clone, Debug)]
@@ -91,7 +91,7 @@ impl GrpcClientService {
             let source = source.clone();
             let chain_config = chain_config.clone();
             race_track.add_racer(name, async move {
-                let rpc_client = GrpcQuerier::new(chain_config, source.rpc.clone()).await?;
+                let rpc_client = Querier::new(chain_config, source.rpc.clone()).await?;
                 let _ = rpc_client.query_config().await?;
 
                 Ok(source)
@@ -173,7 +173,7 @@ impl GrpcClientService {
 
             let grpc_client = match kind {
                 GrpcCallType::Execute => GrpcClient::Execute(Box::new(
-                    match GrpcSigner::new(
+                    match Signer::new(
                         source.rpc.to_string(),
                         self.chain_config.clone(),
                         self.chain_config.manager.clone(),
@@ -193,8 +193,7 @@ impl GrpcClientService {
                     },
                 )),
                 GrpcCallType::Query => GrpcClient::Query(Box::new(
-                    match GrpcQuerier::new(self.chain_config.clone(), source.rpc.to_string()).await
-                    {
+                    match Querier::new(self.chain_config.clone(), source.rpc.to_string()).await {
                         Ok(client) => client,
                         Err(e) => {
                             debug!("Failed to create grpc client for {}: {}", source_key, e);
@@ -229,7 +228,7 @@ impl GrpcClientService {
     pub async fn execute<T, Fut, F>(&self, f: F) -> Result<T, Report>
     where
         Fut: Future<Output = Result<T, Report>>,
-        F: Fn(Box<GrpcSigner>) -> Fut,
+        F: Fn(Box<Signer>) -> Fut,
     {
         self.call(GrpcCallType::Execute, |client| async {
             if let GrpcClient::Execute(client) = client {
@@ -244,7 +243,7 @@ impl GrpcClientService {
     pub async fn query<T, Fut, F>(&self, f: F) -> Result<T, Report>
     where
         Fut: Future<Output = Result<T, Report>>,
-        F: Fn(Box<GrpcQuerier>) -> Fut,
+        F: Fn(Box<Querier>) -> Fut,
     {
         self.call(GrpcCallType::Query, |client| async {
             if let GrpcClient::Query(client) = client {

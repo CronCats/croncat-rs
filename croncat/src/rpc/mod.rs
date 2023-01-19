@@ -8,6 +8,6 @@ pub mod service;
 pub mod signer;
 
 pub use client::RpcClient;
-pub use querier::GrpcQuerier;
+pub use querier::Querier;
 pub use service::GrpcClientService;
-pub use signer::GrpcSigner;
+pub use signer::Signer;

@@ -26,13 +26,13 @@ use crate::errors::{eyre, Report};
 use super::RpcClient;
 
 #[derive(Clone, Debug)]
-pub struct GrpcSigner {
+pub struct Signer {
     rpc_client: RpcClient,
     pub manager: String,
     pub account_id: AccountId,
 }
 
-impl GrpcSigner {
+impl Signer {
     pub async fn new(
         rpc_url: String,
         cfg: ChainConfig,
@@ -75,7 +75,7 @@ impl GrpcSigner {
         key: bip32::XPrv,
         mnemonic: String,
     ) -> impl Future<Output = Result<Self, Report>> {
-        GrpcSigner::new(
+        Signer::new(
             chain_config.info.apis.rpc[0].address.clone(),
             chain_config.clone(),
             chain_config.manager.clone(),

@@ -15,20 +15,20 @@ use crate::errors::{eyre, Report};
 
 use super::RpcClient;
 
-pub struct GrpcQuerier {
+pub struct Querier {
     rpc_client: RpcClient,
     croncat_addr: String,
 }
 
-impl std::fmt::Debug for GrpcQuerier {
+impl std::fmt::Debug for Querier {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        f.debug_struct("GrpcQuerier")
+        f.debug_struct("Querier")
             .field("croncat_addr", &self.croncat_addr)
             .finish()
     }
 }
 
-impl GrpcQuerier {
+impl Querier {
     pub async fn new(cfg: ChainConfig, rpc_url: String) -> Result<Self, Report> {
         let rpc_url = if !rpc_url.starts_with("https://") {
             format!("https://{}", rpc_url)

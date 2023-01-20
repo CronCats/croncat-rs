@@ -47,11 +47,8 @@ impl Signer {
         } else {
             rpc_url
         };
-        // let account_id = client
-        //     .key()
-        //     .public_key()
-        //     .account_id(&client.chain_info.bech32_prefix)?;
 
+        // Get the account id from the key.
         let signing_key: SigningKey = key.into();
         let account_id = signing_key
             .public_key()
@@ -62,6 +59,7 @@ impl Signer {
         // TODO: This is a hack to get around the fact that cosm-tome doesn't
         // let us pass an xprv.
         rpc_client.set_mnemonic(mnemonic);
+        rpc_client.set_denom(&cfg.info.fees.fee_tokens[0].denom);
 
         Ok(Self {
             account_id,

@@ -202,7 +202,7 @@ impl RpcClientService {
                     return Ok(result);
                 }
                 Err(e) if break_loop_errors(&e) => {
-                    debug!("Agent not registered for {}: {}", source_key, e);
+                    debug!("Error calling chain for {}: {}", source_key, e);
                     break Err(e);
                 }
                 Err(e) => {
@@ -250,6 +250,7 @@ impl RpcClientService {
 fn break_loop_errors(e: &Report) -> bool {
     let msg = e.to_string().to_lowercase();
     msg.contains("agent not registered")
+        || msg.contains("agent not found")
         || msg.contains("account not found")
         || msg.contains("already registered")
 }

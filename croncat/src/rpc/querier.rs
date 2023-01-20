@@ -2,6 +2,7 @@
 //! This module contains the code for querying the croncat contract via gRPC.
 //!
 
+use cw_croncat_core::msg::AgentResponse;
 use cw_croncat_core::msg::AgentTaskResponse;
 use cw_croncat_core::msg::TaskResponse;
 use cw_croncat_core::msg::{GetConfigResponse, QueryMsg};
@@ -59,11 +60,14 @@ impl Querier {
     }
 
     pub async fn get_agent_status(&self, account_id: String) -> Result<AgentStatus, Report> {
-        let status: Option<AgentStatus> = self
+        let response: Option<AgentResponse> = self
             .query_croncat(QueryMsg::GetAgent { account_id })
             .await?;
 
-        status.ok_or_else(|| eyre!("Agent not registered"))
+        match response {
+            Some(agent) => Ok(agent.status),
+            None => Err(eyre!("Agent not found")),
+        }
     }
 
     pub async fn get_tasks(

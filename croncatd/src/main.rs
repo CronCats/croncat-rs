@@ -167,7 +167,8 @@ async fn run_command(opts: Opts, mut storage: LocalAgentStorage) -> Result<(), R
                             info!("Result: {}", log);
                         }
                         Err(err) if err.to_string().contains("Agent not registered") => {
-                            Err(eyre!("Agent not already registered"))?;
+                            println!("err: {}", err);
+                            Err(eyre!("Agent not registered"))?;
                         }
                         Err(err) => Err(eyre!("Failed to register agent: {}", err))?,
                     }

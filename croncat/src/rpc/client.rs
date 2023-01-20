@@ -7,9 +7,10 @@ use cosm_orc::config::ChainConfig as CosmOrcChainConfig;
 use cosm_orc::orchestrator::{
     cosm_orc::CosmOrc, deploy::DeployInfo, Address, Denom, SigningKey, TendermintRPC,
 };
-use cosm_orc::orchestrator::{Coin, Key};
+use cosm_orc::orchestrator::{ChainResponse, ChainTxResponse, Coin, Key};
 use cosm_tome::chain::request::TxOptions;
 use cosm_tome::modules::cosmwasm::model::ExecRequest;
+use cosmos_sdk_proto::tendermint::abci::TxResult;
 use serde::de::DeserializeOwned;
 use serde::Serialize;
 
@@ -94,10 +95,9 @@ impl RpcClient {
         Ok(data)
     }
 
-    pub async fn wasm_execute<S, R>(&self, msg: S) -> Result<R, Report>
+    pub async fn wasm_execute<S>(&self, msg: S) -> Result<ChainResponse, Report>
     where
         S: Serialize,
-        R: DeserializeOwned,
     {
         if self.key.is_none() {
             return Err(eyre!("No signing key set"));
@@ -118,12 +118,10 @@ impl RpcClient {
             )
             .await?;
 
-        // Deserialize the response
-        let data = response
-            .data()
-            .map_err(|e| eyre!("Failed to deserialize response data: {}", e))?;
+        // Get the response data
+        let data = response.res;
 
-        Ok(data)
+        Ok(data.res)
     }
 
     /// Query the balance of an address.

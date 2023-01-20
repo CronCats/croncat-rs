@@ -250,7 +250,7 @@ impl RpcClientService {
 fn break_loop_errors(e: &Report) -> bool {
     let msg = e.to_string().to_lowercase();
     msg.contains("agent not registered")
+        || msg.contains("agent already registered")
         || msg.contains("agent not found")
         || msg.contains("account not found")
-        || msg.contains("already registered")
 }

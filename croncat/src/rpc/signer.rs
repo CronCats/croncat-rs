@@ -4,6 +4,7 @@
 
 use std::time::Duration;
 
+use cosm_orc::orchestrator::ChainResponse;
 use cosm_orc::orchestrator::Coin;
 use cosmrs::bip32;
 use cosmrs::crypto::secp256k1::SigningKey;
@@ -17,7 +18,6 @@ use cw_rules_core::types::CroncatQuery;
 use futures_util::Future;
 use serde::de::DeserializeOwned;
 use serde::Serialize;
-use tendermint_rpc::endpoint::broadcast::tx_commit::TxResult;
 use tokio::time::timeout;
 
 use crate::config::ChainConfig;
@@ -94,10 +94,9 @@ impl Signer {
         Ok(out)
     }
 
-    pub async fn execute_croncat<S, R>(&self, msg: S) -> Result<R, Report>
+    pub async fn execute_croncat<S>(&self, msg: S) -> Result<ChainResponse, Report>
     where
         S: Serialize,
-        R: DeserializeOwned,
     {
         let res = timeout(Duration::from_secs(30), self.rpc_client.wasm_execute(msg))
             .await
@@ -109,28 +108,28 @@ impl Signer {
     pub async fn register_agent(
         &self,
         payable_account_id: &Option<String>,
-    ) -> Result<TxResult, Report> {
+    ) -> Result<ChainResponse, Report> {
         self.execute_croncat(ExecuteMsg::RegisterAgent {
             payable_account_id: payable_account_id.clone(),
         })
         .await
     }
 
-    pub async fn unregister_agent(&self) -> Result<TxResult, Report> {
+    pub async fn unregister_agent(&self) -> Result<ChainResponse, Report> {
         self.execute_croncat(ExecuteMsg::UnregisterAgent { from_behind: None })
             .await
     }
 
-    pub async fn update_agent(&self, payable_account_id: String) -> Result<TxResult, Report> {
+    pub async fn update_agent(&self, payable_account_id: String) -> Result<ChainResponse, Report> {
         self.execute_croncat(ExecuteMsg::UpdateAgent { payable_account_id })
             .await
     }
 
-    pub async fn withdraw_reward(&self) -> Result<TxResult, Report> {
+    pub async fn withdraw_reward(&self) -> Result<ChainResponse, Report> {
         self.execute_croncat(ExecuteMsg::WithdrawReward {}).await
     }
 
-    pub async fn proxy_call(&self, task_hash: Option<String>) -> Result<TxResult, Report> {
+    pub async fn proxy_call(&self, task_hash: Option<String>) -> Result<ChainResponse, Report> {
         self.execute_croncat(ExecuteMsg::ProxyCall { task_hash })
             .await
     }
@@ -144,7 +143,7 @@ impl Signer {
         Ok(res)
     }
 
-    pub async fn check_in_agent(&self) -> Result<TxResult, Report> {
+    pub async fn check_in_agent(&self) -> Result<ChainResponse, Report> {
         self.execute_croncat(ExecuteMsg::CheckInAgent {}).await
     }
 

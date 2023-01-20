@@ -2,8 +2,10 @@
 //! GRPC client service that can be used to execute and query the croncat chain.
 //!
 
+use std::str::FromStr;
 use std::time::Duration;
 
+use cosm_orc::orchestrator::Address;
 use cosm_orc::orchestrator::ChainResponse;
 use cosm_orc::orchestrator::Coin;
 use cosmrs::bip32;
@@ -203,12 +205,14 @@ impl Signer {
         let cw_rules_addr = {
             let cfg: GetConfigResponse = self.query_croncat(QueryMsg::GetConfig {}).await?;
             cfg.cw_rules_addr
-        };
+        }
+        .to_string();
         let res = self
             .rpc_client
-            .wasm_query(cw_rules_core::msg::QueryMsg::QueryConstruct(
-                QueryConstruct { queries },
-            ))
+            .call_wasm_query(
+                Address::from_str(cw_rules_addr.as_str()).unwrap(),
+                cw_rules_core::msg::QueryMsg::QueryConstruct(QueryConstruct { queries }),
+            )
             .await?;
         Ok(res)
     }

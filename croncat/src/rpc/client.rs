@@ -7,10 +7,9 @@ use cosm_orc::config::ChainConfig as CosmOrcChainConfig;
 use cosm_orc::orchestrator::{
     cosm_orc::CosmOrc, deploy::DeployInfo, Address, Denom, SigningKey, TendermintRPC,
 };
-use cosm_orc::orchestrator::{ChainResponse, ChainTxResponse, Coin, Key};
+use cosm_orc::orchestrator::{ChainResponse, Coin, Key};
 use cosm_tome::chain::request::TxOptions;
 use cosm_tome::modules::cosmwasm::model::ExecRequest;
-use cosmos_sdk_proto::tendermint::abci::TxResult;
 use serde::de::DeserializeOwned;
 use serde::Serialize;
 
@@ -74,18 +73,14 @@ impl RpcClient {
         self.denom = Some(Denom::from_str(denom).unwrap());
     }
 
-    /// Query the contract via RPC.
-    pub async fn wasm_query<S, R>(&self, msg: S) -> Result<R, Report>
+    /// Query the contract via RPC at a specific address.
+    pub async fn call_wasm_query<S, R>(&self, address: Address, msg: S) -> Result<R, Report>
     where
         S: Serialize,
         R: DeserializeOwned,
     {
         // Query the chain
-        let response = self
-            .client
-            .client
-            .wasm_query(self.contract_addr.clone(), &msg)
-            .await?;
+        let response = self.client.client.wasm_query(address, &msg).await?;
 
         // Deserialize the response
         let data = response
@@ -95,6 +90,16 @@ impl RpcClient {
         Ok(data)
     }
 
+    /// Query the contract at the manager address.
+    pub async fn wasm_query<S, R>(&self, msg: S) -> Result<R, Report>
+    where
+        S: Serialize,
+        R: DeserializeOwned,
+    {
+        self.call_wasm_query(self.contract_addr.clone(), msg).await
+    }
+
+    /// Execute a contract via RPC.
     pub async fn wasm_execute<S>(&self, msg: S) -> Result<ChainResponse, Report>
     where
         S: Serialize,

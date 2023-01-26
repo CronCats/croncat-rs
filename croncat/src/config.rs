@@ -71,7 +71,6 @@ struct RawChainConfigEntry {
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ChainDataSource {
-    pub grpc: Option<String>,
     pub rpc: String,
 }
 
@@ -132,7 +131,6 @@ impl ChainConfig {
                 data_sources.insert(
                     rpc_endpoint.provider.clone().unwrap(),
                     ChainDataSource {
-                        grpc: None,
                         rpc: rpc_endpoint.address.clone(),
                     },
                 );

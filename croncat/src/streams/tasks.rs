@@ -140,7 +140,7 @@ pub async fn queries_loop(
                     };
 
                     if in_boundary {
-                        let query_response = client
+                        let queries_ready = client
                             .execute(|signer| async move {
                                 signer
                                     .check_queries(
@@ -152,7 +152,6 @@ pub async fn queries_loop(
                                     .map_err(|err| eyre!("Failed to query croncat query: {}", err))
                             })
                             .await?;
-                        let queries_ready = query_response;
 
                         if queries_ready {
                             client

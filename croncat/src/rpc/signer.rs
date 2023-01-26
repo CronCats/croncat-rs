@@ -17,7 +17,6 @@ use cw_croncat_core::msg::TaskWithQueriesResponse;
 use cw_croncat_core::msg::{ExecuteMsg, GetConfigResponse, QueryMsg};
 use cw_rules_core::msg::QueryConstruct;
 use cw_rules_core::types::CroncatQuery;
-use futures_util::Future;
 use serde::de::DeserializeOwned;
 use serde::Serialize;
 use tokio::time::timeout;
@@ -68,20 +67,6 @@ impl Signer {
             manager,
             rpc_client,
         })
-    }
-
-    pub fn from_chain_config(
-        chain_config: &ChainConfig,
-        key: bip32::XPrv,
-        mnemonic: String,
-    ) -> impl Future<Output = Result<Self, Report>> {
-        Signer::new(
-            chain_config.info.apis.rpc[0].address.clone(),
-            chain_config.clone(),
-            chain_config.manager.clone(),
-            key,
-            mnemonic,
-        )
     }
 
     pub async fn query_croncat<R, S>(&self, msg: S) -> Result<R, Report>

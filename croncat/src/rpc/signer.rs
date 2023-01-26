@@ -16,7 +16,10 @@ use cw_croncat_core::msg::AgentTaskResponse;
 use cw_croncat_core::msg::TaskWithQueriesResponse;
 use cw_croncat_core::msg::{ExecuteMsg, GetConfigResponse, QueryMsg};
 use cw_rules_core::msg::QueryConstruct;
+use cw_rules_core::msg::QueryResponse;
+use cw_rules_core::types::CheckOwnerOfNft;
 use cw_rules_core::types::CroncatQuery;
+use cw_rules_core::types::HasBalanceGte;
 use serde::de::DeserializeOwned;
 use serde::Serialize;
 use tokio::time::timeout;
@@ -200,23 +203,46 @@ impl Signer {
         Ok(tasks_with_queries)
     }
 
-    pub async fn check_queries(
-        &self,
-        queries: Vec<CroncatQuery>,
-    ) -> Result<(bool, Option<u64>), Report> {
+    pub async fn check_queries(&self, queries: Vec<CroncatQuery>) -> Result<bool, Report> {
         let cw_rules_addr = {
             let cfg: GetConfigResponse = self.query_croncat(QueryMsg::GetConfig {}).await?;
             cfg.cw_rules_addr
         }
         .to_string();
-        let res = self
-            .rpc_client
-            .call_wasm_query(
-                Address::from_str(cw_rules_addr.as_str()).unwrap(),
-                cw_rules_core::msg::QueryMsg::QueryConstruct(QueryConstruct { queries }),
-            )
-            .await?;
-        Ok(res)
+        println!("Rules addr: {:?}", cw_rules_addr);
+        println!("Queries: {:#?}", queries);
+        let mut result = true;
+        for query in queries {
+            let msg = match query {
+                CroncatQuery::Query {
+                    contract_addr: _contract_addr,
+                    msg: _msg,
+                } => todo!(),
+                CroncatQuery::HasBalanceGte(has_balance_gte) => {
+                    cw_rules_core::msg::QueryMsg::HasBalanceGte(has_balance_gte)
+                }
+                CroncatQuery::CheckOwnerOfNft(check_owner_of_nft) => cw_rules_core::msg::QueryMsg::CheckOwnerOfNft(check_owner_of_nft),
+                CroncatQuery::CheckProposalStatus(check_proposal_status) => cw_rules_core::msg::QueryMsg::CheckProposalStatus(check_proposal_status),
+                CroncatQuery::GenericQuery(qeneric_query) => cw_rules_core::msg::QueryMsg::GenericQuery(qeneric_query),
+                CroncatQuery::SmartQuery(smart_query) => cw_rules_core::msg::QueryMsg::SmartQuery(smart_query),
+            };
+            let res: QueryResponse = self
+                .rpc_client
+                .call_wasm_query(Address::from_str(cw_rules_addr.as_str()).unwrap(), msg)
+                .await?;
+            if !res.result {
+                result = false;
+                break;
+            }
+        }
+        // let res= self
+        //     .rpc_client
+        //     .call_wasm_query(
+        //         Address::from_str(cw_rules_addr.as_str()).unwrap(),
+        //         cw_rules_core::msg::QueryMsg::QueryConstruct(QueryConstruct { queries }),
+        //     )
+        //     .await?;
+        Ok(result)
     }
 
     pub async fn query_native_balance(&self, account_id: &str) -> Result<Coin, Report> {

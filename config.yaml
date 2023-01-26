@@ -27,7 +27,7 @@ chains:
     #     gas_prices: 0.04
     #     gas_adjustment: 1.3
     elgafar-1:
-        manager: stars1mesz5kqedgq3vwx6kvxvckk4dg5k7hr2840f3r3xkhyg00dvh9gskk6f9q
+        manager: stars1ml5dpqeg46m232vpu48sr7hp58yku9vd4c6ns5za7gj2ehwretzqwee6p5
         gas_prices: 0.04
         gas_adjustment: 1.3
         threshold: 1000000

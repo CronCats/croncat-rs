@@ -1,5 +1,5 @@
 //!
-//! GRPC client service that can be used to execute and query the croncat chain.
+//! RPC client service that can be used to execute and query the croncat chain.
 //! This uses multiple approaches to ensure that the service is always available.
 //!
 
@@ -10,7 +10,6 @@ use std::time::Duration;
 use cosmrs::bip32;
 use cosmrs::crypto::secp256k1::SigningKey;
 use futures_util::Future;
-use lazy_static::__Deref;
 use rand::seq::SliceRandom;
 use tokio::sync::Mutex;
 use tracing::debug;
@@ -31,13 +30,13 @@ pub enum ServiceFailure {
 }
 
 #[derive(Clone, PartialEq, Hash, Eq, Debug)]
-pub enum GrpcCallType {
+pub enum RpcCallType {
     Execute,
     Query,
 }
 
 #[derive(Debug)]
-pub enum GrpcClient {
+pub enum RpcClientType {
     Execute(Box<Signer>),
     Query(Box<Querier>),
 }
@@ -77,7 +76,7 @@ impl RpcClientService {
         // Create a racetrack for testing sources.
         let mut race_track = RaceTrack::disqualify_after(Duration::from_secs(5));
 
-        // Race all the sources and check that they connect to GRPC.
+        // Race all the sources and check that they connect to RPC.
         for (name, source) in sources {
             let source = source.clone();
             let chain_config = chain_config.clone();
@@ -131,10 +130,10 @@ impl RpcClientService {
             .to_string()
     }
 
-    async fn call<T, Fut, F>(&self, kind: GrpcCallType, f: F) -> Result<T, Report>
+    async fn call<T, Fut, F>(&self, kind: RpcCallType, f: F) -> Result<T, Report>
     where
         Fut: Future<Output = Result<T, Report>>,
-        F: Fn(GrpcClient) -> Fut,
+        F: Fn(RpcClientType) -> Fut,
     {
         let f = Box::new(f);
         let mut last_error = None;
@@ -158,12 +157,11 @@ impl RpcClientService {
             let source_key = source_keys
                 .choose(&mut rand::thread_rng())
                 .unwrap()
-                .deref()
-                .clone();
+                .to_string();
             let (source, _) = source_info.get_mut(&source_key).unwrap().clone();
 
-            let grpc_client = match kind {
-                GrpcCallType::Execute => GrpcClient::Execute(Box::new(
+            let rpc_client = match kind {
+                RpcCallType::Execute => RpcClientType::Execute(Box::new(
                     match Signer::new(
                         source.rpc.to_string(),
                         self.chain_config.clone(),
@@ -175,7 +173,7 @@ impl RpcClientService {
                     {
                         Ok(client) => client,
                         Err(e) => {
-                            debug!("Failed to create grpc client for {}: {}", source_key, e);
+                            debug!("Failed to create RpcClient for {}: {}", source_key, e);
                             let (_, bad) = source_info.get_mut(&source_key).unwrap();
                             *bad = true;
                             last_error = Some(e);
@@ -183,11 +181,11 @@ impl RpcClientService {
                         }
                     },
                 )),
-                GrpcCallType::Query => GrpcClient::Query(Box::new(
+                RpcCallType::Query => RpcClientType::Query(Box::new(
                     match Querier::new(self.chain_config.clone(), source.rpc.to_string()).await {
                         Ok(client) => client,
                         Err(e) => {
-                            debug!("Failed to create grpc client for {}: {}", source_key, e);
+                            debug!("Failed to create RpcClient for {}: {}", source_key, e);
                             let (_, bad) = source_info.get_mut(&source_key).unwrap();
                             *bad = true;
                             last_error = Some(e);
@@ -197,7 +195,7 @@ impl RpcClientService {
                 )),
             };
 
-            match f(grpc_client).await {
+            match f(rpc_client).await {
                 Ok(result) => {
                     return Ok(result);
                 }
@@ -221,8 +219,8 @@ impl RpcClientService {
         Fut: Future<Output = Result<T, Report>>,
         F: Fn(Box<Signer>) -> Fut,
     {
-        self.call(GrpcCallType::Execute, |client| async {
-            if let GrpcClient::Execute(client) = client {
+        self.call(RpcCallType::Execute, |client| async {
+            if let RpcClientType::Execute(client) = client {
                 f(client).await
             } else {
                 unreachable!()
@@ -236,8 +234,8 @@ impl RpcClientService {
         Fut: Future<Output = Result<T, Report>>,
         F: Fn(Box<Querier>) -> Fut,
     {
-        self.call(GrpcCallType::Query, |client| async {
-            if let GrpcClient::Query(client) = client {
+        self.call(RpcCallType::Query, |client| async {
+            if let RpcClientType::Query(client) = client {
                 f(client).await
             } else {
                 unreachable!()

@@ -1,5 +1,5 @@
 //!
-//! This module contains the code for querying the croncat contract via gRPC.
+//! This module contains the code for querying the croncat contract via HTTP RPC.
 //!
 
 use cw_croncat_core::msg::{

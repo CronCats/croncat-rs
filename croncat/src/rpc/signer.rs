@@ -1,5 +1,5 @@
 //!
-//! GRPC client service that can be used to execute and query the croncat chain.
+//! RPC client service that can be used to execute and query the croncat on chain.
 //!
 
 use std::str::FromStr;

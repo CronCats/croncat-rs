@@ -85,7 +85,7 @@ async fn run_command(opts: Opts, mut storage: LocalAgentStorage) -> Result<(), R
             let key = storage.get_agent_signing_key(&opts.agent)?;
             let mnemonic = storage.get_agent_mnemonic(&opts.agent)?;
 
-            // Get a grpc client
+            // Get an rpc client
             let client =
                 RpcClientService::new(chain_config.clone(), mnemonic.to_string(), key).await;
 
@@ -147,7 +147,7 @@ async fn run_command(opts: Opts, mut storage: LocalAgentStorage) -> Result<(), R
             let key = storage.get_agent_signing_key(&opts.agent)?;
             let mnemonic = storage.get_agent_mnemonic(&opts.agent)?;
 
-            // Get a grpc client
+            // Get an rpc client
             let client =
                 RpcClientService::new(chain_config.clone(), mnemonic.to_string(), key).await;
 
@@ -194,7 +194,7 @@ async fn run_command(opts: Opts, mut storage: LocalAgentStorage) -> Result<(), R
             let key = storage.get_agent_signing_key(&opts.agent)?;
             let mnemonic = storage.get_agent_mnemonic(&opts.agent)?;
 
-            // Get a grpc client
+            // Get an rpc client
             let client =
                 RpcClientService::new(chain_config.clone(), mnemonic.to_string(), key).await;
 
@@ -249,7 +249,7 @@ async fn run_command(opts: Opts, mut storage: LocalAgentStorage) -> Result<(), R
             let key = storage.get_agent_signing_key(&opts.agent)?;
             let mnemonic = storage.get_agent_mnemonic(&opts.agent)?;
 
-            // Get a grpc client
+            // Get an rpc client
             let client =
                 RpcClientService::new(chain_config.clone(), mnemonic.to_string(), key).await;
 
@@ -302,7 +302,7 @@ async fn run_command(opts: Opts, mut storage: LocalAgentStorage) -> Result<(), R
             let key = storage.get_agent_signing_key(&opts.agent)?;
             let mnemonic = storage.get_agent_mnemonic(&opts.agent)?;
 
-            // Get a grpc client
+            // Get an rpc client
             let client =
                 RpcClientService::new(chain_config.clone(), mnemonic.to_string(), key).await;
 
@@ -355,7 +355,7 @@ async fn run_command(opts: Opts, mut storage: LocalAgentStorage) -> Result<(), R
             let key = storage.get_agent_signing_key(&opts.agent)?;
             let mnemonic = storage.get_agent_mnemonic(&opts.agent)?;
 
-            // Get a grpc client
+            // Get an rpc client
             let client =
                 RpcClientService::new(chain_config.clone(), mnemonic.to_string(), key).await;
 
@@ -413,7 +413,7 @@ async fn run_command(opts: Opts, mut storage: LocalAgentStorage) -> Result<(), R
             let key = storage.get_agent_signing_key(&opts.agent)?;
             let mnemonic = storage.get_agent_mnemonic(&opts.agent)?;
 
-            // Get a grpc client
+            // Get an rpc client
             let client =
                 RpcClientService::new(chain_config.clone(), mnemonic.to_string(), key).await;
 

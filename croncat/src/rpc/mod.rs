@@ -1,5 +1,6 @@
 //!
-//! Use the [cosmos_sdk_proto](https://crates.io/crates/cosmos-sdk-proto) library to create clients for GRPC node requests.
+//! Use [cosm-orc](https://docs.rs/cosm-orc/3.0.2/cosm_orc/) and [cosm-tome](https://docs.rs/cosm-tome/0.1.1/cosm_tome/)
+//! to query and execute contracts calls on chain.
 //!
 
 pub mod client;

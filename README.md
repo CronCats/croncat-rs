@@ -94,6 +94,7 @@ cargo run go --agent mainnet --chain-id uni-5
 ```
 
 ### Configuring Custom RPCs
+
 ```
     uni-5:
         manager: juno1x4uaf50flf6af8jpean8ruu8q8jdraaqj7e3gg3wemqm5cdw040qk982ec
@@ -102,7 +103,6 @@ cargo run go --agent mainnet --chain-id uni-5
         custom_sources:
             "Cats R US 🙀":
                 rpc: http://192.168.1.13
-                grpc: http://192.168.1.13:12690
 ```
 
 ## Code of Conduct

@@ -12,7 +12,6 @@ chains:
     #        custom_sources:
     #            "CronCat":
     #                rpc: https://rpc-testnet-uni.cron.cat
-    #                grpc: https://grpc-testnet-uni.cron.cat
     # osmosis-1:
     #     manager:
     #     gas_prices: 0.04

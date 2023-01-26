@@ -1,41 +1,46 @@
 chains:
     juno-1:
-        manager: juno1gvu90ulpql5zaes62rnep0cwrndrtdj80lwkywa7uph7eezdsp9qgz37yh
+        manager: juno1yaxs8l9xa4xg7lk0aqxatxqkk5f3mcwetwg7vvlqu7uxc74dlf6qhkx3xj
         gas_prices: 0.04
         gas_adjustment: 1.3
         threshold: 1000000
     uni-5:
-        manager: juno174ncqgapq7fudqj64ut4ue47gevlqp93guecjelnkquruvnpjdgsuk046w
+        manager: juno1gqkv06dxrccavckw8ydwaxm353pvlrtx0cgxfehvn0gjvlwjfscq58nn8w
         gas_prices: 0.04
         gas_adjustment: 1.3
         threshold: 1000000
-#        custom_sources:
-#            "CronCat":
-#                rpc: https://rpc-testnet-uni.cron.cat
-#                grpc: https://grpc-testnet-uni.cron.cat
+    #        custom_sources:
+    #            "CronCat":
+    #                rpc: https://rpc-testnet-uni.cron.cat
     # osmosis-1:
-    #     manager: 
+    #     manager:
     #     gas_prices: 0.04
     #     gas_adjustment: 1.3
     osmo-test-4:
-        manager: osmo1sqlpugu0qh2qv657x7chhaz507pv5wdcck3kj8fz73gxm8uunl4skaapsv
+        manager: osmo1j5tr7329ff843r7u6htjnghylecy3ejc5kxzk0p4yyfuhm5lwr2qa89pl8
         gas_prices: 0.04
         gas_adjustment: 1.3
         threshold: 1000000
+        rpc_timeout: 9.0
     # stargaze-1:
-    #     manager: 
+    #     manager:
     #     gas_prices: 0.04
     #     gas_adjustment: 1.3
     elgafar-1:
-        manager: stars1s4vvwnh2w53mc5avty9439tjfs652kvgsu6tfpp2tzv0npttzy7s4jxsh5
+        manager: stars1mesz5kqedgq3vwx6kvxvckk4dg5k7hr2840f3r3xkhyg00dvh9gskk6f9q
         gas_prices: 0.04
         gas_adjustment: 1.3
         threshold: 1000000
+        rpc_timeout: 9.0
+        denom: "ustars"
+        custom_sources:
+            "stars":
+                rpc: https://rpc.elgafar-1.stargaze-apis.com
     # titus-1:
-    #     manager: 
+    #     manager:
     #     gas_prices: 0.04
     #     gas_adjustment: 1.3
     # constantine-1:
-    #     manager: 
+    #     manager:
     #     gas_prices: 0.04
     #     gas_adjustment: 1.3

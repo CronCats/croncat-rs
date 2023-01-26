@@ -13,7 +13,7 @@ use tracing::{error, info};
 use crate::config::ChainConfig;
 use crate::{
     channels::{BlockStreamRx, ShutdownRx},
-    grpc::GrpcClientService,
+    rpc::RpcClientService,
     utils::AtomicIntervalCounter,
 };
 
@@ -25,7 +25,7 @@ pub async fn check_account_status_loop(
     mut block_stream_rx: BlockStreamRx,
     mut shutdown_rx: ShutdownRx,
     block_status: Arc<Mutex<AgentStatus>>,
-    client: GrpcClientService,
+    client: RpcClientService,
     chain_config: ChainConfig,
 ) -> Result<(), Report> {
     let block_counter = AtomicIntervalCounter::new(10);
@@ -86,7 +86,7 @@ pub async fn check_account_status_loop(
                             Ok(agent)
                         })
                         .await?;
-                    let agent_native_balance = agent_balance.amount.parse::<u128>().unwrap();
+                    let agent_native_balance = agent_balance.amount;
                     let denom = agent_balance.denom;
 
                     // If agent balance is too low and the agent has some native coins in the manager contract
@@ -104,7 +104,7 @@ pub async fn check_account_status_loop(
                             .balance
                             .native
                             .into_iter()
-                            .find(|c| c.denom == *denom)
+                            .find(|c| c.denom == denom.to_string())
                             .unwrap_or_default()
                             .amount;
                         if !reward_balance.is_zero() {
@@ -124,9 +124,7 @@ pub async fn check_account_status_loop(
                                     Ok(agent)
                                 })
                                 .await?
-                                .amount
-                                .parse::<u128>()
-                                .unwrap();
+                                .amount;
                             if native_balance_after_withdraw < threshold as u128 {
                                 error!("Not enough balance to continue, the agent in required to have {} {}, current balance: {} {}", threshold, denom, native_balance_after_withdraw, denom);
                                 error!("Stopping the agent");

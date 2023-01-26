@@ -1,5 +1,5 @@
 //!
-//! GRPC client service that can be used to execute and query the croncat chain.
+//! RPC client service that can be used to execute and query the croncat chain.
 //! This uses multiple approaches to ensure that the service is always available.
 //!
 
@@ -10,7 +10,6 @@ use std::time::Duration;
 use cosmrs::bip32;
 use cosmrs::crypto::secp256k1::SigningKey;
 use futures_util::Future;
-use lazy_static::__Deref;
 use rand::seq::SliceRandom;
 use tokio::sync::Mutex;
 use tracing::debug;
@@ -20,8 +19,8 @@ use crate::config::ChainDataSource;
 use crate::errors::{eyre, Report};
 use crate::logging::info;
 
-use super::GrpcQuerier;
-use super::GrpcSigner;
+use super::Querier;
+use super::Signer;
 
 #[derive(Debug)]
 pub enum ServiceFailure {
@@ -30,40 +29,34 @@ pub enum ServiceFailure {
     Other(Report),
 }
 
-#[derive(Debug, Default)]
-#[allow(dead_code)]
-struct GrpcClientStatus {
-    bad: bool,
-    last_success_timestamp: Option<u64>,
-    last_failure_timestamp: Option<u64>,
-    last_failure: Option<ServiceFailure>,
-}
-
 #[derive(Clone, PartialEq, Hash, Eq, Debug)]
-pub enum GrpcCallType {
+pub enum RpcCallType {
     Execute,
     Query,
 }
 
-pub enum GrpcClient {
-    Execute(Box<GrpcSigner>),
-    Query(Box<GrpcQuerier>),
+#[derive(Debug)]
+pub enum RpcClientType {
+    Execute(Box<Signer>),
+    Query(Box<Querier>),
 }
 
 #[derive(Clone, Debug)]
-pub struct GrpcClientService {
+pub struct RpcClientService {
     chain_config: ChainConfig,
     key: bip32::XPrv,
+    mnemonic: String,
     source_info: Arc<Mutex<HashMap<String, (ChainDataSource, bool)>>>,
 }
 
-impl GrpcClientService {
-    pub async fn new(chain_config: ChainConfig, key: bip32::XPrv) -> Self {
+impl RpcClientService {
+    pub async fn new(chain_config: ChainConfig, mnemonic: String, key: bip32::XPrv) -> Self {
         let data_sources =
             Self::pick_best_sources(&chain_config, &chain_config.data_sources()).await;
 
         Self {
             key,
+            mnemonic,
             chain_config,
             source_info: Arc::new(Mutex::new(data_sources)),
         }
@@ -81,15 +74,15 @@ impl GrpcClientService {
         );
 
         // Create a racetrack for testing sources.
-        let mut race_track = RaceTrack::disqualify_after(Duration::from_secs(2));
+        let mut race_track = RaceTrack::disqualify_after(Duration::from_secs(5));
 
-        // Race all the sources and check that they connect to GRPC.
+        // Race all the sources and check that they connect to RPC.
         for (name, source) in sources {
             let source = source.clone();
             let chain_config = chain_config.clone();
             race_track.add_racer(name, async move {
-                let grpc_client = GrpcQuerier::new(chain_config, source.grpc.clone()).await?;
-                let _ = grpc_client.query_config().await?;
+                let rpc_client = Querier::new(chain_config, source.rpc.clone()).await?;
+                let _ = rpc_client.query_config().await?;
 
                 Ok(source)
             });
@@ -137,10 +130,10 @@ impl GrpcClientService {
             .to_string()
     }
 
-    async fn call<T, Fut, F>(&self, kind: GrpcCallType, f: F) -> Result<T, Report>
+    async fn call<T, Fut, F>(&self, kind: RpcCallType, f: F) -> Result<T, Report>
     where
         Fut: Future<Output = Result<T, Report>>,
-        F: Fn(GrpcClient) -> Fut,
+        F: Fn(RpcClientType) -> Fut,
     {
         let f = Box::new(f);
         let mut last_error = None;
@@ -164,26 +157,23 @@ impl GrpcClientService {
             let source_key = source_keys
                 .choose(&mut rand::thread_rng())
                 .unwrap()
-                .deref()
-                .clone();
+                .to_string();
             let (source, _) = source_info.get_mut(&source_key).unwrap().clone();
 
-            let grpc_client = match kind {
-                GrpcCallType::Execute => GrpcClient::Execute(Box::new(
-                    match GrpcSigner::new(
+            let rpc_client = match kind {
+                RpcCallType::Execute => RpcClientType::Execute(Box::new(
+                    match Signer::new(
                         source.rpc.to_string(),
-                        source.grpc.to_string(),
-                        self.chain_config.info.clone(),
+                        self.chain_config.clone(),
                         self.chain_config.manager.clone(),
                         self.key.clone(),
-                        self.chain_config.gas_prices,
-                        self.chain_config.gas_adjustment,
+                        self.mnemonic.clone(),
                     )
                     .await
                     {
                         Ok(client) => client,
                         Err(e) => {
-                            debug!("Failed to create grpc client for {}: {}", source_key, e);
+                            debug!("Failed to create RpcClient for {}: {}", source_key, e);
                             let (_, bad) = source_info.get_mut(&source_key).unwrap();
                             *bad = true;
                             last_error = Some(e);
@@ -191,12 +181,11 @@ impl GrpcClientService {
                         }
                     },
                 )),
-                GrpcCallType::Query => GrpcClient::Query(Box::new(
-                    match GrpcQuerier::new(self.chain_config.clone(), source.grpc.to_string()).await
-                    {
+                RpcCallType::Query => RpcClientType::Query(Box::new(
+                    match Querier::new(self.chain_config.clone(), source.rpc.to_string()).await {
                         Ok(client) => client,
                         Err(e) => {
-                            debug!("Failed to create grpc client for {}: {}", source_key, e);
+                            debug!("Failed to create RpcClient for {}: {}", source_key, e);
                             let (_, bad) = source_info.get_mut(&source_key).unwrap();
                             *bad = true;
                             last_error = Some(e);
@@ -206,9 +195,13 @@ impl GrpcClientService {
                 )),
             };
 
-            match f(grpc_client).await {
+            match f(rpc_client).await {
                 Ok(result) => {
                     return Ok(result);
+                }
+                Err(e) if break_loop_errors(&e) => {
+                    debug!("Error calling chain for {}: {}", source_key, e);
+                    break Err(e);
                 }
                 Err(e) => {
                     debug!("Error calling chain for {}: {}", source_key, e);
@@ -224,10 +217,10 @@ impl GrpcClientService {
     pub async fn execute<T, Fut, F>(&self, f: F) -> Result<T, Report>
     where
         Fut: Future<Output = Result<T, Report>>,
-        F: Fn(Box<GrpcSigner>) -> Fut,
+        F: Fn(Box<Signer>) -> Fut,
     {
-        self.call(GrpcCallType::Execute, |client| async {
-            if let GrpcClient::Execute(client) = client {
+        self.call(RpcCallType::Execute, |client| async {
+            if let RpcClientType::Execute(client) = client {
                 f(client).await
             } else {
                 unreachable!()
@@ -239,10 +232,10 @@ impl GrpcClientService {
     pub async fn query<T, Fut, F>(&self, f: F) -> Result<T, Report>
     where
         Fut: Future<Output = Result<T, Report>>,
-        F: Fn(Box<GrpcQuerier>) -> Fut,
+        F: Fn(Box<Querier>) -> Fut,
     {
-        self.call(GrpcCallType::Query, |client| async {
-            if let GrpcClient::Query(client) = client {
+        self.call(RpcCallType::Query, |client| async {
+            if let RpcClientType::Query(client) = client {
                 f(client).await
             } else {
                 unreachable!()
@@ -250,4 +243,12 @@ impl GrpcClientService {
         })
         .await
     }
+}
+
+fn break_loop_errors(e: &Report) -> bool {
+    let msg = e.to_string().to_lowercase();
+    msg.contains("agent not registered")
+        || msg.contains("agent already registered")
+        || msg.contains("agent not found")
+        || msg.contains("account not found")
 }

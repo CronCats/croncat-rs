@@ -3,10 +3,7 @@
 use std::collections::HashMap;
 
 use color_eyre::Result;
-use cosmos_chain_registry::{
-    chain::{Grpc, Rpc},
-    ChainInfo, ChainRegistry,
-};
+use cosmos_chain_registry::{chain::Rpc, ChainInfo, ChainRegistry};
 use serde::{Deserialize, Serialize};
 use url::Url;
 
@@ -70,11 +67,12 @@ struct RawChainConfigEntry {
     pub gas_adjustment: Option<f32>,
     pub threshold: Option<u64>,
     pub custom_sources: Option<HashMap<String, ChainDataSource>>,
+    pub rpc_timeout_seconds: Option<f64>,
+    pub denom: Option<String>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ChainDataSource {
-    pub grpc: String,
     pub rpc: String,
 }
 
@@ -90,6 +88,8 @@ pub struct ChainConfig {
     pub gas_prices: f32,
     pub gas_adjustment: f32,
     pub threshold: Option<u64>,
+    pub rpc_timeout_seconds: Option<f64>,
+    pub denom: Option<String>,
 }
 
 impl ChainConfig {
@@ -110,12 +110,6 @@ impl ChainConfig {
                     provider: Some(provider.clone()),
                     address: source.rpc.clone(),
                 });
-
-                // Add the custom gRPC source.
-                info.apis.grpc.push(Grpc {
-                    provider: Some(provider.clone()),
-                    address: source.grpc.clone(),
-                });
             }
         }
 
@@ -130,39 +124,20 @@ impl ChainConfig {
             gas_prices,
             gas_adjustment,
             threshold: entry.threshold,
+            rpc_timeout_seconds: entry.rpc_timeout_seconds,
+            denom: entry.denom,
         }
     }
 
     pub fn data_sources(&self) -> HashMap<String, ChainDataSource> {
         let mut data_sources = HashMap::new();
 
-        let mut rpc_urls = HashMap::new();
-        let mut grpc_urls = HashMap::new();
-
         for rpc_endpoint in self.info.apis.rpc.iter() {
             if rpc_endpoint.provider.is_some() {
-                rpc_urls.insert(
-                    rpc_endpoint.provider.clone().unwrap(),
-                    rpc_endpoint.address.clone(),
-                );
-            }
-        }
-        for grpc_endpoint in self.info.apis.grpc.iter() {
-            if grpc_endpoint.provider.is_some() {
-                grpc_urls.insert(
-                    grpc_endpoint.provider.clone().unwrap(),
-                    grpc_endpoint.address.clone(),
-                );
-            }
-        }
-
-        for (provider, rpc_url) in rpc_urls {
-            if let Some(grpc_url) = grpc_urls.get(&provider) {
                 data_sources.insert(
-                    provider,
+                    rpc_endpoint.provider.clone().unwrap(),
                     ChainDataSource {
-                        grpc: grpc_url.clone(),
-                        rpc: rpc_url.clone(),
+                        rpc: rpc_endpoint.address.clone(),
                     },
                 );
             }

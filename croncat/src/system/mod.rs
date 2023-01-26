@@ -18,8 +18,8 @@ use crate::{
     channels::ShutdownTx,
     config::ChainConfig,
     errors::{eyre, Report},
-    grpc::GrpcClientService,
     logging::info,
+    rpc::RpcClientService,
     streams::{agent, polling::poll_stream_blocks, tasks},
     tokio,
 };
@@ -36,24 +36,18 @@ pub async fn run(
     shutdown_tx: &ShutdownTx,
     config: &ChainConfig,
     key: &ExtendedPrivateKey<SigningKey>,
+    #[allow(clippy::ptr_arg)] mnemonic: &String,
     with_queries: bool,
 ) -> Result<(), Report> {
     // Setup the chain client.
-    let client = GrpcClientService::new(config.clone(), key.clone()).await;
+    let client = RpcClientService::new(config.clone(), mnemonic.clone(), key.clone()).await;
 
     // Get the status of the agent
     let account_id = client.account_id();
     let status = client
-        .execute(move |signer| {
+        .query(move |querier| {
             let account_id = account_id.clone();
-            async move {
-                signer
-                    .get_agent(&account_id)
-                    .await
-                    .map_err(|err| eyre!("Failed to get agent status: {}", err))?
-                    .ok_or_else(|| eyre!("Agent account {} is not registered", account_id))
-                    .map(|agent| agent.status)
-            }
+            async move { querier.get_agent_status(account_id).await }
         })
         .await?;
 
@@ -211,13 +205,14 @@ pub async fn run_retry(
     shutdown_tx: &ShutdownTx,
     config: &ChainConfig,
     key: &ExtendedPrivateKey<SigningKey>,
+    mnemonic: &String,
     with_queries: bool,
 ) -> Result<(), Report> {
     // TODO: Rethink this retry logic
     // let retry_strategy = FixedInterval::from_millis(5000).take(1200);
 
     // Retry::spawn(retry_strategy, || async {
-    run(chain_id, shutdown_tx, config, key, with_queries).await?;
+    run(chain_id, shutdown_tx, config, key, mnemonic, with_queries).await?;
     // .map_err(|err| {
     //     error!("[{}] System crashed: {}", &chain_id, err);
     //     error!("[{}] Retrying...", &chain_id);

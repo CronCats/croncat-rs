@@ -2,6 +2,8 @@
 //! This module contains the code for querying the croncat contract via HTTP RPC.
 //!
 
+use std::time::Duration;
+
 use cw_croncat_core::msg::{
     AgentResponse, AgentTaskResponse, GetConfigResponse, QueryMsg, TaskResponse,
 };
@@ -9,6 +11,7 @@ use cw_croncat_core::types::AgentStatus;
 
 use serde::de::DeserializeOwned;
 use serde::Serialize;
+use tokio::time::timeout;
 
 use crate::config::ChainConfig;
 use crate::errors::{eyre, Report};
@@ -46,7 +49,18 @@ impl Querier {
         S: Serialize,
         T: DeserializeOwned,
     {
-        self.rpc_client.wasm_query(msg).await
+        timeout(
+            Duration::from_secs_f64(self.rpc_client.timeout_secs),
+            self.rpc_client.wasm_query(msg),
+        )
+        .await
+        .map_err(|err| {
+            eyre!(
+                "Timeout ({}s) while querying contract: {}",
+                self.rpc_client.timeout_secs,
+                err
+            )
+        })?
     }
 
     pub async fn query_config(&self) -> Result<String, Report> {

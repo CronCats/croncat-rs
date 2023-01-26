@@ -15,6 +15,9 @@ use serde::Serialize;
 
 use crate::config::ChainConfig;
 
+/// The default RPC call timeout.
+pub const DEFAULT_TIMEOUT: f64 = 4.0;
+
 /// An RPC client for querying the croncat contract.
 #[derive(Clone)]
 pub struct RpcClient {
@@ -22,6 +25,7 @@ pub struct RpcClient {
     pub(crate) contract_addr: Address,
     key: Option<SigningKey>,
     denom: Option<Denom>,
+    pub(crate) timeout_secs: f64,
 }
 
 impl RpcClient {
@@ -57,6 +61,7 @@ impl RpcClient {
             contract_addr,
             key: None,
             denom: None,
+            timeout_secs: cfg.rpc_timeout_seconds.unwrap_or(DEFAULT_TIMEOUT),
         })
     }
 

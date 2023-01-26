@@ -55,7 +55,11 @@ impl Signer {
         // TODO: This is a hack to get around the fact that cosm-tome doesn't
         // let us pass an xprv.
         rpc_client.set_mnemonic(mnemonic);
-        rpc_client.set_denom(&cfg.info.fees.fee_tokens[0].denom);
+        rpc_client.set_denom(
+            cfg.denom
+                .unwrap_or_else(|| cfg.info.fees.fee_tokens[0].denom.clone())
+                .as_str(),
+        );
 
         Ok(Self {
             account_id,
@@ -69,9 +73,18 @@ impl Signer {
         S: Serialize,
         R: DeserializeOwned,
     {
-        let out = timeout(Duration::from_secs(30), self.rpc_client.wasm_query(msg))
-            .await
-            .map_err(|err| eyre!("Timeout (30s) while querying contract: {}", err))??;
+        let out = timeout(
+            Duration::from_secs_f64(self.rpc_client.timeout_secs),
+            self.rpc_client.wasm_query(msg),
+        )
+        .await
+        .map_err(|err| {
+            eyre!(
+                "Timeout ({}s) while querying contract: {}",
+                self.rpc_client.timeout_secs,
+                err
+            )
+        })??;
 
         Ok(out)
     }
@@ -80,9 +93,18 @@ impl Signer {
     where
         S: Serialize,
     {
-        let res = timeout(Duration::from_secs(30), self.rpc_client.wasm_execute(msg))
-            .await
-            .map_err(|err| eyre!("Timeout (30s) while executing wasm: {}", err))??;
+        let res = timeout(
+            Duration::from_secs_f64(self.rpc_client.timeout_secs),
+            self.rpc_client.wasm_execute(msg),
+        )
+        .await
+        .map_err(|err| {
+            eyre!(
+                "Timeout ({}) while executing wasm: {}",
+                self.rpc_client.timeout_secs,
+                err
+            )
+        })??;
 
         Ok(res)
     }

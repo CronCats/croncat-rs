@@ -16,7 +16,7 @@ use serde::Serialize;
 use crate::config::ChainConfig;
 
 /// The default RPC call timeout.
-pub const DEFAULT_TIMEOUT: f64 = 4.0;
+pub const DEFAULT_TIMEOUT: f64 = 20.0;
 
 /// An RPC client for querying the croncat contract.
 #[derive(Clone)]

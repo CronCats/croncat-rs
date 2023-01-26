@@ -100,7 +100,7 @@ impl Signer {
         .await
         .map_err(|err| {
             eyre!(
-                "Timeout ({}) while executing wasm: {}",
+                "Timeout ({}s) while executing wasm: {}",
                 self.rpc_client.timeout_secs,
                 err
             )

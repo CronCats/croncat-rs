@@ -12,6 +12,7 @@ use serde::Serialize;
 
 use crate::config::ChainConfig;
 use crate::errors::{eyre, Report};
+use crate::utils::normalize_rpc_url;
 
 use super::RpcClient;
 
@@ -30,11 +31,7 @@ impl std::fmt::Debug for Querier {
 
 impl Querier {
     pub async fn new(cfg: ChainConfig, rpc_url: String) -> Result<Self, Report> {
-        let rpc_url = if !rpc_url.starts_with("https://") {
-            format!("https://{}", rpc_url)
-        } else {
-            rpc_url
-        };
+        let rpc_url = normalize_rpc_url(&rpc_url);
 
         let rpc_client = RpcClient::new(&cfg, &rpc_url)?;
 

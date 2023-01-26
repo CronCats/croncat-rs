@@ -23,6 +23,7 @@ use tokio::time::timeout;
 
 use crate::config::ChainConfig;
 use crate::errors::{eyre, Report};
+use crate::utils::normalize_rpc_url;
 
 use super::RpcClient;
 
@@ -41,13 +42,7 @@ impl Signer {
         key: bip32::XPrv,
         mnemonic: String,
     ) -> Result<Self, Report> {
-        // TODO: How should we handle this? Is the hack okay?
-        // Quick hack to add https:// to the url if it is missing
-        let rpc_url = if !rpc_url.starts_with("https://") {
-            format!("https://{}", rpc_url)
-        } else {
-            rpc_url
-        };
+        let rpc_url = normalize_rpc_url(&rpc_url);
 
         // Get the account id from the key.
         let signing_key: SigningKey = key.into();

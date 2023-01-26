@@ -104,7 +104,6 @@ pub async fn queries_loop(
     client: RpcClientService,
     block_status: Arc<Mutex<AgentStatus>>,
 ) -> Result<(), Report> {
-    println!("In queries_loop");
     let block_consumer_stream: JoinHandle<Result<(), Report>> = tokio::task::spawn(async move {
         while let Ok(block) = block_stream_rx.recv().await {
             let tasks_with_queries = client
@@ -116,12 +115,9 @@ pub async fn queries_loop(
                 })
                 .await?;
 
-            println!("Tasks with queries: {:?}", tasks_with_queries);
-
             let locked_status = block_status.lock().await;
             let is_active = *locked_status == AgentStatus::Active;
 
-            println!("Is active: {:?}", is_active);
             // unlocking it ASAP
             std::mem::drop(locked_status);
             if is_active {
@@ -142,7 +138,7 @@ pub async fn queries_loop(
                         }
                         None => true,
                     };
-                    println!("In boundary: {:?}", in_boundary);
+
                     if in_boundary {
                         let query_response = client
                             .execute(|signer| async move {
@@ -157,7 +153,7 @@ pub async fn queries_loop(
                             })
                             .await?;
                         let queries_ready = query_response;
-                        println!("Queries ready: {:?}", queries_ready);
+
                         if queries_ready {
                             client
                                 .execute(|signer| {

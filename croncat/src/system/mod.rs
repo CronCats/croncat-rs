@@ -39,7 +39,6 @@ pub async fn run(
     #[allow(clippy::ptr_arg)] mnemonic: &String,
     with_queries: bool,
 ) -> Result<(), Report> {
-    println!("Start RUN");
     // Setup the chain client.
     let client = RpcClientService::new(config.clone(), mnemonic.clone(), key.clone()).await;
 
@@ -150,7 +149,6 @@ pub async fn run(
 
     // Check queries if enabled
     let queries_runner_handle = if with_queries {
-        println!("Checking for queries");
         tokio::task::spawn(tasks::queries_loop(
             dispatcher_tx.subscribe(),
             shutdown_tx.subscribe(),
@@ -160,7 +158,6 @@ pub async fn run(
     } else {
         tokio::task::spawn(async { Ok(()) })
     };
-    println!("After queries");
 
     // Ctrl-C handler
     let ctrl_c_shutdown_tx = shutdown_tx.clone();

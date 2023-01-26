@@ -120,7 +120,6 @@ async fn run_command(opts: Opts, mut storage: LocalAgentStorage) -> Result<(), R
                                 if err.to_string().contains("account")
                                     && err.to_string().contains("not found") =>
                             {
-                                println!("{:?}", err);
                                 Err(eyre!("Agent account not found on chain"))?;
                             }
                             Err(err) => Err(eyre!("Failed to register agent: {}", err))?,
@@ -167,7 +166,6 @@ async fn run_command(opts: Opts, mut storage: LocalAgentStorage) -> Result<(), R
                             info!("Result: {}", log);
                         }
                         Err(err) if err.to_string().contains("Agent not registered") => {
-                            println!("err: {}", err);
                             Err(eyre!("Agent not registered"))?;
                         }
                         Err(err) => Err(eyre!("Failed to register agent: {}", err))?,

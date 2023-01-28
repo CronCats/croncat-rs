@@ -36,11 +36,10 @@ pub async fn run(
     shutdown_tx: &ShutdownTx,
     config: &ChainConfig,
     key: &ExtendedPrivateKey<SigningKey>,
-    #[allow(clippy::ptr_arg)] mnemonic: &String,
     with_queries: bool,
 ) -> Result<(), Report> {
     // Setup the chain client.
-    let client = RpcClientService::new(config.clone(), mnemonic.clone(), key.clone()).await;
+    let client = RpcClientService::new(config.clone(), key.clone()).await;
 
     // Get the status of the agent
     let account_id = client.account_id();
@@ -205,14 +204,13 @@ pub async fn run_retry(
     shutdown_tx: &ShutdownTx,
     config: &ChainConfig,
     key: &ExtendedPrivateKey<SigningKey>,
-    mnemonic: &String,
     with_queries: bool,
 ) -> Result<(), Report> {
     // TODO: Rethink this retry logic
     // let retry_strategy = FixedInterval::from_millis(5000).take(1200);
 
     // Retry::spawn(retry_strategy, || async {
-    run(chain_id, shutdown_tx, config, key, mnemonic, with_queries).await?;
+    run(chain_id, shutdown_tx, config, key, with_queries).await?;
     // .map_err(|err| {
     //     error!("[{}] System crashed: {}", &chain_id, err);
     //     error!("[{}] Retrying...", &chain_id);

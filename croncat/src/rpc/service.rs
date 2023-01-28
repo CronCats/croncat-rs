@@ -45,18 +45,16 @@ pub enum RpcClientType {
 pub struct RpcClientService {
     chain_config: ChainConfig,
     key: bip32::XPrv,
-    mnemonic: String,
     source_info: Arc<Mutex<HashMap<String, (ChainDataSource, bool)>>>,
 }
 
 impl RpcClientService {
-    pub async fn new(chain_config: ChainConfig, mnemonic: String, key: bip32::XPrv) -> Self {
+    pub async fn new(chain_config: ChainConfig, key: bip32::XPrv) -> Self {
         let data_sources =
             Self::pick_best_sources(&chain_config, &chain_config.data_sources()).await;
 
         Self {
             key,
-            mnemonic,
             chain_config,
             source_info: Arc::new(Mutex::new(data_sources)),
         }
@@ -167,7 +165,6 @@ impl RpcClientService {
                         self.chain_config.clone(),
                         self.chain_config.manager.clone(),
                         self.key.clone(),
-                        self.mnemonic.clone(),
                     )
                     .await
                     {

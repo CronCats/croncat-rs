@@ -52,9 +52,7 @@ impl Signer {
 
         // Create a new RPC client
         let mut rpc_client = RpcClient::new(&cfg, rpc_url.as_str())?;
-        // TODO: This is a hack to get around the fact that cosm-tome doesn't
-        // let us pass an xprv.
-        rpc_client.set_mnemonic(key_bytes);
+        rpc_client.set_key(key_bytes);
         rpc_client.set_denom(
             cfg.denom
                 .unwrap_or_else(|| cfg.info.fees.fee_tokens[0].denom.clone())

@@ -68,7 +68,7 @@ impl RpcClient {
     }
 
     /// Set the signing key for this client.
-    pub fn set_mnemonic(&mut self, key_bytes: Vec<u8>) {
+    pub fn set_key(&mut self, key_bytes: Vec<u8>) {
         self.key = Some(SigningKey {
             name: "".to_string(),
             key: Key::Raw(key_bytes),

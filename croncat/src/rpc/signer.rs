@@ -7,6 +7,7 @@ use std::time::Duration;
 
 use cosm_orc::orchestrator::Address;
 use cosm_orc::orchestrator::ChainResponse;
+use cosm_orc::orchestrator::ChainTxResponse;
 use cosm_orc::orchestrator::Coin;
 use cosmrs::bip32;
 use cosmrs::crypto::secp256k1::SigningKey;
@@ -229,7 +230,7 @@ impl Signer {
         to: &str,
         amount: u128,
         denom: &str,
-    ) -> Result<(), Report> {
+    ) -> Result<ChainTxResponse, Report> {
         self.rpc_client
             .send_funds(account_id, to, denom, amount)
             .await
@@ -240,8 +241,6 @@ impl Signer {
                     to,
                     err
                 )
-            })?;
-
-        Ok(())
+            })
     }
 }

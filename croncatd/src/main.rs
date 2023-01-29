@@ -515,6 +515,9 @@ async fn run_command(opts: Opts, mut storage: LocalAgentStorage) -> Result<(), R
                         // Print info about the agent sending funds
                         info!("Account ID: {}", signer.account_id());
 
+                        // Print info about the amount and denom being sent.
+                        info!("Sending {}{} to {}", amount, denom, to);
+
                         // Send funds to the given address.
                         let query = signer
                             .send_funds(
@@ -527,8 +530,9 @@ async fn run_command(opts: Opts, mut storage: LocalAgentStorage) -> Result<(), R
 
                         // Handle the result of the transaction
                         match query {
-                            Ok(_) => {
+                            Ok(tx) => {
                                 info!("Funds sent successfully");
+                                info!("TxHash: {}", tx.tx_hash);
                             }
                             Err(err) => Err(err)?,
                         }

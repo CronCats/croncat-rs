@@ -480,6 +480,64 @@ async fn run_command(opts: Opts, mut storage: LocalAgentStorage) -> Result<(), R
                 system::DaemonService::create(output.clone(), &chain_id, opts.no_frills)?;
             }
         }
+        opts::Command::SendFunds { to, denom, amount } => {
+            // Make sure we have a chain id to run on
+            if opts.chain_id.is_none() {
+                return Err(eyre!("chain-id is required for go command"));
+            }
+            let chain_id = opts.chain_id.unwrap();
+
+            // Get the chain config for the chain we're going to run on
+            let chain_config = config
+                .chains
+                .get(&chain_id)
+                .ok_or_else(|| eyre!("Chain not found in configuration: {}", chain_id))?;
+
+            // Get the key and create a signer
+            let key = storage.get_agent_signing_key(&opts.agent)?;
+            let mnemonic = storage.get_agent_mnemonic(&opts.agent)?;
+
+            // Get an rpc client
+            let client =
+                RpcClientService::new(chain_config.clone(), mnemonic.to_string(), key).await;
+
+            // Parse the amount
+            let amount = amount
+                .parse::<u128>()
+                .map_err(|e| eyre!("Invalid send amount: {}", e))?;
+
+            client
+                .execute(|signer| {
+                    let to = to.clone();
+                    let denom = denom.clone();
+
+                    async move {
+                        // Print info about the agent sending funds
+                        info!("Account ID: {}", signer.account_id());
+
+                        // Send funds to the given address.
+                        let query = signer
+                            .send_funds(
+                                signer.account_id().as_ref(),
+                                to.as_str(),
+                                amount,
+                                denom.as_str(),
+                            )
+                            .await;
+
+                        // Handle the result of the transaction
+                        match query {
+                            Ok(_) => {
+                                info!("Funds sent successfully");
+                            }
+                            Err(err) => Err(err)?,
+                        }
+
+                        Ok(())
+                    }
+                })
+                .await?;
+        }
     }
 
     Ok(())

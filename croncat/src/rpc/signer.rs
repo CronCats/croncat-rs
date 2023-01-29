@@ -222,4 +222,26 @@ impl Signer {
     pub async fn query_native_balance(&self, account_id: &str) -> Result<Coin, Report> {
         self.rpc_client.query_balance(account_id).await
     }
+
+    pub async fn send_funds(
+        &self,
+        account_id: &str,
+        to: &str,
+        amount: u128,
+        denom: &str,
+    ) -> Result<(), Report> {
+        self.rpc_client
+            .send_funds(account_id, to, denom, amount)
+            .await
+            .map_err(|err| {
+                eyre!(
+                    "Failed to send funds from {} to {}: {}",
+                    account_id,
+                    to,
+                    err
+                )
+            })?;
+
+        Ok(())
+    }
 }

@@ -7,8 +7,9 @@ use cosm_orc::config::ChainConfig as CosmOrcChainConfig;
 use cosm_orc::orchestrator::{
     cosm_orc::CosmOrc, deploy::DeployInfo, Address, Denom, SigningKey, TendermintRPC,
 };
-use cosm_orc::orchestrator::{ChainResponse, Coin, Key};
+use cosm_orc::orchestrator::{ChainResponse, ChainTxResponse, Coin, Key};
 use cosm_tome::chain::request::TxOptions;
+use cosm_tome::modules::bank::model::SendRequest;
 use cosm_tome::modules::cosmwasm::model::ExecRequest;
 use serde::de::DeserializeOwned;
 use serde::Serialize;
@@ -149,5 +150,40 @@ impl RpcClient {
             .await?;
 
         Ok(balance.balance)
+    }
+
+    /// Send funds to an address.
+    pub async fn send_funds(
+        &self,
+        to: &str,
+        from: &str,
+        denom: &str,
+        amount: u128,
+    ) -> Result<ChainTxResponse, Report> {
+        if self.key.is_none() {
+            return Err(eyre!("No signing key set"));
+        }
+
+        let to = to.parse::<Address>()?;
+        let from = from.parse::<Address>()?;
+
+        let response = self
+            .client
+            .client
+            .bank_send(
+                SendRequest {
+                    to,
+                    from,
+                    amounts: vec![Coin {
+                        denom: Denom::from_str(denom)?,
+                        amount,
+                    }],
+                },
+                self.key.as_ref().unwrap(),
+                &TxOptions::default(),
+            )
+            .await?;
+
+        Ok(response.res)
     }
 }

@@ -15,6 +15,7 @@ use serde::de::DeserializeOwned;
 use serde::Serialize;
 
 use crate::config::ChainConfig;
+use crate::utils::DERIVATION_PATH;
 
 /// The default RPC call timeout.
 pub const DEFAULT_TIMEOUT: f64 = 20.0;
@@ -50,8 +51,9 @@ impl RpcClient {
                 chain_id: cfg.info.chain_id.clone(),
                 rpc_endpoint: Some(rpc_url.to_string()),
                 grpc_endpoint: None,
-                gas_prices: cfg.gas_prices as f64,
+                gas_price: cfg.gas_prices as f64,
                 gas_adjustment: cfg.gas_adjustment as f64,
+                derivation_path: DERIVATION_PATH.to_string(),
             },
             contract_deploy_info,
         };
@@ -67,10 +69,11 @@ impl RpcClient {
     }
 
     /// Set the signing key for this client.
-    pub fn set_mnemonic(&mut self, mnemonic: String) {
+    pub fn set_key(&mut self, key_bytes: Vec<u8>) {
         self.key = Some(SigningKey {
             name: "".to_string(),
-            key: Key::Mnemonic(mnemonic),
+            key: Key::Raw(key_bytes),
+            derivation_path: DERIVATION_PATH.to_string(),
         });
     }
 

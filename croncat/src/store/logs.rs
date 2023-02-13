@@ -30,7 +30,7 @@ impl ErrorLogStorage {
         fs::create_dir_all(path.parent().unwrap())?;
         error!("Writing error to log file at {}", path.to_str().unwrap());
         let mut file = File::create(path)?;
-        file.write_all(format!("{:?}", err).as_bytes())?;
+        file.write_all(format!("{err:?}").as_bytes())?;
         Ok(())
     }
 }

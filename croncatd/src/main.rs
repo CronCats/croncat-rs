@@ -30,7 +30,7 @@ async fn main() -> Result<(), Report> {
     // Get the CLI options, handle argument errors nicely
     let opts = cli::get_opts()
         .map_err(|err| {
-            eprintln!("{}", err);
+            eprintln!("{err}");
             exit(1);
         })
         .unwrap();
@@ -83,11 +83,9 @@ async fn run_command(opts: Opts, mut storage: LocalAgentStorage) -> Result<(), R
 
             // Get the key and create a signer
             let key = storage.get_agent_signing_key(&opts.agent)?;
-            let mnemonic = storage.get_agent_mnemonic(&opts.agent)?;
 
             // Get an rpc client
-            let client =
-                RpcClientService::new(chain_config.clone(), mnemonic.to_string(), key).await;
+            let client = RpcClientService::new(chain_config.clone(), key).await;
 
             client
                 .execute(|signer| {
@@ -144,11 +142,9 @@ async fn run_command(opts: Opts, mut storage: LocalAgentStorage) -> Result<(), R
 
             // Get the key and create a signer
             let key = storage.get_agent_signing_key(&opts.agent)?;
-            let mnemonic = storage.get_agent_mnemonic(&opts.agent)?;
 
             // Get an rpc client
-            let client =
-                RpcClientService::new(chain_config.clone(), mnemonic.to_string(), key).await;
+            let client = RpcClientService::new(chain_config.clone(), key).await;
 
             client
                 .execute(|signer| async move {
@@ -190,11 +186,9 @@ async fn run_command(opts: Opts, mut storage: LocalAgentStorage) -> Result<(), R
 
             // Get the key and create a signer
             let key = storage.get_agent_signing_key(&opts.agent)?;
-            let mnemonic = storage.get_agent_mnemonic(&opts.agent)?;
 
             // Get an rpc client
-            let client =
-                RpcClientService::new(chain_config.clone(), mnemonic.to_string(), key).await;
+            let client = RpcClientService::new(chain_config.clone(), key).await;
 
             client
                 .execute(|signer| async move {
@@ -227,7 +221,7 @@ async fn run_command(opts: Opts, mut storage: LocalAgentStorage) -> Result<(), R
             for (chain_id, chain_config) in config.chains {
                 let account_addr = storage
                     .get_agent_signing_account_addr(&opts.agent, chain_config.info.bech32_prefix)?;
-                println!("{}: {}", chain_id, account_addr);
+                println!("{chain_id}: {account_addr}");
             }
         }
         opts::Command::Status => {
@@ -245,11 +239,9 @@ async fn run_command(opts: Opts, mut storage: LocalAgentStorage) -> Result<(), R
 
             // Get the key and create a signer
             let key = storage.get_agent_signing_key(&opts.agent)?;
-            let mnemonic = storage.get_agent_mnemonic(&opts.agent)?;
 
             // Get an rpc client
-            let client =
-                RpcClientService::new(chain_config.clone(), mnemonic.to_string(), key).await;
+            let client = RpcClientService::new(chain_config.clone(), key).await;
 
             // Get the account id
             let account_addr = storage.get_agent_signing_account_addr(
@@ -298,11 +290,9 @@ async fn run_command(opts: Opts, mut storage: LocalAgentStorage) -> Result<(), R
 
             // Get the key and create a signer
             let key = storage.get_agent_signing_key(&opts.agent)?;
-            let mnemonic = storage.get_agent_mnemonic(&opts.agent)?;
 
             // Get an rpc client
-            let client =
-                RpcClientService::new(chain_config.clone(), mnemonic.to_string(), key).await;
+            let client = RpcClientService::new(chain_config.clone(), key).await;
 
             // Get the account id
             let account_addr = storage.get_agent_signing_account_addr(
@@ -351,11 +341,9 @@ async fn run_command(opts: Opts, mut storage: LocalAgentStorage) -> Result<(), R
 
             // Get the key and create a signer
             let key = storage.get_agent_signing_key(&opts.agent)?;
-            let mnemonic = storage.get_agent_mnemonic(&opts.agent)?;
 
             // Get an rpc client
-            let client =
-                RpcClientService::new(chain_config.clone(), mnemonic.to_string(), key).await;
+            let client = RpcClientService::new(chain_config.clone(), key).await;
 
             // Get the account id
             let account_addr = storage.get_agent_signing_account_addr(
@@ -392,7 +380,7 @@ async fn run_command(opts: Opts, mut storage: LocalAgentStorage) -> Result<(), R
         }
         opts::Command::GenerateMnemonic { new_name, mnemonic } => {
             storage.generate_account(new_name.clone(), mnemonic).await?;
-            println!("Generated agent for {}", new_name);
+            println!("Generated agent for {new_name}");
         }
         opts::Command::Update => {
             // Make sure we have a chain id to run on
@@ -409,11 +397,9 @@ async fn run_command(opts: Opts, mut storage: LocalAgentStorage) -> Result<(), R
 
             // Get the key and create a signer
             let key = storage.get_agent_signing_key(&opts.agent)?;
-            let mnemonic = storage.get_agent_mnemonic(&opts.agent)?;
 
             // Get an rpc client
-            let client =
-                RpcClientService::new(chain_config.clone(), mnemonic.to_string(), key).await;
+            let client = RpcClientService::new(chain_config.clone(), key).await;
 
             client
                 .execute(|signer| async move {
@@ -453,7 +439,6 @@ async fn run_command(opts: Opts, mut storage: LocalAgentStorage) -> Result<(), R
 
             // Get the key for the agent signing account
             let key = storage.get_agent_signing_key(&opts.agent)?;
-            let mnemonic = storage.get_agent_mnemonic(&opts.agent)?.to_string();
 
             // Get the chain config for the chain we're going to run on
             let chain_config = config
@@ -465,15 +450,7 @@ async fn run_command(opts: Opts, mut storage: LocalAgentStorage) -> Result<(), R
             let (shutdown_tx, _shutdown_rx) = create_shutdown_channel();
 
             // Run the agent on the chain
-            system::run_retry(
-                &chain_id,
-                &shutdown_tx,
-                chain_config,
-                &key,
-                &mnemonic,
-                with_queries,
-            )
-            .await?;
+            system::run_retry(&chain_id, &shutdown_tx, chain_config, &key, with_queries).await?;
         }
         opts::Command::SetupService { output } => {
             for (chain_id, _) in config.chains {

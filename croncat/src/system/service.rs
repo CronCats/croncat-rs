@@ -62,7 +62,7 @@ impl DaemonService {
         let full_service_dir_path = fs::canonicalize(path)?;
         // File path for the croncatd service file.
         let service_file_path = full_service_dir_path
-            .join(format!("croncatd-{}.service", chain_id))
+            .join(format!("croncatd-{chain_id}.service"))
             .to_str()
             .ok_or_else(|| eyre!("Failed to get service file path."))?
             .to_string();

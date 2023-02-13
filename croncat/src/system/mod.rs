@@ -36,7 +36,7 @@ pub async fn run(
     shutdown_tx: &ShutdownTx,
     config: &ChainConfig,
     key: &ExtendedPrivateKey<SigningKey>,
-    with_queries: bool,
+    _with_queries: bool,
 ) -> Result<(), Report> {
     // Setup the chain client.
     let client = RpcClientService::new(config.clone(), key.clone()).await;
@@ -146,17 +146,18 @@ pub async fn run(
         block_status_tasks,
     ));
 
-    // Check queries if enabled
-    let queries_runner_handle = if with_queries {
-        tokio::task::spawn(tasks::queries_loop(
-            dispatcher_tx.subscribe(),
-            shutdown_tx.subscribe(),
-            client,
-            block_status,
-        ))
-    } else {
-        tokio::task::spawn(async { Ok(()) })
-    };
+    // TODO: Bring back!!!!!!!!!!!!!!!!
+    // // Check queries if enabled
+    // let queries_runner_handle = if with_queries {
+    //     tokio::task::spawn(tasks::queries_loop(
+    //         dispatcher_tx.subscribe(),
+    //         shutdown_tx.subscribe(),
+    //         client,
+    //         block_status,
+    //     ))
+    // } else {
+    //     tokio::task::spawn(async { Ok(()) })
+    // };
 
     // Ctrl-C handler
     let ctrl_c_shutdown_tx = shutdown_tx.clone();
@@ -186,7 +187,7 @@ pub async fn run(
         provider_system_handle,
         account_status_check_handle,
         task_runner_handle,
-        queries_runner_handle,
+        // queries_runner_handle,
     );
 
     // If any of the tasks failed, we need to propagate the error.

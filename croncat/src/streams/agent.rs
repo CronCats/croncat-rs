@@ -4,7 +4,7 @@
 //!
 
 use color_eyre::{eyre::eyre, Report};
-use cw_croncat_core::types::AgentStatus;
+use croncat_sdk_agents::types::AgentStatus;
 use std::process::exit;
 use std::sync::Arc;
 use tokio::sync::Mutex;
@@ -50,6 +50,8 @@ pub async fn check_account_status_loop(
                 let mut locked_status = block_status.lock().await;
                 *locked_status = agent
                     .ok_or(eyre!("Agent unregistered during the loop"))?
+                    .agent
+                    .unwrap()
                     .status;
                 info!("Agent status: {:?}", *locked_status);
                 if *locked_status == AgentStatus::Nominated {
@@ -72,6 +74,8 @@ pub async fn check_account_status_loop(
                         .await?;
                     *locked_status = agent
                         .ok_or(eyre!("Agent unregistered during the loop"))?
+                        .agent
+                        .unwrap()
                         .status;
                     info!("Agent status: {:?}", *locked_status);
                 }
@@ -101,12 +105,15 @@ pub async fn check_account_status_loop(
                             .await?;
                         let reward_balance = agent
                             .ok_or(eyre!("Agent unregistered during the loop"))?
-                            .balance
-                            .native
-                            .into_iter()
-                            .find(|c| c.denom == denom.to_string())
-                            .unwrap_or_default()
-                            .amount;
+                            .agent
+                            .unwrap()
+                            .balance;
+                        // TODO: Check if removing this is right!!
+                        // .native
+                        // .into_iter()
+                        // .find(|c| c.denom == denom.to_string())
+                        // .unwrap_or_default()
+                        // .amount;
                         if !reward_balance.is_zero() {
                             info!("Automatically withdrawing agent reward");
                             let result = client

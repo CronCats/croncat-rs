@@ -36,10 +36,10 @@ impl RpcClient {
         // Build the contract info map.
         let mut contract_deploy_info = HashMap::new();
         contract_deploy_info.insert(
-            "croncat-manager".to_string(),
+            "croncat-factory".to_string(),
             DeployInfo {
                 code_id: None,
-                address: Some(cfg.manager.clone()),
+                address: Some(cfg.factory.clone()),
             },
         );
 
@@ -57,7 +57,7 @@ impl RpcClient {
             },
             contract_deploy_info,
         };
-        let contract_addr = cfg.manager.parse::<Address>()?;
+        let contract_addr = cfg.factory.parse::<Address>()?;
 
         Ok(Self {
             client: CosmOrc::new_tendermint_rpc(config, true)?,
@@ -99,7 +99,7 @@ impl RpcClient {
         Ok(data)
     }
 
-    /// Query the contract at the manager address.
+    /// Query the contract at the factory address.
     pub async fn wasm_query<S, R>(&self, msg: S) -> Result<R, Report>
     where
         S: Serialize,

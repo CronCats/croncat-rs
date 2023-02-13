@@ -2,22 +2,22 @@
 //! RPC client service that can be used to execute and query the croncat on chain.
 //!
 
-use std::str::FromStr;
+// use std::str::FromStr;
 use std::time::Duration;
 
-use cosm_orc::orchestrator::Address;
+// use cosm_orc::orchestrator::Address;
 use cosm_orc::orchestrator::ChainResponse;
 use cosm_orc::orchestrator::ChainTxResponse;
 use cosm_orc::orchestrator::Coin;
 use cosmrs::bip32;
 use cosmrs::crypto::secp256k1::SigningKey;
 use cosmrs::AccountId;
-use cw_croncat_core::msg::AgentResponse;
-use cw_croncat_core::msg::AgentTaskResponse;
-use cw_croncat_core::msg::TaskWithQueriesResponse;
-use cw_croncat_core::msg::{ExecuteMsg, GetConfigResponse, QueryMsg};
-use cw_rules_core::msg::QueryConstruct;
-use cw_rules_core::types::CroncatQuery;
+use croncat_sdk_agents::msg::{
+    AgentResponse, AgentTaskResponse, ExecuteMsg as AgentExecuteMsg, QueryMsg as AgentQueryMsg,
+};
+use croncat_sdk_manager::msg::ManagerExecuteMsg;
+use croncat_sdk_tasks::msg::TasksQueryMsg;
+use croncat_sdk_tasks::types::TaskInfo;
 use serde::de::DeserializeOwned;
 use serde::Serialize;
 use tokio::time::timeout;
@@ -31,7 +31,7 @@ use super::RpcClient;
 #[derive(Clone, Debug)]
 pub struct Signer {
     rpc_client: RpcClient,
-    pub manager: String,
+    pub contract_addr: String,
     pub account_id: AccountId,
 }
 
@@ -39,7 +39,7 @@ impl Signer {
     pub async fn new(
         rpc_url: String,
         cfg: ChainConfig,
-        manager: String,
+        contract_addr: String,
         key: bip32::XPrv,
     ) -> Result<Self, Report> {
         let rpc_url = normalize_rpc_url(&rpc_url);
@@ -62,7 +62,7 @@ impl Signer {
 
         Ok(Self {
             account_id,
-            manager,
+            contract_addr,
             rpc_client,
         })
     }
@@ -112,34 +112,35 @@ impl Signer {
         &self,
         payable_account_id: &Option<String>,
     ) -> Result<ChainResponse, Report> {
-        self.execute_croncat(ExecuteMsg::RegisterAgent {
+        self.execute_croncat(AgentExecuteMsg::RegisterAgent {
             payable_account_id: payable_account_id.clone(),
         })
         .await
     }
 
     pub async fn unregister_agent(&self) -> Result<ChainResponse, Report> {
-        self.execute_croncat(ExecuteMsg::UnregisterAgent { from_behind: None })
+        self.execute_croncat(AgentExecuteMsg::UnregisterAgent { from_behind: None })
             .await
     }
 
     pub async fn update_agent(&self, payable_account_id: String) -> Result<ChainResponse, Report> {
-        self.execute_croncat(ExecuteMsg::UpdateAgent { payable_account_id })
+        self.execute_croncat(AgentExecuteMsg::UpdateAgent { payable_account_id })
             .await
     }
 
     pub async fn withdraw_reward(&self) -> Result<ChainResponse, Report> {
-        self.execute_croncat(ExecuteMsg::WithdrawReward {}).await
+        self.execute_croncat(ManagerExecuteMsg::AgentWithdraw(None))
+            .await
     }
 
     pub async fn proxy_call(&self, task_hash: Option<String>) -> Result<ChainResponse, Report> {
-        self.execute_croncat(ExecuteMsg::ProxyCall { task_hash })
+        self.execute_croncat(ManagerExecuteMsg::ProxyCall { task_hash })
             .await
     }
 
     pub async fn get_agent(&self, account_id: &str) -> Result<Option<AgentResponse>, Report> {
         let res = self
-            .query_croncat(QueryMsg::GetAgent {
+            .query_croncat(AgentQueryMsg::GetAgent {
                 account_id: account_id.to_string(),
             })
             .await?;
@@ -147,7 +148,7 @@ impl Signer {
     }
 
     pub async fn check_in_agent(&self) -> Result<ChainResponse, Report> {
-        self.execute_croncat(ExecuteMsg::CheckInAgent {}).await
+        self.execute_croncat(AgentExecuteMsg::CheckInAgent {}).await
     }
 
     pub fn account_id(&self) -> &AccountId {
@@ -159,21 +160,22 @@ impl Signer {
         account_id: &str,
     ) -> Result<Option<AgentTaskResponse>, Report> {
         let res: Option<AgentTaskResponse> = self
-            .query_croncat(QueryMsg::GetAgentTasks {
+            .query_croncat(AgentQueryMsg::GetAgentTasks {
                 account_id: account_id.to_string(),
             })
             .await?;
         Ok(res)
     }
 
-    pub async fn query_get_tasks_with_queries(
+    pub async fn query_get_evented_tasks(
         &self,
+        start: Option<u64>,
         from_index: Option<u64>,
         limit: Option<u64>,
-    ) -> Result<Vec<TaskWithQueriesResponse>, Report> {
-        let res: Vec<TaskWithQueriesResponse> = self
-            .query_croncat(QueryMsg::GetTasksWithQueries {
-                // TODO: find optimal pagination
+    ) -> Result<Vec<TaskInfo>, Report> {
+        let res: Vec<TaskInfo> = self
+            .query_croncat(TasksQueryMsg::EventedTasks {
+                start,
                 from_index,
                 limit,
             })
@@ -181,42 +183,45 @@ impl Signer {
         Ok(res)
     }
 
-    pub async fn fetch_queries(&self) -> Result<Vec<TaskWithQueriesResponse>, Report> {
-        let mut tasks_with_queries = Vec::new();
+    pub async fn fetch_queries(&self) -> Result<Vec<TaskInfo>, Report> {
+        let mut evented_tasks = Vec::new();
         let mut start_index = 0;
+        // NOTE: May need to support mut here if things get too crazy
+        let from_index = 0;
         let limit = 20;
         loop {
             let current_iteration = self
-                .query_get_tasks_with_queries(Some(start_index), Some(limit))
+                .query_get_evented_tasks(Some(start_index), Some(from_index), Some(limit))
                 .await?;
             let last_iteration = current_iteration.len() < limit as usize;
-            tasks_with_queries.extend(current_iteration);
+            evented_tasks.extend(current_iteration);
             if last_iteration {
                 break;
             }
             start_index += limit;
         }
-        Ok(tasks_with_queries)
+        Ok(evented_tasks)
     }
 
-    pub async fn check_queries(
-        &self,
-        queries: Vec<CroncatQuery>,
-    ) -> Result<(bool, Option<u64>), Report> {
-        let cw_rules_addr = {
-            let cfg: GetConfigResponse = self.query_croncat(QueryMsg::GetConfig {}).await?;
-            cfg.cw_rules_addr
-        }
-        .to_string();
-        let res = self
-            .rpc_client
-            .call_wasm_query(
-                Address::from_str(cw_rules_addr.as_str()).unwrap(),
-                cw_rules_core::msg::QueryMsg::QueryConstruct(QueryConstruct { queries }),
-            )
-            .await?;
-        Ok(res)
-    }
+    // TODO: Bring back!!!!!!!!!!!!!!!
+    // pub async fn check_queries(
+    //     &self,
+    //     queries: Vec<CroncatQuery>,
+    // ) -> Result<(bool, Option<u64>), Report> {
+    //     let cw_rules_addr = {
+    //         let cfg: GetConfigResponse = self.query_croncat(QueryMsg::GetConfig {}).await?;
+    //         cfg.cw_rules_addr
+    //     }
+    //     .to_string();
+    //     let res = self
+    //         .rpc_client
+    //         .call_wasm_query(
+    //             Address::from_str(cw_rules_addr.as_str()).unwrap(),
+    //             cw_rules_core::msg::QueryMsg::QueryConstruct(QueryConstruct { queries }),
+    //         )
+    //         .await?;
+    //     Ok(res)
+    // }
 
     pub async fn query_native_balance(&self, account_id: &str) -> Result<Coin, Report> {
         self.rpc_client.query_balance(account_id).await

@@ -57,7 +57,7 @@ impl<'de> Deserialize<'de> for Config {
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 struct RawChainConfigEntry {
-    pub manager: String,
+    pub factory: String,
     pub registry: Option<String>,
     pub block_polling_seconds: Option<f64>,
     pub block_polling_timeout_seconds: Option<f64>,
@@ -79,7 +79,7 @@ pub struct ChainDataSource {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ChainConfig {
     pub info: ChainInfo,
-    pub manager: String,
+    pub factory: String,
     pub registry: Option<String>,
     pub block_polling_seconds: f64,
     pub block_polling_timeout_seconds: f64,
@@ -115,7 +115,7 @@ impl ChainConfig {
 
         Self {
             info,
-            manager: entry.manager,
+            factory: entry.factory,
             registry: entry.registry,
             block_polling_seconds,
             block_polling_timeout_seconds,

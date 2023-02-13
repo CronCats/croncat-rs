@@ -158,12 +158,13 @@ impl RpcClientService {
                 .to_string();
             let (source, _) = source_info.get_mut(&source_key).unwrap().clone();
 
+            // TODO: Change to contract_addr
             let rpc_client = match kind {
                 RpcCallType::Execute => RpcClientType::Execute(Box::new(
                     match Signer::new(
                         source.rpc.to_string(),
                         self.chain_config.clone(),
-                        self.chain_config.manager.clone(),
+                        self.chain_config.factory.clone(),
                         self.key.clone(),
                     )
                     .await

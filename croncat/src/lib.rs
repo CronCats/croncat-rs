@@ -19,5 +19,5 @@ pub mod streams;
 pub mod system;
 pub mod utils;
 
-pub use cw_croncat_core::msg::GetConfigResponse;
-pub use cw_croncat_core::msg::QueryMsg;
+// pub use cw_croncat_core::msg::GetConfigResponse;
+// pub use cw_croncat_core::msg::QueryMsg;

@@ -1,11 +1,11 @@
 chains:
     juno-1:
-        manager: juno1yaxs8l9xa4xg7lk0aqxatxqkk5f3mcwetwg7vvlqu7uxc74dlf6qhkx3xj
+        factory: juno1yaxs8l9xa4xg7lk0aqxatxqkk5f3mcwetwg7vvlqu7uxc74dlf6qhkx3xj
         gas_prices: 0.04
         gas_adjustment: 1.3
         threshold: 1000000
     uni-6:
-        manager: juno167qx4hlrmfweuxt53cnw76jtf0l2ctw5eujg4c89qre0glj79pfqeljykk
+        factory: juno167qx4hlrmfweuxt53cnw76jtf0l2ctw5eujg4c89qre0glj79pfqeljykk
         gas_prices: 0.04
         gas_adjustment: 1.3
         threshold: 1000000
@@ -13,21 +13,21 @@ chains:
     #            "CronCat":
     #                rpc: https://rpc-testnet-uni.cron.cat
     # osmosis-1:
-    #     manager:
+    #     factory:
     #     gas_prices: 0.04
     #     gas_adjustment: 1.3
     osmo-test-4:
-        manager: osmo1j5tr7329ff843r7u6htjnghylecy3ejc5kxzk0p4yyfuhm5lwr2qa89pl8
+        factory: osmo1j5tr7329ff843r7u6htjnghylecy3ejc5kxzk0p4yyfuhm5lwr2qa89pl8
         gas_prices: 0.04
         gas_adjustment: 1.3
         threshold: 1000000
         rpc_timeout: 9.0
     # stargaze-1:
-    #     manager:
+    #     factory:
     #     gas_prices: 0.04
     #     gas_adjustment: 1.3
     elgafar-1:
-        manager: stars1mesz5kqedgq3vwx6kvxvckk4dg5k7hr2840f3r3xkhyg00dvh9gskk6f9q
+        factory: stars1mesz5kqedgq3vwx6kvxvckk4dg5k7hr2840f3r3xkhyg00dvh9gskk6f9q
         gas_prices: 0.04
         gas_adjustment: 1.3
         threshold: 1000000
@@ -37,10 +37,10 @@ chains:
             "stars":
                 rpc: https://rpc.elgafar-1.stargaze-apis.com
     # titus-1:
-    #     manager:
+    #     factory:
     #     gas_prices: 0.04
     #     gas_adjustment: 1.3
     # constantine-1:
-    #     manager:
+    #     factory:
     #     gas_prices: 0.04
     #     gas_adjustment: 1.3

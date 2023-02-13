@@ -11,7 +11,7 @@ use color_eyre::Report;
 use delegate::delegate;
 use tokio::task::JoinHandle;
 
-use cw_croncat_core::msg::AgentTaskResponse;
+use croncat_sdk_agents::msg::AgentTaskResponse;
 
 pub const DEFAULT_AGENT_ID: &str = "agent";
 pub const DERIVATION_PATH: &str = "m/44'/118'/0'/0/0";
@@ -47,11 +47,7 @@ impl AtomicIntervalCounter {
 }
 
 pub fn sum_num_tasks(tasks: &AgentTaskResponse) -> u64 {
-    (tasks.num_block_tasks
-        + tasks.num_block_tasks_extra
-        + tasks.num_cron_tasks
-        + tasks.num_cron_tasks_extra)
-        .into()
+    (tasks.stats.num_block_tasks + tasks.stats.num_cron_tasks).into()
 }
 
 ///

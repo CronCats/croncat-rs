@@ -617,7 +617,7 @@ dependencies = [
  "hex",
  "schemars",
  "serde",
- "serde-json-wasm 0.4.1",
+ "serde-json-wasm",
  "thiserror",
  "uint",
 ]
@@ -644,7 +644,7 @@ dependencies = [
 
 [[package]]
 name = "croncat"
-version = "0.2.1"
+version = "0.3.0"
 dependencies = [
  "async-stream",
  "async-trait",
@@ -658,13 +658,17 @@ dependencies = [
  "cosmrs 0.9.0",
  "cosmwasm-std",
  "croncat-pipeline",
- "cw-croncat-core",
- "cw-rules-core",
- "cw20 0.16.0",
+ "croncat-sdk-agents",
+ "croncat-sdk-core",
+ "croncat-sdk-factory",
+ "croncat-sdk-manager",
+ "croncat-sdk-tasks",
+ "cw20",
  "delegate",
  "futures-util",
  "indoc",
  "lazy_static",
+ "mod-sdk",
  "prost",
  "prost-types",
  "rand 0.8.5",
@@ -687,6 +691,19 @@ dependencies = [
 ]
 
 [[package]]
+name = "croncat-mod-generic"
+version = "0.1.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "90615d0891f4814ab98adc9670feaeec3afd1d625b8340d257de2c68584abed6"
+dependencies = [
+ "cosmwasm-schema",
+ "cosmwasm-std",
+ "cw2 1.0.1",
+ "mod-sdk",
+ "serde-cw-value",
+]
+
+[[package]]
 name = "croncat-pipeline"
 version = "0.1.1"
 source = "git+https://github.com/CronCats/croncat-pipeline#91d6f14ac6de38ceff27717688e50b4345731ebd"
@@ -699,8 +716,73 @@ dependencies = [
 ]
 
 [[package]]
+name = "croncat-sdk-agents"
+version = "0.1.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "5b3a0fb5da38f09c5aa15574c386dcf09b6a3ee0314a7c24b6e2532eb19060f6"
+dependencies = [
+ "cosmwasm-schema",
+ "cosmwasm-std",
+ "croncat-sdk-core",
+ "serde",
+ "thiserror",
+]
+
+[[package]]
+name = "croncat-sdk-core"
+version = "0.1.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "370cc4741ea1bfddd1f8872c53ef421d5db048e704afc2078021ee33fe548d6a"
+dependencies = [
+ "cosmwasm-schema",
+ "cosmwasm-std",
+ "cw20",
+]
+
+[[package]]
+name = "croncat-sdk-factory"
+version = "0.1.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "b48891ff7179906db99da1088e74643a4ba4b17a8c65c2b8cff7c5ffe69f8f19"
+dependencies = [
+ "cosmwasm-schema",
+ "cosmwasm-std",
+ "cw-storage-plus 1.0.1",
+]
+
+[[package]]
+name = "croncat-sdk-manager"
+version = "0.1.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "5b594689fd80fb2f60699f296cbfc45f0e056e6efd07fa6abda252bec54afe2f"
+dependencies = [
+ "cosmwasm-schema",
+ "cosmwasm-std",
+ "croncat-sdk-core",
+ "cw20",
+ "thiserror",
+]
+
+[[package]]
+name = "croncat-sdk-tasks"
+version = "0.1.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "5237642d4ef590ec6c5aefc3484d458f085ee7b09104bcb381b68b15f562292a"
+dependencies = [
+ "cosmwasm-schema",
+ "cosmwasm-std",
+ "cron_schedule",
+ "croncat-mod-generic",
+ "croncat-sdk-core",
+ "cw20",
+ "hex",
+ "mod-sdk",
+ "sha2 0.10.6",
+]
+
+[[package]]
 name = "croncatd"
-version = "0.2.1"
+version = "0.3.0"
 dependencies = [
  "croncat",
  "enum-display",
@@ -781,43 +863,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "cw-croncat-core"
-version = "0.1.5"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "f7060bf8840a40c3f04fea1ee9cff2d80388e40c17e46d27cd18c9bccb39ed26"
-dependencies = [
- "cosmwasm-std",
- "cron_schedule",
- "cw-rules-core",
- "cw-storage-plus",
- "cw2",
- "cw20 0.13.4",
- "generic-query",
- "hex",
- "schemars",
- "serde",
- "serde-cw-value",
- "serde-json-wasm 0.5.0",
- "sha2 0.10.6",
- "thiserror",
-]
-
-[[package]]
-name = "cw-rules-core"
-version = "0.1.2"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "9a795ead0583c1137fcc0b289fbf47133c97fd23b334c7b85d851755942fd951"
-dependencies = [
- "cosmwasm-std",
- "cw20 0.13.4",
- "generic-query",
- "schemars",
- "serde",
- "serde-cw-value",
- "smart-query",
-]
-
-[[package]]
 name = "cw-storage-plus"
 version = "0.16.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -829,15 +874,14 @@ dependencies = [
 ]
 
 [[package]]
-name = "cw-utils"
-version = "0.13.4"
+name = "cw-storage-plus"
+version = "1.0.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "9dbaecb78c8e8abfd6b4258c7f4fbeb5c49a5e45ee4d910d3240ee8e1d714e1b"
+checksum = "053a5083c258acd68386734f428a5a171b29f7d733151ae83090c6fcc9417ffa"
 dependencies = [
  "cosmwasm-std",
  "schemars",
  "serde",
- "thiserror",
 ]
 
 [[package]]
@@ -848,7 +892,7 @@ checksum = "d6a84c6c1c0acc3616398eba50783934bd6c964bad6974241eaee3460c8f5b26"
 dependencies = [
  "cosmwasm-schema",
  "cosmwasm-std",
- "cw2",
+ "cw2 0.16.0",
  "schemars",
  "semver",
  "serde",
@@ -863,19 +907,20 @@ checksum = "91398113b806f4d2a8d5f8d05684704a20ffd5968bf87e3473e1973710b884ad"
 dependencies = [
  "cosmwasm-schema",
  "cosmwasm-std",
- "cw-storage-plus",
+ "cw-storage-plus 0.16.0",
  "schemars",
  "serde",
 ]
 
 [[package]]
-name = "cw20"
-version = "0.13.4"
+name = "cw2"
+version = "1.0.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "4cb782b8f110819a4eb5dbbcfed25ffba49ec16bbe32b4ad8da50a5ce68fec05"
+checksum = "8fb70cee2cf0b4a8ff7253e6bc6647107905e8eb37208f87d54f67810faa62f8"
 dependencies = [
+ "cosmwasm-schema",
  "cosmwasm-std",
- "cw-utils 0.13.4",
+ "cw-storage-plus 1.0.1",
  "schemars",
  "serde",
 ]
@@ -888,7 +933,7 @@ checksum = "a45a8794a5dd33b66af34caee52a7beceb690856adcc1682b6e3db88b2cdee62"
 dependencies = [
  "cosmwasm-schema",
  "cosmwasm-std",
- "cw-utils 0.16.0",
+ "cw-utils",
  "schemars",
  "serde",
 ]
@@ -1291,18 +1336,6 @@ checksum = "bff49e947297f3312447abdca79f45f4738097cc82b06e72054d2223f601f1b9"
 dependencies = [
  "typenum",
  "version_check",
-]
-
-[[package]]
-name = "generic-query"
-version = "0.1.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "11b28be4cdf3e37cd41507426306f2a00b4e5f92e706083afaf49aa20f9f0d7a"
-dependencies = [
- "cosmwasm-std",
- "schemars",
- "serde",
- "serde-cw-value",
 ]
 
 [[package]]
@@ -1855,6 +1888,17 @@ dependencies = [
  "log",
  "wasi 0.11.0+wasi-snapshot-preview1",
  "windows-sys 0.42.0",
+]
+
+[[package]]
+name = "mod-sdk"
+version = "0.1.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "541f6e42c38d10ba9e2c726d911ec7f3bb7e1e9996cecec8f8bdd964f1c4a89a"
+dependencies = [
+ "cosmwasm-schema",
+ "cosmwasm-std",
+ "thiserror",
 ]
 
 [[package]]
@@ -2789,15 +2833,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "serde-json-wasm"
-version = "0.5.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "a15bee9b04dd165c3f4e142628982ddde884c2022a89e8ddf99c4829bf2c3a58"
-dependencies = [
- "serde",
-]
-
-[[package]]
 name = "serde_bytes"
 version = "0.11.8"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2982,20 +3017,6 @@ name = "smallvec"
 version = "1.10.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "a507befe795404456341dfab10cef66ead4c041f62b8b11bbb92bffe5d0953e0"
-
-[[package]]
-name = "smart-query"
-version = "0.1.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "a790ee0e521c6a78bbd9f2d25ec759a65522a06aa8e14a669ffb36a3d1ab72fa"
-dependencies = [
- "cosmwasm-std",
- "generic-query",
- "schemars",
- "serde",
- "serde-cw-value",
- "thiserror",
-]
 
 [[package]]
 name = "socket2"

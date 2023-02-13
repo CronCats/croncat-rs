@@ -472,11 +472,9 @@ async fn run_command(opts: Opts, mut storage: LocalAgentStorage) -> Result<(), R
 
             // Get the key and create a signer
             let key = storage.get_agent_signing_key(&opts.agent)?;
-            let mnemonic = storage.get_agent_mnemonic(&opts.agent)?;
 
             // Get an rpc client
-            let client =
-                RpcClientService::new(chain_config.clone(), mnemonic.to_string(), key).await;
+            let client = RpcClientService::new(chain_config.clone(), key).await;
 
             // Parse the amount
             let amount = amount

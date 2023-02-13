@@ -114,6 +114,6 @@ pub fn normalize_rpc_url(rpc_url: &str) -> String {
     if rpc_url.starts_with("http://") || rpc_url.starts_with("https://") {
         rpc_url.to_string()
     } else {
-        format!("https://{}", rpc_url)
+        format!("https://{rpc_url}")
     }
 }

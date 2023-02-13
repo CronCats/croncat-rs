@@ -30,7 +30,7 @@ async fn main() -> Result<(), Report> {
     // Get the CLI options, handle argument errors nicely
     let opts = cli::get_opts()
         .map_err(|err| {
-            eprintln!("{}", err);
+            eprintln!("{err}");
             exit(1);
         })
         .unwrap();
@@ -221,7 +221,7 @@ async fn run_command(opts: Opts, mut storage: LocalAgentStorage) -> Result<(), R
             for (chain_id, chain_config) in config.chains {
                 let account_addr = storage
                     .get_agent_signing_account_addr(&opts.agent, chain_config.info.bech32_prefix)?;
-                println!("{}: {}", chain_id, account_addr);
+                println!("{chain_id}: {account_addr}");
             }
         }
         opts::Command::Status => {
@@ -380,7 +380,7 @@ async fn run_command(opts: Opts, mut storage: LocalAgentStorage) -> Result<(), R
         }
         opts::Command::GenerateMnemonic { new_name, mnemonic } => {
             storage.generate_account(new_name.clone(), mnemonic).await?;
-            println!("Generated agent for {}", new_name);
+            println!("Generated agent for {new_name}");
         }
         opts::Command::Update => {
             // Make sure we have a chain id to run on

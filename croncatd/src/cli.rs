@@ -13,7 +13,7 @@ const BANNER_STR: &str = include_str!("../banner.txt");
 /// Print the cute croncat banner for fun.
 ///
 pub fn print_banner() {
-    println!("{}", BANNER_STR);
+    println!("{BANNER_STR}");
 }
 
 ///

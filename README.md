@@ -96,7 +96,7 @@ cargo run go --agent mainnet --chain-id uni-5
 ### Configuring Custom RPCs
 
 ```
-    uni-5:
+    uni-6:
         manager: juno1x4uaf50flf6af8jpean8ruu8q8jdraaqj7e3gg3wemqm5cdw040qk982ec
         gas_prices: 0.1
         gas_adjustment: 1.5
@@ -114,6 +114,10 @@ cargo run go --agent mainnet --chain-id uni-5
 ## Contributing
 
 -   Please see [CONTRIBUTING.md](./CONTRIBUTING.md)
+
+### Chain Registry:
+
+For clearing the latest local cache of chain registry, `rm -rf .cosmos-chain-registry`, then build.
 
 ### This project is made possible by these awesome contributors!
 

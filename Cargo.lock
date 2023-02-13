@@ -448,8 +448,9 @@ checksum = "5827cebf4670468b8772dd191856768aedcb1b0278a04f989f7766351917b9dc"
 
 [[package]]
 name = "cosm-orc"
-version = "3.0.2"
-source = "git+https://github.com/SeedyROM/cosm-orc#306a698a088f263a794d364f238a735bc98abfee"
+version = "4.0.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "2f90492cad471f940506b1e6531dda0b62d3bc0aab2e58c745b902f30144d4d1"
 dependencies = [
  "config",
  "cosm-tome",
@@ -463,8 +464,9 @@ dependencies = [
 
 [[package]]
 name = "cosm-tome"
-version = "0.1.1"
-source = "git+https://github.com/de-husk/cosm-tome?rev=d0efb01#d0efb017400031af0f14b31ae3075928a3304984"
+version = "0.2.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "2fa6c1895e44f212da439e325a2ab8717a1981f26987d32b754d1a629c999488"
 dependencies = [
  "async-trait",
  "cosmrs 0.10.0",

@@ -4,8 +4,8 @@ version = "0.2.1"
 edition = "2021"
 
 [dependencies]
-cosm-orc = { git = "https://github.com/SeedyROM/cosm-orc" }
-cosm-tome = { git = "https://github.com/de-husk/cosm-tome", rev = "d0efb01" }
+cosm-orc = "4.0.0"
+cosm-tome = "0.2.0"
 async-stream = "0.3.3"
 async-trait = "0.1.57"
 bip39 = { version = "~1.0.1", features = ["rand"] }

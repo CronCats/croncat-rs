@@ -7,6 +7,7 @@ use std::time::Duration;
 
 use cosm_orc::orchestrator::Address;
 use cosm_orc::orchestrator::ChainResponse;
+use cosm_orc::orchestrator::ChainTxResponse;
 use cosm_orc::orchestrator::Coin;
 use cosmrs::bip32;
 use cosmrs::crypto::secp256k1::SigningKey;
@@ -221,5 +222,25 @@ impl Signer {
 
     pub async fn query_native_balance(&self, account_id: &str) -> Result<Coin, Report> {
         self.rpc_client.query_balance(account_id).await
+    }
+
+    pub async fn send_funds(
+        &self,
+        account_id: &str,
+        to: &str,
+        amount: u128,
+        denom: &str,
+    ) -> Result<ChainTxResponse, Report> {
+        self.rpc_client
+            .send_funds(account_id, to, denom, amount)
+            .await
+            .map_err(|err| {
+                eyre!(
+                    "Failed to send funds from {} to {}: {}",
+                    account_id,
+                    to,
+                    err
+                )
+            })
     }
 }

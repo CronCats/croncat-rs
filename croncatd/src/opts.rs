@@ -94,4 +94,17 @@ pub enum Command {
         #[structopt(long)]
         output: Option<String>,
     },
+
+    /// Send funds from the agent account to another account
+    #[structopt(name = "send")]
+    SendFunds {
+        /// The address to send funds to
+        to: String,
+
+        /// The amount of funds to send
+        amount: String,
+
+        /// The denom of the funds to send
+        denom: String,
+    },
 }

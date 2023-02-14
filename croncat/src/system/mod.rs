@@ -19,8 +19,8 @@ use crate::{
     config::ChainConfig,
     errors::{eyre, Report},
     logging::info,
-    rpc::RpcClientService,
     modules::{agent, polling::poll_stream_blocks, tasks},
+    rpc::RpcClientService,
     tokio,
 };
 

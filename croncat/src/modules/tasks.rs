@@ -6,21 +6,22 @@ use std::sync::{
 // use cosmos_sdk_proto::tendermint::google::protobuf::Timestamp;
 use croncat_sdk_agents::types::AgentStatus;
 use croncat_sdk_tasks::msg::TasksQueryMsg;
-use croncat_sdk_tasks::types::{TaskResponse, TaskInfo};
+use croncat_sdk_tasks::types::{TaskInfo, TaskResponse};
 // use croncat_sdk_tasks::types::Boundary;
 use tokio::{sync::Mutex, task::JoinHandle};
 use tracing::error;
 
+use crate::config::ChainConfig;
 use crate::{
     channels::{BlockStreamRx, ShutdownRx},
     errors::{eyre, Report},
     logging::info,
     monitor::ping_uptime_monitor,
-    rpc::{RpcClientService, Querier, Signer},
+    rpc::{Querier, Signer},
     utils::sum_num_tasks,
 };
-use crate::config::ChainConfig;
 
+use super::{agent::Agent, manager::Manager};
 
 pub struct Tasks {
     querier: Querier,
@@ -29,7 +30,12 @@ pub struct Tasks {
 }
 
 impl Tasks {
-    pub async fn new(cfg: ChainConfig, contract_addr: String, signer: Signer, querier: Querier) -> Result<Self, Report> {
+    pub async fn new(
+        cfg: ChainConfig,
+        contract_addr: String,
+        signer: Signer,
+        querier: Querier,
+    ) -> Result<Self, Report> {
         Ok(Self {
             querier,
             signer,
@@ -44,7 +50,8 @@ impl Tasks {
         limit: Option<u64>,
     ) -> Result<String, Report> {
         let response: Vec<TaskResponse> = self
-            .querier.query_croncat(TasksQueryMsg::Tasks { from_index, limit })
+            .querier
+            .query_croncat(TasksQueryMsg::Tasks { from_index, limit })
             .await?;
         let json = serde_json::to_string_pretty(&response)?;
         Ok(json)
@@ -57,7 +64,8 @@ impl Tasks {
         limit: Option<u64>,
     ) -> Result<Vec<TaskInfo>, Report> {
         let res: Vec<TaskInfo> = self
-            .querier.query_croncat(TasksQueryMsg::EventedTasks {
+            .querier
+            .query_croncat(TasksQueryMsg::EventedTasks {
                 start,
                 from_index,
                 limit,
@@ -113,7 +121,8 @@ impl Tasks {
 pub async fn tasks_loop(
     mut block_stream_rx: BlockStreamRx,
     mut shutdown_rx: ShutdownRx,
-    client: RpcClientService,
+    manager_client: Manager,
+    agent_client: Agent,
     block_status: Arc<Mutex<AgentStatus>>,
 ) -> Result<(), Report> {
     let block_consumer_stream: JoinHandle<Result<(), Report>> = tokio::task::spawn(async move {
@@ -124,44 +133,27 @@ pub async fn tasks_loop(
             std::mem::drop(locked_status);
             if is_active {
                 let tasks_failed = Arc::new(AtomicBool::new(false));
-                let account_addr = client.account_id();
-                let tasks = client
-                    .execute(move |signer| {
-                        let account_addr = account_addr.clone();
-                        async move {
-                            signer
-                                .get_agent_tasks(account_addr.as_str())
-                                .await
-                                .map_err(|err| eyre!("Failed to get agent tasks: {}", err))
-                        }
-                    })
-                    .await?;
+                let account_addr = agent_client.account_id();
+                let tasks = agent_client
+                    .get_agent_tasks(account_addr.as_str())
+                    .await
+                    .map_err(|err| eyre!("Failed to get agent tasks: {}", err))?;
 
                 if let Some(tasks) = tasks {
                     info!("Tasks: {:?}", tasks);
+                    // TODO: Change this to batch, if possible!
                     for _ in 0..sum_num_tasks(&tasks) {
-                        client
-                            .execute(|signer| {
-                                let tasks_failed = tasks_failed.clone();
+                        let tasks_failed = tasks_failed.clone();
 
-                                async move {
-                                    match signer.proxy_call(None).await {
-                                        Ok(proxy_call_res) => {
-                                            info!("Finished task: {}", proxy_call_res.log);
-                                        }
-                                        Err(err) => {
-                                            tasks_failed.store(true, SeqCst);
-                                            error!(
-                                                "Something went wrong during proxy_call: {}",
-                                                err
-                                            );
-                                        }
-                                    }
-
-                                    Ok(())
-                                }
-                            })
-                            .await?;
+                        match manager_client.proxy_call(None).await {
+                            Ok(proxy_call_res) => {
+                                info!("Finished task: {}", proxy_call_res.log);
+                            }
+                            Err(err) => {
+                                tasks_failed.store(true, SeqCst);
+                                error!("Something went wrong during proxy_call: {}", err);
+                            }
+                        }
                     }
                 } else {
                     info!("No tasks for block (height: {})", block.header().height);

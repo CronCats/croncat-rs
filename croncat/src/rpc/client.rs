@@ -89,6 +89,7 @@ impl RpcClient {
         R: DeserializeOwned,
     {
         // Query the chain
+        // TODO: Assess support for batch settings
         let response = self.client.client.wasm_query(address, &msg).await?;
 
         // Deserialize the response

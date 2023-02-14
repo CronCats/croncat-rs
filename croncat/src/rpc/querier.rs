@@ -2,9 +2,9 @@
 //! This module contains the code for querying the croncat contract via HTTP RPC.
 //!
 
-use std::time::Duration;
 use serde::de::DeserializeOwned;
 use serde::Serialize;
+use std::time::Duration;
 use tokio::time::timeout;
 
 use crate::config::ChainConfig;

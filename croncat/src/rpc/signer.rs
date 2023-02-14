@@ -2,19 +2,16 @@
 //! RPC client service that can be used to execute and query the croncat on chain.
 //!
 
-// use std::str::FromStr;
-use std::time::Duration;
-
-// use cosm_orc::orchestrator::Address;
-use cosm_orc::orchestrator::ChainResponse;
-use cosmrs::crypto::secp256k1::SigningKey;
-use cosmrs::AccountId;
-use serde::Serialize;
-use tokio::time::timeout;
-
 use crate::config::ChainConfig;
 use crate::errors::{eyre, Report};
 use crate::utils::normalize_rpc_url;
+use cosm_orc::orchestrator::ChainResponse;
+use cosmrs::bip32;
+use cosmrs::crypto::secp256k1::SigningKey;
+use cosmrs::AccountId;
+use serde::Serialize;
+use std::time::Duration;
+use tokio::time::timeout;
 
 use super::RpcClient;
 
@@ -56,27 +53,6 @@ impl Signer {
             rpc_client,
         })
     }
-
-    // pub async fn query_croncat<R, S>(&self, msg: S) -> Result<R, Report>
-    // where
-    //     S: Serialize,
-    //     R: DeserializeOwned,
-    // {
-    //     let out = timeout(
-    //         Duration::from_secs_f64(self.rpc_client.timeout_secs),
-    //         self.rpc_client.wasm_query(msg),
-    //     )
-    //     .await
-    //     .map_err(|err| {
-    //         eyre!(
-    //             "Timeout ({}s) while querying contract: {}",
-    //             self.rpc_client.timeout_secs,
-    //             err
-    //         )
-    //     })??;
-
-    //     Ok(out)
-    // }
 
     pub async fn execute_croncat<S>(&self, msg: S) -> Result<ChainResponse, Report>
     where

@@ -14,19 +14,20 @@ const LOCAL_STORAGE_FILENAME: &str = "./cache.json";
 /// The hashmap we intend to store on disk.
 type LocalCacheStorageData = HashMap<String, LocalCacheStorageEntry>;
 
-/// Store the keypair and the payable account idea for a stored agent
+/// Store the factory data cache
 #[derive(Serialize, Deserialize, Clone)]
 pub struct LocalCacheStorageEntry {
-    pub timestamp: u64,
-    pub metadata: ContractMetadataInfo,
+    pub expires: u64,
+    pub latest: HashMap<&str, [u8; 2]>,
+    pub versions: HashMap<(&str, &[u8]), ContractMetadataInfo>,
 }
 
-/// Hide the user mnemonic from the user when debug printing.
 impl std::fmt::Debug for LocalCacheStorageEntry {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.debug_struct("LocalCacheStorageEntry")
-            .field("timestamp", &self.timestamp.to_string())
-            .field("metadata", &self.metadata)
+            .field("expires", &self.expires.to_string())
+            .field("latest", &self.latest)
+            .field("versions", &self.versions)
             .finish()
     }
 }

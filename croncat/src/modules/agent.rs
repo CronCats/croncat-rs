@@ -8,7 +8,7 @@ use tracing::{error, info};
 use crate::config::ChainConfig;
 use crate::{
     channels::{BlockStreamRx, ShutdownRx},
-    rpc::{Querier, Signer},
+    rpc::RpcClientService,
     utils::AtomicIntervalCounter,
 };
 use cosm_orc::orchestrator::{ChainResponse, ChainTxResponse, Coin};
@@ -17,11 +17,11 @@ use cosmrs::crypto::secp256k1::SigningKey;
 use croncat_sdk_agents::msg::{
     AgentResponse, AgentTaskResponse, ExecuteMsg as AgentExecuteMsg, QueryMsg as AgentQueryMsg,
 };
-use croncat_sdk_manager::msg::ManagerExecuteMsg;
+
+use super::manager::Manager;
 
 pub struct Agent {
-    querier: Querier,
-    signer: Signer,
+    pub client: RpcClientService,
     pub contract_addr: String,
     pub account_id: String,
 }
@@ -31,8 +31,7 @@ impl Agent {
         cfg: ChainConfig,
         contract_addr: String,
         key: bip32::XPrv,
-        signer: Signer,
-        querier: Querier,
+        client: RpcClientService,
     ) -> Result<Self, Report> {
         let signing_key: SigningKey = key.into();
         let account_id = signing_key
@@ -40,77 +39,97 @@ impl Agent {
             .account_id(&cfg.info.bech32_prefix)?;
 
         Ok(Self {
-            querier,
-            signer,
+            client,
             contract_addr,
             account_id: account_id.to_string(),
         })
-    }
-
-    pub async fn register_agent(
-        &self,
-        payable_account_id: &Option<String>,
-    ) -> Result<ChainResponse, Report> {
-        self.signer
-            .execute_croncat(AgentExecuteMsg::RegisterAgent {
-                payable_account_id: payable_account_id.clone(),
-            })
-            .await
-    }
-
-    pub async fn unregister_agent(&self) -> Result<ChainResponse, Report> {
-        self.signer
-            .execute_croncat(AgentExecuteMsg::UnregisterAgent { from_behind: None })
-            .await
-    }
-
-    pub async fn update_agent(&self, payable_account_id: String) -> Result<ChainResponse, Report> {
-        self.signer
-            .execute_croncat(AgentExecuteMsg::UpdateAgent { payable_account_id })
-            .await
-    }
-
-    pub async fn withdraw_reward(&self) -> Result<ChainResponse, Report> {
-        self.signer
-            .execute_croncat(ManagerExecuteMsg::AgentWithdraw(None))
-            .await
-    }
-
-    pub async fn get_agent(&self, account_id: &str) -> Result<Option<AgentResponse>, Report> {
-        let res = self
-            .querier
-            .query_croncat(AgentQueryMsg::GetAgent {
-                account_id: account_id.to_string(),
-            })
-            .await?;
-        Ok(res)
-    }
-
-    pub async fn check_in_agent(&self) -> Result<ChainResponse, Report> {
-        self.signer
-            .execute_croncat(AgentExecuteMsg::CheckInAgent {})
-            .await
     }
 
     pub fn account_id(&self) -> &String {
         &self.account_id
     }
 
-    pub async fn query_native_balance(&self, account: Option<String>) -> Result<Coin, Report> {
-        let account_id: String = account
-            .unwrap_or(self.account_id.clone())
-            .clone()
-            .to_string();
-        self.querier
-            .rpc_client
-            .query_balance(account_id.as_str())
-            .await
+    pub async fn register_agent(
+        &self,
+        payable_account_id: &Option<String>,
+    ) -> Result<ChainResponse, Report> {
+        self.client.execute(|signer| {
+            let payable_account_id = payable_account_id.clone();
+
+            async move {
+                signer
+                .execute_croncat(AgentExecuteMsg::RegisterAgent {
+                    payable_account_id: payable_account_id.clone(),
+                })
+                .await
+            }
+        })
+        .await
+    }
+
+    pub async fn check_in_agent(&self) -> Result<ChainResponse, Report> {
+        self.client.execute(|signer| {
+            async move {
+                signer
+                .execute_croncat(AgentExecuteMsg::CheckInAgent {})
+                .await
+            }
+        })
+        .await
+    }
+
+    pub async fn unregister_agent(&self) -> Result<ChainResponse, Report> {
+        self.client.execute(|signer| {
+            async move {
+                signer
+                .execute_croncat(AgentExecuteMsg::UnregisterAgent { from_behind: None })
+                .await
+            }
+        })
+        .await
+    }
+
+    pub async fn update_agent(&self, payable_account_id: String) -> Result<ChainResponse, Report> {
+        self.client.execute(|signer| {
+            let payable_account_id = payable_account_id.clone();
+
+            async move {
+                signer
+                .execute_croncat(AgentExecuteMsg::UpdateAgent {
+                    payable_account_id: payable_account_id.clone(),
+                })
+                .await
+            }
+        })
+        .await
+    }
+
+    pub async fn get_agent(&self, account_id: &str) -> Result<Option<AgentResponse>, Report> {
+        let res = self
+            .client
+            .query(move |querier| {
+                let account_id = account_id.clone();
+                async move {
+                    querier.query_croncat(AgentQueryMsg::GetAgent {
+                        account_id: account_id.to_string(),
+                    }).await
+                }
+            })
+            .await?;
+        Ok(res)
     }
 
     pub async fn get_agent_status(&self, account_id: String) -> Result<AgentStatus, Report> {
         let agent_info: Option<AgentResponse> = self
-            .querier
-            .query_croncat(AgentQueryMsg::GetAgent { account_id })
+            .client
+            .query(move |querier| {
+                let account_id = account_id.clone();
+                async move {
+                    querier.query_croncat(AgentQueryMsg::GetAgent {
+                        account_id: account_id.to_string(),
+                    }).await
+                }
+            })
             .await?;
 
         if agent_info.is_none() {
@@ -129,34 +148,51 @@ impl Agent {
         account_id: &str,
     ) -> Result<Option<AgentTaskResponse>, Report> {
         let res: Option<AgentTaskResponse> = self
-            .querier
-            .query_croncat(AgentQueryMsg::GetAgentTasks {
-                account_id: account_id.to_string(),
+            .client
+            .query(move |querier| {
+                let account_id = account_id.clone();
+                async move {
+                    querier.query_croncat(AgentQueryMsg::GetAgentTasks {
+                        account_id: account_id.to_string(),
+                    }).await
+                }
             })
             .await?;
         Ok(res)
     }
 
-    pub async fn send_funds(
-        &self,
-        account_id: &str,
-        to: &str,
-        amount: u128,
-        denom: &str,
-    ) -> Result<ChainTxResponse, Report> {
-        self.signer
-            .rpc_client
-            .send_funds(account_id, to, denom, amount)
+    // TODO: Fix/MOVE!
+    pub async fn query_native_balance(&self, account: Option<String>) -> Result<Coin, Report> {
+        let account_id: String = account
+            .unwrap_or(self.account_id.clone())
+            .clone()
+            .to_string();
+        self.client
+            .query_balance(account_id.as_str())
             .await
-            .map_err(|err| {
-                eyre!(
-                    "Failed to send funds from {} to {}: {}",
-                    account_id,
-                    to,
-                    err
-                )
-            })
     }
+
+    // TODO: Move!
+    // pub async fn send_funds(
+    //     &self,
+    //     account_id: &str,
+    //     to: &str,
+    //     amount: u128,
+    //     denom: &str,
+    // ) -> Result<ChainTxResponse, Report> {
+    //     self.client
+    //         .client
+    //         .send_funds(account_id, to, denom, amount)
+    //         .await
+    //         .map_err(|err| {
+    //             eyre!(
+    //                 "Failed to send funds from {} to {}: {}",
+    //                 account_id,
+    //                 to,
+    //                 err
+    //             )
+    //         })
+    // }
 }
 
 ///
@@ -168,6 +204,7 @@ pub async fn check_account_status_loop(
     mut shutdown_rx: ShutdownRx,
     block_status: Arc<Mutex<AgentStatus>>,
     agent_client: Agent,
+    manager_client: Manager,
     chain_config: ChainConfig,
 ) -> Result<(), Report> {
     let block_counter = AtomicIntervalCounter::new(10);
@@ -225,15 +262,10 @@ pub async fn check_account_status_loop(
                             .agent
                             .unwrap()
                             .balance;
-                        // TODO: Check if removing this is right!!
-                        // .native
-                        // .into_iter()
-                        // .find(|c| c.denom == denom.to_string())
-                        // .unwrap_or_default()
-                        // .amount;
+
                         if !reward_balance.is_zero() {
                             info!("Automatically withdrawing agent reward");
-                            let result = agent_client.withdraw_reward().await?;
+                            let result = manager_client.withdraw_reward().await?;
                             let log = result.log;
                             info!("Log: {log}");
 

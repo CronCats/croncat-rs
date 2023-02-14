@@ -5,7 +5,7 @@ chains:
         gas_adjustment: 1.3
         threshold: 1000000
     uni-6:
-        factory: juno167qx4hlrmfweuxt53cnw76jtf0l2ctw5eujg4c89qre0glj79pfqeljykk
+        factory: juno1x82wr3jkfurkgm8za3vayjr5ty932vn8nsmauvkxe4n35aj632tq5lguvl
         gas_prices: 0.04
         gas_adjustment: 1.3
         threshold: 1000000

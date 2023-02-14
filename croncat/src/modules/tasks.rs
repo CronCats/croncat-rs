@@ -10,35 +10,29 @@ use croncat_sdk_tasks::types::{TaskInfo, TaskResponse};
 // use croncat_sdk_tasks::types::Boundary;
 use tokio::{sync::Mutex, task::JoinHandle};
 use tracing::error;
-
-use crate::config::ChainConfig;
 use crate::{
     channels::{BlockStreamRx, ShutdownRx},
     errors::{eyre, Report},
     logging::info,
     monitor::ping_uptime_monitor,
-    rpc::{Querier, Signer},
+    rpc::RpcClientService,
     utils::sum_num_tasks,
 };
 
 use super::{agent::Agent, manager::Manager};
 
 pub struct Tasks {
-    querier: Querier,
-    signer: Signer,
+    pub client: RpcClientService,
     pub contract_addr: String,
 }
 
 impl Tasks {
     pub async fn new(
-        cfg: ChainConfig,
         contract_addr: String,
-        signer: Signer,
-        querier: Querier,
+        client: RpcClientService,
     ) -> Result<Self, Report> {
         Ok(Self {
-            querier,
-            signer,
+            client,
             contract_addr,
         })
     }
@@ -50,8 +44,18 @@ impl Tasks {
         limit: Option<u64>,
     ) -> Result<String, Report> {
         let response: Vec<TaskResponse> = self
-            .querier
-            .query_croncat(TasksQueryMsg::Tasks { from_index, limit })
+            .client
+            .query(move |querier| {
+                let start = start.clone();
+                let from_index = from_index.clone();
+                let limit = limit.clone();
+                async move {
+                    querier.query_croncat(TasksQueryMsg::Tasks {
+                        from_index,
+                        limit,
+                    }).await
+                }
+            })
             .await?;
         let json = serde_json::to_string_pretty(&response)?;
         Ok(json)
@@ -64,11 +68,18 @@ impl Tasks {
         limit: Option<u64>,
     ) -> Result<Vec<TaskInfo>, Report> {
         let res: Vec<TaskInfo> = self
-            .querier
-            .query_croncat(TasksQueryMsg::EventedTasks {
-                start,
-                from_index,
-                limit,
+            .client
+            .query(move |querier| {
+                let start = start.clone();
+                let from_index = from_index.clone();
+                let limit = limit.clone();
+                async move {
+                    querier.query_croncat(TasksQueryMsg::EventedTasks {
+                        start,
+                        from_index,
+                        limit,
+                    }).await
+                }
             })
             .await?;
         Ok(res)
@@ -79,7 +90,7 @@ impl Tasks {
         let mut start_index = 0;
         // NOTE: May need to support mut here if things get too crazy
         let from_index = 0;
-        let limit = 20;
+        let limit = 100;
         loop {
             let current_iteration = self
                 .get_evented_tasks(Some(start_index), Some(from_index), Some(limit))

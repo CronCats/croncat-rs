@@ -90,7 +90,8 @@ pub fn poll_stream_blocks(http_rpc_host: String, poll_duration_secs: f64) -> Blo
     Box::pin(try_stream! {
         let client = HttpClient::new(http_rpc_host.as_str()).map_err(|source| eyre!("Failed to connect to RPC: {}", source))?;
 
-        let poll_timeout_duration = Duration::from_secs(30);
+        // TODO: Double check this change - since block heights are ~6secs, don't want to have timeout 30 seconds for failures
+        let poll_timeout_duration = Duration::from_secs_f64(poll_duration_secs);
         loop {
             match timeout(poll_timeout_duration, client.latest_block()).await {
                 Ok(Ok(block)) => {

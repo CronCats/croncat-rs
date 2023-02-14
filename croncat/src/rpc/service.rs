@@ -81,7 +81,12 @@ impl RpcClientService {
             race_track.add_racer(name, async move {
                 let rpc_client = Querier::new(chain_config, source.rpc.clone()).await?;
                 // get status from the nodes directly
-                let _ = rpc_client.rpc_client.client.client.tendermint_query_latest_block().await?;
+                let _ = rpc_client
+                    .rpc_client
+                    .client
+                    .client
+                    .tendermint_query_latest_block()
+                    .await?;
 
                 Ok(source)
             });
@@ -241,6 +246,59 @@ impl RpcClientService {
             }
         })
         .await
+    }
+
+    /// Query the balance of an address.
+    /// Returns the balance in the denom set for this client.
+    pub async fn query_balance(&self, address: &str) -> Result<Coin, Report> {
+        if self.denom.is_none() {
+            return Err(eyre!("No denom set"));
+        }
+
+        let address = address.parse::<Address>()?;
+        let balance = self
+            .client
+            .client
+            .bank_query_balance(address, self.denom.as_ref().unwrap().clone())
+            .await?;
+
+        Ok(balance.balance)
+    }
+
+    /// Send funds to an address.
+    pub async fn send_funds(
+        &self,
+        to: &str,
+        from: &str,
+        denom: &str,
+        amount: u128,
+    ) -> Result<ChainTxResponse, Report> {
+        if self.key.is_none() {
+            return Err(eyre!("No signing key set"));
+        }
+
+        let to = to.parse::<Address>()?;
+        let from = from.parse::<Address>()?;
+        let res = self.
+
+        let response = self
+            .client
+            .client
+            .bank_send(
+                SendRequest {
+                    to,
+                    from,
+                    amounts: vec![Coin {
+                        denom: Denom::from_str(denom)?,
+                        amount,
+                    }],
+                },
+                self.key.as_ref().unwrap(),
+                &TxOptions::default(),
+            )
+            .await?;
+
+        Ok(response.res)
     }
 }
 

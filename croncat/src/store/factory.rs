@@ -1,8 +1,8 @@
-use serde::{Deserialize, Serialize};
+use crate::errors::Report;
 use chrono::Utc;
-use std::{collections::HashMap, fs, path::PathBuf};
-use crate::{errors::Report};
 use croncat_sdk_factory::msg::ContractMetadataInfo;
+use serde::{Deserialize, Serialize};
+use std::{collections::HashMap, fs, path::PathBuf};
 
 use super::get_storage_path;
 
@@ -52,10 +52,7 @@ impl LocalCacheStorage {
             Self { path, data }
         } else {
             // Otherwise create a new hashmap
-            Self {
-                path,
-                data: None,
-            }
+            Self { path, data: None }
         }
     }
 
@@ -79,7 +76,7 @@ impl LocalCacheStorage {
         latest: Option<HashMap<String, [u8; 2]>>,
         versions: Option<HashMap<(String, [u8; 2]), ContractMetadataInfo>>,
     ) -> Result<Option<LocalCacheStorageEntry>, Report> {
-      // Expires after 1 hour
+        // Expires after 1 hour
         let dt = Utc::now();
         let expires = dt.timestamp().saturating_add(1 * 60 * 60 * 1000);
 
@@ -104,9 +101,9 @@ impl LocalCacheStorage {
     /// Retrieve data, only if not expired
     pub fn get(&self) -> Option<LocalCacheStorageEntry> {
         if !self.is_expired() && self.has_latest_versions() {
-          self.data
+            self.data
         } else {
-          None
+            None
         }
     }
 
@@ -116,21 +113,27 @@ impl LocalCacheStorage {
             let dt = Utc::now();
             let now = dt.timestamp();
             now > data.expires
-        } else { true }
+        } else {
+            true
+        }
     }
 
     /// Check if has latest versions
     pub fn has_latest_versions(&self) -> bool {
         if let Some(data) = self.data {
             data.latest.len() > 2
-        } else { false }
+        } else {
+            false
+        }
     }
 
     /// Check if has latest versions
     pub fn has_all_versions(&self) -> bool {
         if let Some(data) = self.data {
             data.versions.len() > 2
-        } else { false }
+        } else {
+            false
+        }
     }
 }
 

@@ -8,8 +8,12 @@ use croncat::{
     config::Config,
     errors::{eyre, Report},
     logging::{self, error, info},
-    rpc::RpcClientService,
+    rpc::{RpcClientService, Signer, Querier},
     store::agent::LocalAgentStorage,
+    modules::{
+        agent::Agent,
+        factory::Factory,
+    },
     system,
     tokio,
 };
@@ -44,6 +48,7 @@ async fn main() -> Result<(), Report> {
     }
 
     // Run a command and handle errors
+    // TODO: for opts::Command::Go need to handle errors & reboot if possible
     if let Err(err) = run_command(opts.clone(), storage).await {
         error!("Command failed: {}", opts.cmd);
         error!("{}", err);
@@ -66,6 +71,38 @@ async fn main() -> Result<(), Report> {
 async fn run_command(opts: Opts, mut storage: LocalAgentStorage) -> Result<(), Report> {
     // Get the key for the agent signing account
     let config = Config::from_pwd()?;
+    // Make sure we have a chain id to run on
+    if opts.chain_id.is_none() {
+        return Err(eyre!("chain-id is required for go command"));
+    }
+    let chain_id = opts.chain_id.unwrap();
+
+    // Get the chain config for the chain we're going to run on
+    let chain_config = config
+        .chains
+        .get(&chain_id)
+        .ok_or_else(|| eyre!("Chain not found in configuration: {}", chain_id))?;
+
+        // Get the key and create a signer
+    let key = storage.get_agent_signing_key(&opts.agent)?;
+
+    // Get an rpc client
+    let client = RpcClientService::new(chain_config.clone(), key).await;
+
+    // Bootstrap all the factory stuffz
+    let factory_client = Factory::new(chain_config.clone(), client).await?;
+
+    // Get that factory info before moving on
+    if !factory_client.load().await {
+        return Err(eyre!("Failed to load factory contracts!"));
+    }
+
+    // Init that agent client lyfe
+    let agent_contract_addr = factory_client.get_contract_addr("agents".to_string()).await?;
+    let agent_client = Agent::new(chain_config.clone(), agent_contract_addr, key, client).await?;
+
+    // Get the account id
+    let account_addr = agent_client.account_id();
 
     match opts.cmd {
         opts::Command::Register { payable_account_id } => {
@@ -225,55 +262,23 @@ async fn run_command(opts: Opts, mut storage: LocalAgentStorage) -> Result<(), R
             }
         }
         opts::Command::Status => {
-            // Make sure we have a chain id to run on
-            if opts.chain_id.is_none() {
-                return Err(eyre!("chain-id is required for go command"));
+            // Print info about the agent
+            let account_addr = account_addr.clone();
+            info!("Account ID: {}", account_addr);
+
+            // Get the agent status
+            let res = agent_client.get_agent_status(account_addr).await?;
+
+            // Handle the result of the query
+            match res {
+                Ok(result) => {
+                    info!("Result: {:?}", result);
+                }
+                Err(err) if err.to_string().contains("Agent not registered") => {
+                    Err(eyre!("Agent not registered"))?;
+                }
+                Err(err) => Err(eyre!("Failed to get agent status: {}", err))?,
             }
-            let chain_id = opts.chain_id.unwrap();
-
-            // Get the chain config for the chain we're going to run on
-            let chain_config = config
-                .chains
-                .get(&chain_id)
-                .ok_or_else(|| eyre!("Chain not found in configuration: {}", chain_id))?;
-
-            // Get the key and create a signer
-            let key = storage.get_agent_signing_key(&opts.agent)?;
-
-            // Get an rpc client
-            let client = RpcClientService::new(chain_config.clone(), key).await;
-
-            // Get the account id
-            let account_addr = storage.get_agent_signing_account_addr(
-                &opts.agent,
-                chain_config.info.bech32_prefix.clone(),
-            )?;
-
-            client
-                .query(|querier| {
-                    let account_addr = account_addr.clone();
-                    async move {
-                        // Print info about the agent about to be registered
-                        info!("Account ID: {}", account_addr);
-
-                        // Get the agent status
-                        let query = querier.get_agent_status(account_addr).await;
-
-                        // Handle the result of the query
-                        match query {
-                            Ok(result) => {
-                                info!("Result: {:?}", result);
-                            }
-                            Err(err) if err.to_string().contains("Agent not registered") => {
-                                Err(eyre!("Agent not registered"))?;
-                            }
-                            Err(err) => Err(eyre!("Failed to get agent status: {}", err))?,
-                        }
-
-                        Ok(())
-                    }
-                })
-                .await?;
         }
         opts::Command::AllTasks { from_index, limit } => {
             // Make sure we have a chain id to run on

@@ -1,16 +1,19 @@
+use std::collections::HashMap;
 use crate::config::ChainConfig;
+use color_eyre::{eyre::eyre, Report};
 use crate::{
-    errors::Report,
     rpc::{Querier, Signer},
+    store::factory::LocalCacheStorage,
 };
 use croncat_sdk_factory::msg::{
-    Config, ContractMetadataInfo, ContractMetadataResponse, EntryResponse, FactoryQueryMsg,
+    ContractMetadataInfo, ContractMetadataResponse, EntryResponse, FactoryQueryMsg,
 };
 
 pub struct Factory {
     pub querier: Querier,
     pub signer: Signer,
     pub contract_addr: String,
+    pub store: LocalCacheStorage,
 }
 
 // FLOW:
@@ -23,7 +26,7 @@ pub struct Factory {
 // Example Data:
 // {
 //   // when this cache should get removed/updated
-//   expires: 168242309209090,
+//   expires: 1696407069536,
 //   // Which versions to default to
 //   latest: {
 //     manager: "0.1"
@@ -39,27 +42,55 @@ pub struct Factory {
 
 impl Factory {
     pub async fn new(
-        cfg: ChainConfig,
         // This MUST exist or the whole app goes booommmmmm. 
-        contract_addr: String,
+        cfg: ChainConfig,
         signer: Signer,
         querier: Querier,
     ) -> Result<Self, Report> {
         Ok(Self {
             querier,
             signer,
-            contract_addr,
+            contract_addr: cfg.factory,
+            store: LocalCacheStorage::default(),
         })
     }
 
-    // TODO: load versions: get latest & all versions, put into storage
-    pub async fn load(&self) -> Result<bool, Report> {
-      Ok(true)
+    // load versions: get latest & all versions, put into storage
+    pub async fn load(&mut self) -> Result<bool, Report> {
+      let b = if let Some(data) = self.store.get() {
+        // Have the unexpired cache data, wooooot!
+        true
+      } else {
+        // Go get latest version data
+        let mut latest = HashMap::new();
+        let mut versions = HashMap::new();
+        let entries = self.get_latest_contracts().await?;
+
+        // NOTE: This doesnt handle ALL versions, just latest
+        for entry in entries {
+            latest.insert(entry.contract_name.clone(), entry.metadata.version);
+            versions.insert((entry.contract_name, entry.metadata.version), entry.metadata);
+        }
+
+        // update storage
+        self.store.insert(Some(latest), Some(versions));
+
+        true
+      };
+
+      // only need to make sure we loaded y'all
+      Ok(b)
     }
 
-    // TODO: get contract addr for contract_name, by version or default latest
-    pub async fn get_contract_addr(&self, contract_name: String) -> Result<bool, Report> {
-      Ok(true)
+    // get contract addr for contract_name, by version or default latest
+    pub async fn get_contract_addr(&self, contract_name: String) -> Result<String, Report> {
+      let err = "No version found for {contract_name}";
+      if let Some(data) = self.store.get() {
+        let version = data.latest.get(&contract_name).expect(err);
+        let metadata = data.versions.get(&(contract_name, *version)).expect(err);
+        return Ok(metadata.contract_addr.to_string());
+      }
+      Err(eyre!(err))
     }
 
     pub async fn get_latest_contracts(&self) -> Result<Vec<EntryResponse>, Report> {

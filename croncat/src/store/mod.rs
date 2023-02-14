@@ -6,6 +6,7 @@ use std::path::PathBuf;
 pub const LOCAL_STORAGE_DEFAULT_DIR: &str = "/.croncatd";
 
 pub mod agent;
+pub mod factory;
 pub mod logs;
 
 pub fn get_storage_path() -> PathBuf {

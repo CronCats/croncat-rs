@@ -1,9 +1,7 @@
-use color_eyre::eyre::eyre;
-use cosmrs::{bip32, crypto::secp256k1::SigningKey};
 use serde::{Deserialize, Serialize};
 use chrono::Utc;
 use std::{collections::HashMap, fs, path::PathBuf};
-use crate::{errors::Report, utils::DERIVATION_PATH};
+use crate::{errors::Report};
 use croncat_sdk_factory::msg::ContractMetadataInfo;
 
 use super::get_storage_path;
@@ -11,15 +9,12 @@ use super::get_storage_path;
 /// Where our [`LocalCacheStorage`] will be stored.
 const LOCAL_STORAGE_FILENAME: &str = "./cache.json";
 
-/// The hashmap we intend to store on disk.
-type LocalCacheStorageData = HashMap<String, LocalCacheStorageEntry>;
-
 /// Store the factory data cache
 #[derive(Serialize, Deserialize, Clone)]
 pub struct LocalCacheStorageEntry {
-    pub expires: u64,
-    pub latest: HashMap<&str, [u8; 2]>,
-    pub versions: HashMap<(&str, &[u8]), ContractMetadataInfo>,
+    pub expires: i64,
+    pub latest: HashMap<String, [u8; 2]>,
+    pub versions: HashMap<(String, [u8; 2]), ContractMetadataInfo>,
 }
 
 impl std::fmt::Debug for LocalCacheStorageEntry {
@@ -35,7 +30,7 @@ impl std::fmt::Debug for LocalCacheStorageEntry {
 /// Store key pairs on disk and allow access to the data.
 pub struct LocalCacheStorage {
     pub path: PathBuf,
-    data: LocalCacheStorageData,
+    data: Option<LocalCacheStorageEntry>,
 }
 
 impl LocalCacheStorage {
@@ -59,13 +54,13 @@ impl LocalCacheStorage {
             // Otherwise create a new hashmap
             Self {
                 path,
-                data: HashMap::new(),
+                data: None,
             }
         }
     }
 
     /// Write our data to disk at the specified location.
-    fn write_to_disk(&self) -> Result<(), Report> {
+    pub fn write_to_disk(&self) -> Result<(), Report> {
         let data_file = self.path.join(LOCAL_STORAGE_FILENAME);
 
         // Create the directory to store our data if it doesn't exist
@@ -79,28 +74,63 @@ impl LocalCacheStorage {
     }
 
     /// Insert a item into the data map.
-    fn insert(
+    pub fn insert(
         &mut self,
-        key: String,
-        metadata: ContractMetadataInfo,
+        latest: Option<HashMap<String, [u8; 2]>>,
+        versions: Option<HashMap<(String, [u8; 2]), ContractMetadataInfo>>,
     ) -> Result<Option<LocalCacheStorageEntry>, Report> {
-        if self.data.get(&key).is_some() {
-            Ok(None)
+      // Expires after 1 hour
+        let dt = Utc::now();
+        let expires = dt.timestamp().saturating_add(1 * 60 * 60 * 1000);
+
+        let new_data = if let Some(data) = self.data {
+            LocalCacheStorageEntry {
+                expires,
+                latest: latest.unwrap_or(data.latest),
+                versions: versions.unwrap_or(data.versions),
+            }
         } else {
-            let dt = Utc::now();
-            let timestamp: u64 = dt.timestamp();
-            let new_data = LocalCacheStorageEntry {
-                timestamp,
-                metadata,
-            };
-            self.data.insert(key, new_data.clone());
-            Ok(Some(new_data))
+            LocalCacheStorageEntry {
+                expires,
+                latest: latest.unwrap_or(HashMap::new()),
+                versions: versions.unwrap_or(HashMap::new()),
+            }
+        };
+        self.data = Some(new_data.clone());
+        self.write_to_disk()?;
+        Ok(Some(new_data))
+    }
+
+    /// Retrieve data, only if not expired
+    pub fn get(&self) -> Option<LocalCacheStorageEntry> {
+        if !self.is_expired() && self.has_latest_versions() {
+          self.data
+        } else {
+          None
         }
     }
 
-    /// Retrieve data based on the key
-    fn get(&self, key: &str) -> Option<&LocalCacheStorageEntry> {
-        self.data.get(key)
+    /// Check if the data has expired
+    pub fn is_expired(&self) -> bool {
+        if let Some(data) = self.data {
+            let dt = Utc::now();
+            let now = dt.timestamp();
+            now > data.expires
+        } else { true }
+    }
+
+    /// Check if has latest versions
+    pub fn has_latest_versions(&self) -> bool {
+        if let Some(data) = self.data {
+            data.latest.len() > 2
+        } else { false }
+    }
+
+    /// Check if has latest versions
+    pub fn has_all_versions(&self) -> bool {
+        if let Some(data) = self.data {
+            data.versions.len() > 2
+        } else { false }
     }
 }
 

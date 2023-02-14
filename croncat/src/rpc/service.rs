@@ -80,7 +80,8 @@ impl RpcClientService {
             let chain_config = chain_config.clone();
             race_track.add_racer(name, async move {
                 let rpc_client = Querier::new(chain_config, source.rpc.clone()).await?;
-                let _ = rpc_client.query_config().await?;
+                // get status from the nodes directly
+                let _ = rpc_client.rpc_client.client.client.tendermint_query_latest_block().await?;
 
                 Ok(source)
             });

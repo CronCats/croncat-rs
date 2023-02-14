@@ -3,13 +3,6 @@
 //!
 
 use std::time::Duration;
-
-use croncat_sdk_agents::msg::{AgentResponse, AgentTaskResponse, QueryMsg as AgentQueryMsg};
-use croncat_sdk_agents::types::AgentStatus;
-use croncat_sdk_factory::msg::{Config, FactoryQueryMsg};
-use croncat_sdk_tasks::msg::TasksQueryMsg;
-use croncat_sdk_tasks::types::TaskResponse;
-
 use serde::de::DeserializeOwned;
 use serde::Serialize;
 use tokio::time::timeout;
@@ -21,8 +14,8 @@ use crate::utils::normalize_rpc_url;
 use super::RpcClient;
 
 pub struct Querier {
-    rpc_client: RpcClient,
-    croncat_addr: String,
+    pub rpc_client: RpcClient,
+    pub croncat_addr: String,
 }
 
 impl std::fmt::Debug for Querier {
@@ -62,65 +55,6 @@ impl Querier {
                 err
             )
         })?
-    }
-
-    pub async fn query_config(&self) -> Result<String, Report> {
-        let config: Config = self.query_croncat(FactoryQueryMsg::Config {}).await?;
-        let json = serde_json::to_string_pretty(&config)?;
-        Ok(json)
-    }
-
-    pub async fn get_agent_status(&self, account_id: String) -> Result<AgentStatus, Report> {
-        let agent_info: Option<AgentResponse> = self
-            .query_croncat(AgentQueryMsg::GetAgent { account_id })
-            .await?;
-
-        if agent_info.is_none() {
-            Err(eyre!("Agent not registered"))
-        } else {
-            if let Some(agent) = agent_info.unwrap().agent {
-                Ok(agent.status)
-            } else {
-                Err(eyre!("Agent not registered"))
-            }
-        }
-    }
-
-    pub async fn get_tasks(
-        &self,
-        from_index: Option<u64>,
-        limit: Option<u64>,
-    ) -> Result<String, Report> {
-        let response: Vec<TaskResponse> = self
-            .query_croncat(TasksQueryMsg::Tasks { from_index, limit })
-            .await?;
-        let json = serde_json::to_string_pretty(&response)?;
-        Ok(json)
-    }
-
-    pub async fn get_evented_tasks(
-        &self,
-        start: Option<u64>,
-        from_index: Option<u64>,
-        limit: Option<u64>,
-    ) -> Result<String, Report> {
-        let response: Vec<TaskResponse> = self
-            .query_croncat(TasksQueryMsg::EventedTasks {
-                start,
-                from_index,
-                limit,
-            })
-            .await?;
-        let json = serde_json::to_string_pretty(&response)?;
-        Ok(json)
-    }
-
-    pub async fn get_agent_tasks(&self, account_id: String) -> Result<String, Report> {
-        let response: Option<AgentTaskResponse> = self
-            .query_croncat(AgentQueryMsg::GetAgentTasks { account_id })
-            .await?;
-        let json = serde_json::to_string_pretty(&response)?;
-        Ok(json)
     }
 }
 

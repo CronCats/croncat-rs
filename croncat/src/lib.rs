@@ -15,7 +15,7 @@ pub mod logging;
 pub mod monitor;
 pub mod rpc;
 pub mod store;
-pub mod streams;
+pub mod modules;
 pub mod system;
 pub mod utils;
 

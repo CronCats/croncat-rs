@@ -44,7 +44,7 @@ OPTIONS:
         --chain-id <chain-id>    Chain ID of the chain to connect to [env: CRONCAT_CHAIN_ID=]
 
 SUBCOMMANDS:
-    all-tasks            Get contract's state Show all task(s) information
+    all-tasks            Show all task(s) information
     generate-mnemonic    Generates a new keypair and agent account (good first step)
     get-agent            [SENSITIVE!] Shows all details about agents on this machine
     get-tasks            Get the agent's tasks they're assigned to fulfill
@@ -97,7 +97,7 @@ cargo run go --agent mainnet --chain-id uni-5
 
 ```
     uni-6:
-        manager: juno1x4uaf50flf6af8jpean8ruu8q8jdraaqj7e3gg3wemqm5cdw040qk982ec
+        factory: juno1x4uaf50flf6af8jpean8ruu8q8jdraaqj7e3gg3wemqm5cdw040qk982ec
         gas_prices: 0.1
         gas_adjustment: 1.5
         rpc_timeout: 4.0

@@ -1,7 +1,3 @@
-//!
-//! How to process and consume blocks from the chain.
-//!
-
 use std::sync::{
     atomic::{AtomicBool, Ordering::SeqCst},
     Arc,
@@ -9,6 +5,8 @@ use std::sync::{
 
 // use cosmos_sdk_proto::tendermint::google::protobuf::Timestamp;
 use croncat_sdk_agents::types::AgentStatus;
+use croncat_sdk_tasks::msg::TasksQueryMsg;
+use croncat_sdk_tasks::types::{TaskResponse, TaskInfo};
 // use croncat_sdk_tasks::types::Boundary;
 use tokio::{sync::Mutex, task::JoinHandle};
 use tracing::error;
@@ -18,9 +16,96 @@ use crate::{
     errors::{eyre, Report},
     logging::info,
     monitor::ping_uptime_monitor,
-    rpc::RpcClientService,
+    rpc::{RpcClientService, Querier, Signer},
     utils::sum_num_tasks,
 };
+use crate::config::ChainConfig;
+
+
+pub struct Tasks {
+    querier: Querier,
+    signer: Signer,
+    pub contract_addr: String,
+}
+
+impl Tasks {
+    pub async fn new(cfg: ChainConfig, contract_addr: String, signer: Signer, querier: Querier) -> Result<Self, Report> {
+        Ok(Self {
+            querier,
+            signer,
+            contract_addr,
+        })
+    }
+
+    pub async fn get_tasks(
+        &self,
+        start: Option<u64>,
+        from_index: Option<u64>,
+        limit: Option<u64>,
+    ) -> Result<String, Report> {
+        let response: Vec<TaskResponse> = self
+            .querier.query_croncat(TasksQueryMsg::Tasks { from_index, limit })
+            .await?;
+        let json = serde_json::to_string_pretty(&response)?;
+        Ok(json)
+    }
+
+    pub async fn get_evented_tasks(
+        &self,
+        start: Option<u64>,
+        from_index: Option<u64>,
+        limit: Option<u64>,
+    ) -> Result<Vec<TaskInfo>, Report> {
+        let res: Vec<TaskInfo> = self
+            .querier.query_croncat(TasksQueryMsg::EventedTasks {
+                start,
+                from_index,
+                limit,
+            })
+            .await?;
+        Ok(res)
+    }
+
+    pub async fn fetch_all_evented_tasks(&self) -> Result<Vec<TaskInfo>, Report> {
+        let mut evented_tasks = Vec::new();
+        let mut start_index = 0;
+        // NOTE: May need to support mut here if things get too crazy
+        let from_index = 0;
+        let limit = 20;
+        loop {
+            let current_iteration = self
+                .get_evented_tasks(Some(start_index), Some(from_index), Some(limit))
+                .await?;
+            let last_iteration = current_iteration.len() < limit as usize;
+            evented_tasks.extend(current_iteration);
+            if last_iteration {
+                break;
+            }
+            start_index += limit;
+        }
+        Ok(evented_tasks)
+    }
+
+    // TODO: Bring back!!!!!!!!!!!!!!!
+    // pub async fn check_queries(
+    //     &self,
+    //     queries: Vec<CroncatQuery>,
+    // ) -> Result<(bool, Option<u64>), Report> {
+    //     let cw_rules_addr = {
+    //         let cfg: GetConfigResponse = self.query_croncat(QueryMsg::GetConfig {}).await?;
+    //         cfg.cw_rules_addr
+    //     }
+    //     .to_string();
+    //     let res = self
+    //         .rpc_client
+    //         .call_wasm_query(
+    //             Address::from_str(cw_rules_addr.as_str()).unwrap(),
+    //             cw_rules_core::msg::QueryMsg::QueryConstruct(QueryConstruct { queries }),
+    //         )
+    //         .await?;
+    //     Ok(res)
+    // }
+}
 
 ///
 /// Do work on blocks that are sent from the ws stream.

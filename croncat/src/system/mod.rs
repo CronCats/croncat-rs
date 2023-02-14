@@ -20,7 +20,7 @@ use crate::{
     errors::{eyre, Report},
     logging::info,
     rpc::RpcClientService,
-    streams::{agent, polling::poll_stream_blocks, tasks},
+    modules::{agent, polling::poll_stream_blocks, tasks},
     tokio,
 };
 

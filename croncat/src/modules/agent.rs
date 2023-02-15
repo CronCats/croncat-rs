@@ -232,8 +232,8 @@ pub async fn check_status_loop(
     mut shutdown_rx: ShutdownRx,
     block_status: Arc<Mutex<AgentStatus>>,
     chain_config: ChainConfig,
-    agent_client: Agent,
-    manager_client: Manager,
+    agent_client: Arc<Agent>,
+    manager_client: Arc<Manager>,
 ) -> Result<(), Report> {
     let block_counter = AtomicIntervalCounter::new(10);
     let task_handle: tokio::task::JoinHandle<Result<(), Report>> = tokio::task::spawn(async move {

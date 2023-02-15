@@ -785,6 +785,7 @@ name = "croncatd"
 version = "0.3.0"
 dependencies = [
  "croncat",
+ "croncat-sdk-agents",
  "enum-display",
  "futures",
  "reqwest",

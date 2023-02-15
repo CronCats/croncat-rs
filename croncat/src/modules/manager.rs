@@ -1,5 +1,5 @@
 use crate::{errors::Report, rpc::RpcClientService};
-use cosm_orc::orchestrator::{Address, ChainResponse};
+use cosm_orc::orchestrator::{Address, ChainTxResponse};
 use croncat_sdk_manager::msg::ManagerExecuteMsg;
 
 pub struct Manager {
@@ -15,7 +15,7 @@ impl Manager {
         })
     }
 
-    pub async fn proxy_call(&self, task_hash: Option<String>) -> Result<ChainResponse, Report> {
+    pub async fn proxy_call(&self, task_hash: Option<String>) -> Result<ChainTxResponse, Report> {
         self.client
             .execute(|signer| {
                 let task_hash = task_hash.clone();
@@ -32,7 +32,7 @@ impl Manager {
             .await
     }
 
-    pub async fn withdraw_reward(&self) -> Result<ChainResponse, Report> {
+    pub async fn withdraw_reward(&self) -> Result<ChainTxResponse, Report> {
         self.client
             .execute(|signer| {
                 let contract_addr = self.contract_addr.clone();

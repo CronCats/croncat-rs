@@ -48,7 +48,7 @@ pub enum Command {
     Unregister,
 
     /// Update the agent's configuration
-    Update,
+    Update { payable_account_id: String },
 
     /// Withdraw the agent's funds to the payable account ID
     Withdraw,
@@ -84,7 +84,7 @@ pub enum Command {
     },
 
     /// [SENSITIVE!] Shows all details about agents on this machine
-    GetAgent {
+    GetAgentKeys {
         #[structopt(long, default_value = "agent", env = "CRONCAT_AGENT")]
         name: String,
     },
@@ -105,6 +105,6 @@ pub enum Command {
         amount: String,
 
         /// The denom of the funds to send
-        denom: String,
+        denom: Option<String>,
     },
 }

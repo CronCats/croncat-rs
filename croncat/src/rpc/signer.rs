@@ -5,7 +5,7 @@
 use crate::config::ChainConfig;
 use crate::errors::{eyre, Report};
 use crate::utils::normalize_rpc_url;
-use cosm_orc::orchestrator::{Address, ChainResponse};
+use cosm_orc::orchestrator::{Address, ChainTxResponse};
 use cosmrs::bip32;
 use cosmrs::crypto::secp256k1::SigningKey;
 use cosmrs::AccountId;
@@ -58,7 +58,7 @@ impl Signer {
         &self,
         msg: S,
         address: Option<Address>,
-    ) -> Result<ChainResponse, Report>
+    ) -> Result<ChainTxResponse, Report>
     where
         S: Serialize,
     {

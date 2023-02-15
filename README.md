@@ -58,6 +58,9 @@ SUBCOMMANDS:
     update               Update the agent's configuration
     withdraw             Withdraw the agent's funds to the payable account ID
 
+Example:
+$ cargo run -- --debug status
+
 ```
 
 ## Generate Docs

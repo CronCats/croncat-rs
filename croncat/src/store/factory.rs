@@ -1,4 +1,4 @@
-use crate::errors::Report;
+use color_eyre::{eyre::eyre, Report};
 use chrono::Utc;
 use croncat_sdk_factory::msg::ContractMetadataInfo;
 use serde::{Deserialize, Serialize};
@@ -7,14 +7,14 @@ use std::{collections::HashMap, fs, path::PathBuf};
 use super::get_storage_path;
 
 /// Where our [`LocalCacheStorage`] will be stored.
-const LOCAL_STORAGE_FILENAME: &str = "./cache.json";
+const LOCAL_STORAGE_FILENAME: &str = "cache.json";
 
 /// Store the factory data cache
 #[derive(Serialize, Deserialize, Clone)]
 pub struct LocalCacheStorageEntry {
     pub expires: i64,
     pub latest: HashMap<String, [u8; 2]>,
-    pub versions: HashMap<(String, [u8; 2]), ContractMetadataInfo>,
+    pub versions: HashMap<String, ContractMetadataInfo>,
 }
 
 impl std::fmt::Debug for LocalCacheStorageEntry {
@@ -58,6 +58,9 @@ impl LocalCacheStorage {
 
     /// Write our data to disk at the specified location.
     pub fn write_to_disk(&self) -> Result<(), Report> {
+        if self.data.is_none() {
+            return Err(eyre!("No factory data to write"));
+        }
         let data_file = self.path.join(LOCAL_STORAGE_FILENAME);
 
         // Create the directory to store our data if it doesn't exist
@@ -65,20 +68,24 @@ impl LocalCacheStorage {
             fs::create_dir_all(p)?
         };
 
-        fs::write(data_file, serde_json::to_string_pretty(&self.data)?)?;
+        let r = fs::write(data_file, serde_json::to_string_pretty(&self.data.clone().unwrap())?);
 
-        Ok(())
+        if r.is_ok() {
+            Ok(())
+        } else {
+            Err(eyre!(r.unwrap_err()))
+        }
     }
 
     /// Insert a item into the data map.
     pub fn insert(
         &mut self,
         latest: Option<HashMap<String, [u8; 2]>>,
-        versions: Option<HashMap<(String, [u8; 2]), ContractMetadataInfo>>,
+        versions: Option<HashMap<String, ContractMetadataInfo>>,
     ) -> Result<Option<LocalCacheStorageEntry>, Report> {
         // Expires after 1 hour
         let dt = Utc::now();
-        let expires = dt.timestamp().saturating_add(1 * 60 * 60 * 1000);
+        let expires = dt.timestamp().saturating_add(1 * 60 * 60);
 
         let new_data = if let Some(data) = self.data.clone() {
             LocalCacheStorageEntry {

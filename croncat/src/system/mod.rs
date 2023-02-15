@@ -3,8 +3,6 @@
 //!
 
 use std::sync::Arc;
-
-use cosmrs::bip32::{secp256k1::ecdsa::SigningKey, ExtendedPrivateKey};
 use croncat_pipeline::{
     try_flat_join, Dispatcher, ProviderSystem, ProviderSystemMonitor, Sequencer,
 };
@@ -39,18 +37,17 @@ pub async fn run(
     chain_id: &String,
     shutdown_tx: &ShutdownTx,
     config: &ChainConfig,
-    key: &ExtendedPrivateKey<SigningKey>,
     agent: Arc<Agent>,
     manager: Arc<Manager>,
     // TODO: Bring back
-    // _with_queries: bool,
+    _with_queries: bool,
 ) -> Result<(), Report> {
     // Get the status of the agent
     let account_id = agent.account_id();
     let account_addr = account_id.clone();
     let status = agent.get_status(account_addr).await?;
-    info!("[{}] Agent account id: {}", chain_id, account_id);
-    info!("[{}] Initial agent status: {:?}", chain_id, status);
+    info!("[{}] Agent: {}", chain_id, account_id);
+    info!("[{}] Current Status: {:?}", chain_id, status);
     let status = Arc::new(Mutex::new(status));
 
     // Create a channel for block sources
@@ -110,7 +107,7 @@ pub async fn run(
     let block_stream_chain_id = chain_id.clone();
     let _block_stream_info_handle = tokio::task::spawn(async move {
         while let Ok(block) = block_stream_info_rx.recv().await {
-            info!(
+            debug!(
                 "[{}] Processing block (height: {})",
                 block_stream_chain_id,
                 block.header().height,
@@ -127,6 +124,7 @@ pub async fn run(
         account_status_check_block_stream_rx,
         account_status_check_shutdown_rx,
         block_status_accounts_loop,
+        Arc::new(chain_id.clone()),
         config.clone(),
         agent.clone(),
         manager.clone(),
@@ -140,6 +138,7 @@ pub async fn run(
         task_runner_block_stream_rx,
         task_runner_shutdown_rx,
         block_status_tasks,
+        Arc::new(chain_id.clone()),
         agent.clone(),
         manager.clone(),
     ));
@@ -202,11 +201,9 @@ pub async fn run_retry(
     chain_id: &String,
     shutdown_tx: &ShutdownTx,
     config: &ChainConfig,
-    key: &ExtendedPrivateKey<SigningKey>,
     agent: Arc<Agent>,
     manager: Arc<Manager>,
-    // TODO: Bring back
-    // _with_queries: bool,
+    with_queries: bool,
 ) -> Result<(), Report> {
     // TODO: Rethink this retry logic
     // let retry_strategy = FixedInterval::from_millis(5000).take(1200);
@@ -216,10 +213,9 @@ pub async fn run_retry(
         chain_id,
         shutdown_tx,
         config,
-        key,
         agent,
         manager,
-        // with_queries
+        with_queries
     )
     .await?;
     // .map_err(|err| {

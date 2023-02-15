@@ -11,7 +11,7 @@ use crate::{
     rpc::RpcClientService,
     utils::AtomicIntervalCounter,
 };
-use cosm_orc::orchestrator::{Address, ChainResponse, ChainTxResponse, Coin};
+use cosm_orc::orchestrator::{Address, ChainTxResponse, Coin};
 use cosmrs::bip32;
 use cosmrs::crypto::secp256k1::SigningKey;
 use croncat_sdk_agents::msg::{
@@ -52,7 +52,7 @@ impl Agent {
     pub async fn register(
         &self,
         payable_account_id: &Option<String>,
-    ) -> Result<ChainResponse, Report> {
+    ) -> Result<ChainTxResponse, Report> {
         self.client
             .execute(|signer| {
                 let payable_account_id = payable_account_id.clone();
@@ -72,7 +72,7 @@ impl Agent {
             .await
     }
 
-    pub async fn check_in(&self) -> Result<ChainResponse, Report> {
+    pub async fn check_in(&self) -> Result<ChainTxResponse, Report> {
         self.client
             .execute(|signer| {
                 let contract_addr = self.contract_addr.clone();
@@ -85,7 +85,7 @@ impl Agent {
             .await
     }
 
-    pub async fn unregister(&self) -> Result<ChainResponse, Report> {
+    pub async fn unregister(&self) -> Result<ChainTxResponse, Report> {
         self.client
             .execute(|signer| {
                 let contract_addr = self.contract_addr.clone();
@@ -101,7 +101,7 @@ impl Agent {
             .await
     }
 
-    pub async fn update(&self, payable_account_id: String) -> Result<ChainResponse, Report> {
+    pub async fn update(&self, payable_account_id: String) -> Result<ChainTxResponse, Report> {
         self.client
             .execute(|signer| {
                 let payable_account_id = payable_account_id.clone();
@@ -231,6 +231,7 @@ pub async fn check_status_loop(
     mut block_stream_rx: BlockStreamRx,
     mut shutdown_rx: ShutdownRx,
     block_status: Arc<Mutex<AgentStatus>>,
+    chain_id: Arc<String>,
     chain_config: ChainConfig,
     agent_client: Arc<Agent>,
     manager_client: Arc<Manager>,
@@ -252,11 +253,11 @@ pub async fn check_status_loop(
                     .agent
                     .unwrap()
                     .status;
-                info!("Agent status: {:?}", *locked_status);
+                info!("[{}] Agent status: {:?}", chain_id, *locked_status);
                 if *locked_status == AgentStatus::Nominated {
                     info!(
                         "Checking in agent: {}",
-                        agent_client.check_in().await.map(|result| result.log)?
+                        agent_client.check_in().await.map(|result| result.res.log)?
                     );
                     let agent = agent_client.get(account_id.as_str()).await?;
                     *locked_status = agent
@@ -270,7 +271,6 @@ pub async fn check_status_loop(
                 if let Some(threshold) = chain_config.threshold {
                     // Check the agent's balance to make sure it's not falling below a threshold
                     let account_id = agent_client.account_id();
-                    let account_str = account_id.as_str();
                     let agent_balance = agent_client
                         .query_native_balance(Some(account_id.clone()))
                         .await?;
@@ -291,7 +291,7 @@ pub async fn check_status_loop(
                         if !reward_balance.is_zero() {
                             info!("Automatically withdrawing agent reward");
                             let result = manager_client.withdraw_reward().await?;
-                            let log = result.log;
+                            let log = result.res.log;
                             info!("Log: {log}");
 
                             let native_balance_after_withdraw = agent_client

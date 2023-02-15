@@ -7,7 +7,7 @@ use cosm_orc::config::ChainConfig as CosmOrcChainConfig;
 use cosm_orc::orchestrator::{
     cosm_orc::CosmOrc, deploy::DeployInfo, Address, Denom, SigningKey, TendermintRPC,
 };
-use cosm_orc::orchestrator::{ChainResponse, ChainTxResponse, Coin, Key};
+use cosm_orc::orchestrator::{ChainTxResponse, Coin, Key};
 use cosm_tome::chain::request::TxOptions;
 use cosm_tome::modules::bank::model::SendRequest;
 use cosm_tome::modules::cosmwasm::model::ExecRequest;
@@ -44,9 +44,10 @@ impl RpcClient {
         );
 
         // Convert our config into a CosmOrc config with the specified rpc url.
+        let denom = cfg.info.fees.fee_tokens[0].denom.clone();
         let config = CosmOrcConfig {
             chain_cfg: CosmOrcChainConfig {
-                denom: cfg.info.fees.fee_tokens[0].denom.clone(),
+                denom: denom.clone(),
                 prefix: cfg.info.bech32_prefix.clone(),
                 chain_id: cfg.info.chain_id.clone(),
                 rpc_endpoint: Some(rpc_url.to_string()),
@@ -63,7 +64,7 @@ impl RpcClient {
             client: CosmOrc::new_tendermint_rpc(config, true)?,
             contract_addr,
             key: None,
-            denom: None,
+            denom: Some(Denom::from_str(denom.as_str())?),
             timeout_secs: cfg.rpc_timeout_seconds.unwrap_or(DEFAULT_TIMEOUT),
         })
     }
@@ -115,7 +116,7 @@ impl RpcClient {
         &self,
         msg: S,
         address: Option<Address>,
-    ) -> Result<ChainResponse, Report>
+    ) -> Result<ChainTxResponse, Report>
     where
         S: Serialize,
     {
@@ -131,7 +132,7 @@ impl RpcClient {
             .client
             .wasm_execute(
                 ExecRequest {
-                    address: self.contract_addr.clone(),
+                    address: a,
                     msg: &msg,
                     funds: vec![],
                 },
@@ -140,10 +141,8 @@ impl RpcClient {
             )
             .await?;
 
-        // Get the response data
-        let data = response.res;
-
-        Ok(data.res)
+        // return the response data
+        Ok(response.res)
     }
 
     /// Query the balance of an address.

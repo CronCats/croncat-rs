@@ -137,6 +137,7 @@ pub async fn tasks_loop(
     mut block_stream_rx: BlockStreamRx,
     mut shutdown_rx: ShutdownRx,
     block_status: Arc<Mutex<AgentStatus>>,
+    chain_id: Arc<String>,
     agent_client: Arc<Agent>,
     manager_client: Arc<Manager>,
 ) -> Result<(), Report> {
@@ -155,14 +156,15 @@ pub async fn tasks_loop(
                     .map_err(|err| eyre!("Failed to get agent tasks: {}", err))?;
 
                 if let Some(tasks) = tasks {
-                    info!("Tasks: {:?}", tasks);
+                    info!("[{}] Block {} :: Block Tasks: {}, Cron Tasks: {}", chain_id, block.header().height, tasks.stats.num_block_tasks, tasks.stats.num_cron_tasks);
+
                     // TODO: Change this to batch, if possible!
                     for _ in 0..sum_num_tasks(&tasks) {
                         let tasks_failed = tasks_failed.clone();
 
                         match manager_client.proxy_call(None).await {
                             Ok(proxy_call_res) => {
-                                info!("Finished task: {}", proxy_call_res.log);
+                                info!("Finished task: {}", proxy_call_res.res.log);
                             }
                             Err(err) => {
                                 tasks_failed.store(true, SeqCst);
@@ -171,7 +173,7 @@ pub async fn tasks_loop(
                         }
                     }
                 } else {
-                    info!("No tasks for block (height: {})", block.header().height);
+                    info!("[{}] No tasks for block (height: {})", chain_id, block.header().height);
                 }
 
                 if !tasks_failed.load(SeqCst) {

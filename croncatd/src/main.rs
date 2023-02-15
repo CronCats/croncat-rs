@@ -9,14 +9,13 @@ use croncat::{
     errors::{eyre, Report},
     logging::{self, error, info},
     modules::{agent::Agent, factory::Factory, manager::Manager, tasks::Tasks},
-    rpc::{Querier, RpcClientService, Signer},
+    rpc::RpcClientService,
     store::agent::LocalAgentStorage,
     system,
     tokio,
 };
 use opts::Opts;
 use std::{process::exit, sync::Arc};
-
 mod cli;
 mod opts;
 
@@ -45,22 +44,21 @@ async fn main() -> Result<(), Report> {
     }
 
     // Run a command and handle errors
-    // TODO: for opts::Command::Go need to handle errors & reboot if possible
     if let Err(err) = run_command(opts.clone(), storage).await {
-        error!("Command failed: {}", opts.cmd);
         error!("{}", err);
-
+        
         if opts.debug {
+            error!("Command failed: {}", opts.cmd);
             return Err(err);
         }
 
         exit(1);
     }
 
-    // Say goodbye if no no-frills
-    if !opts.no_frills {
-        println!("\n🐱 Cron Cat says: Goodbye / さようなら\n");
-    }
+    // // Say goodbye if no no-frills
+    // if !opts.no_frills {
+    //     println!("\n🐱 Cron Cat says: Goodbye / さようなら\n");
+    // }
 
     Ok(())
 }
@@ -79,6 +77,12 @@ async fn run_command(opts: Opts, mut storage: LocalAgentStorage) -> Result<(), R
         .chains
         .get(&chain_id)
         .ok_or_else(|| eyre!("Chain not found in configuration: {}", chain_id))?;
+    let fee_token = chain_config.clone().info.fees.fee_tokens.pop();
+    let chain_denom = if let Some(token) = fee_token {
+        token.denom
+    } else {
+        chain_config.clone().denom.unwrap_or("".to_string())
+    };
 
     // Get the key and create a signer
     let key = storage.get_agent_signing_key(&opts.agent)?;
@@ -99,7 +103,7 @@ async fn run_command(opts: Opts, mut storage: LocalAgentStorage) -> Result<(), R
     let agent_client = RpcClientService::new(
         chain_config.clone(),
         key.clone(),
-        Some(agent_contract_addr.to_string()),
+        Some(agent_contract_addr.clone()),
     )
     .await;
     // Get the account id
@@ -119,21 +123,21 @@ async fn run_command(opts: Opts, mut storage: LocalAgentStorage) -> Result<(), R
     let manager_client = RpcClientService::new(
         chain_config.clone(),
         key.clone(),
-        Some(manager_contract_addr.clone().to_string()),
+        Some(manager_contract_addr.clone()),
     )
     .await;
     let manager =
         Arc::new(Manager::new(manager_contract_addr.clone(), manager_client.clone()).await?);
 
     // Init that tasks client lyfe
-    let tasks_contract_addr = factory.get_contract_addr("manager".to_string()).await?;
+    let tasks_contract_addr = factory.get_contract_addr("tasks".to_string()).await?;
     let tasks_client = RpcClientService::new(
         chain_config.clone(),
         key.clone(),
-        Some(manager_contract_addr.clone().to_string()),
+        Some(tasks_contract_addr.clone()),
     )
     .await;
-    let tasks = Arc::new(Tasks::new(manager_contract_addr.clone(), manager_client).await?);
+    let tasks = Arc::new(Tasks::new(tasks_contract_addr.clone(), tasks_client).await?);
 
     match opts.cmd {
         opts::Command::Register { payable_account_id } => {
@@ -143,18 +147,41 @@ async fn run_command(opts: Opts, mut storage: LocalAgentStorage) -> Result<(), R
             // Handle the result
             match res {
                 Ok(result) => {
-                    info!("Agent registered successfully");
-                    let log = result.log;
-                    info!("Result: {}", log);
+                    let account_addr = account_addr.clone();
+                    info!("Agent {} registered successfully! 😻", account_addr);
+
+                    let status = result.find_event_tags("wasm".to_string(), "agent_status".to_string());
+                    for s in status {
+                        info!("Agent is {}", s.value);
+                        info!("Now run the command: `cargo run go`");
+                        if s.value != "active".to_string() {
+                            info!("Make sure to keep your agent running, it will automatically become active when enough tasks exist.");
+                        }
+                    }
+
+                    if opts.debug {
+                        let log = result.res.log;
+                        info!("Result: {}", log);
+                    }
+
+                    // // Get the agent status
+                    // let res = agent.get_status(account_addr).await?;
+                    // info!("Agent is {:?}", res);
+                    // info!("Now run the command: `cargo run go`");
+                    // if res != AgentStatus::Active {
+                    //     info!("Make sure to keep your agent running, it will automatically become active when enough tasks exist.");
+                    // }
                 }
-                Err(err) if err.to_string().contains("Agent already exists") => {
-                    Err(eyre!("Agent already registered"))?;
+                Err(err) if err.to_string().contains("Agent already registered") => {
+                    let account_addr = account_addr.clone();
+                    Err(eyre!("Agent {} already registered", account_addr))?;
                 }
                 Err(err)
                     if err.to_string().contains("account")
                         && err.to_string().contains("not found") =>
                 {
-                    Err(eyre!("Agent account not found on chain"))?;
+                    let account_addr = account_addr.clone();
+                    Err(eyre!("\n\nAgent account not found on chain\nPlease add enough funds to execute a few transactions on your account then try to register again.\nYour account: {}", account_addr))?;
                 }
                 Err(err) => Err(eyre!("Failed to register agent: {}", err))?,
             }
@@ -165,14 +192,23 @@ async fn run_command(opts: Opts, mut storage: LocalAgentStorage) -> Result<(), R
             // Handle the result
             match res {
                 Ok(result) => {
-                    info!("Agent unregistered successfully");
-                    let log = result.log;
-                    info!("Result: {}", log);
+                    let account_addr = account_addr.clone();
+                    info!("Agent {} unregistered successfully! 👋", account_addr);
+                    // Unwrap all the logs, to show funds received, if any
+                    let rewards = result.find_event_tags("wasm".to_string(), "rewards".to_string());
+                    for r in rewards {
+                        info!("Rewards received: {} {}", r.value, chain_denom);
+                    }
+
+                    if opts.debug {
+                        let log = result.res.log;
+                        info!("\nResult: {}", log);
+                    }
                 }
                 Err(err) if err.to_string().contains("Agent not registered") => {
-                    Err(eyre!("Agent not registered"))?;
+                    Err(eyre!("Agent doesnt exist, must first register and do tasks."))?;
                 }
-                Err(err) => Err(eyre!("Failed to register agent: {}", err))?,
+                Err(err) => Err(eyre!("Failed to unregister agent: {}", err))?,
             }
         }
         opts::Command::Withdraw => {
@@ -182,11 +218,18 @@ async fn run_command(opts: Opts, mut storage: LocalAgentStorage) -> Result<(), R
             match res {
                 Ok(result) => {
                     info!("Agent reward withdrawn successfully");
-                    let log = result.log;
-                    info!("Result: {}", log);
+                    // Parse logs and show how much funds were sent
+                    let rewards = result.find_event_tags("wasm".to_string(), "rewards".to_string());
+                    for r in rewards {
+                        info!("Rewards received: {} {}", r.value, chain_denom);
+                    }
+                    if opts.debug {
+                        let log = result.res.log;
+                        info!("\nResult: {}", log);
+                    }
                 }
                 Err(err) if err.to_string().contains("Agent not registered") => {
-                    Err(eyre!("Agent not registered"))?;
+                    Err(eyre!("Agent doesnt exist, must first register and do tasks."))?;
                 }
                 Err(err) => Err(eyre!("Failed to withdraw reward: {}", err))?,
             }
@@ -201,22 +244,24 @@ async fn run_command(opts: Opts, mut storage: LocalAgentStorage) -> Result<(), R
             }
         }
         opts::Command::Status => {
+            let err_helper = eyre!("Agent not registered, please make sure above account has funds then run the command: `cargo run register`");
             // Print info about the agent
             let account_addr = account_addr.clone();
-            info!("Account ID: {}", account_addr);
 
             // Get the agent status
-            let res = agent.get_status(account_addr).await;
+            let res = agent.get(account_addr.as_str()).await?;
 
-            // Handle the result of the query
-            match res {
-                Ok(result) => {
-                    info!("Result: {:?}", result);
+            if let Some(result) = res {
+                if let Some(info) = result.agent {
+                    let c = agent.query_native_balance(Some(account_addr.clone())).await?;
+                    let b = format!("{:?} {}", c.amount, c.denom.to_string());
+                    info!("\n\nStatus: {:?}\nAddress: {}\nReward Address: {}\nEarned Rewards: {:?} {}\nCurrent Balance: {}\n\n", info.status, account_addr, info.payable_account_id.to_string(), u128::from(info.balance), chain_denom, b);
+                    return Ok(());
+                } else {
+                    Err(err_helper)?
                 }
-                Err(err) if err.to_string().contains("Agent not registered") => {
-                    Err(eyre!("Agent not registered"))?;
-                }
-                Err(err) => Err(eyre!("Failed to get agent status: {}", err))?,
+            } else {
+                Err(err_helper)?
             }
         }
         opts::Command::AllTasks { from_index, limit } => {
@@ -225,7 +270,8 @@ async fn run_command(opts: Opts, mut storage: LocalAgentStorage) -> Result<(), R
             // Handle the result
             match res {
                 Ok(result) => {
-                    info!("Result: {}", result);
+                    // TODO: Parse and represent results better
+                    info!("{}", result);
                 }
                 Err(err) if err.to_string().contains("Agent not registered") => {
                     Err(eyre!("Agent not registered"))?;
@@ -234,32 +280,32 @@ async fn run_command(opts: Opts, mut storage: LocalAgentStorage) -> Result<(), R
             }
         }
         opts::Command::GetTasks => {
-            let res = agent.get_tasks(account_addr.as_str()).await;
+            let result = agent.get_tasks(account_addr.as_str()).await?;
 
-            // Handle the result
-            match res {
-                Ok(result) => {
-                    info!("Result: {:?}", result);
-                }
-                Err(err) if err.to_string().contains("Agent not registered") => {
-                    Err(eyre!("Agent not registered"))?;
-                }
-                Err(err) => Err(eyre!("Failed to get contract tasks: {}", err))?,
+            if let Some(res) = result {
+                info!("Block Tasks: {}, Cron Tasks: {}", res.stats.num_block_tasks, res.stats.num_cron_tasks);
+                return Ok(());
+            } else {
+                Err(eyre!("Failed to get agent tasks"))?
             }
         }
         opts::Command::GenerateMnemonic { new_name, mnemonic } => {
             storage.generate_account(new_name.clone(), mnemonic).await?;
-            println!("Generated agent for {new_name}");
+            println!("Generated agent keys for '{new_name}'");
+            println!("Start using it by doing the command: `export CRONCAT_AGENT={new_name}`");
+            println!("View the account addresses with command: `cargo run list-accounts`");
         }
-        opts::Command::Update => {
-            let res = agent.update(agent.client.account_id().to_string()).await;
+        opts::Command::Update { payable_account_id } => {
+            let res = agent.update(payable_account_id).await;
 
             // Handle the result
             match res {
                 Ok(result) => {
-                    info!("Agent configuration updated successfully");
-                    let log = result.log;
-                    info!("Result: {}", log);
+                    info!("Agent configuration updated successfully! 😸");
+                    if opts.debug {
+                        let log = result.res.log;
+                        info!("\nResult: {}", log);
+                    }
                 }
                 Err(err) if err.to_string().contains("Agent not registered") => {
                     Err(eyre!("Agent not registered"))?;
@@ -270,7 +316,7 @@ async fn run_command(opts: Opts, mut storage: LocalAgentStorage) -> Result<(), R
                 ))?,
             }
         }
-        opts::Command::GetAgent { name } => storage.display_account(&name),
+        opts::Command::GetAgentKeys { name } => storage.display_account(&name),
         // TODO: Move "with_queries" to just be config.yaml
         opts::Command::Go { with_queries } => {
             // Create the global shutdown channel
@@ -281,10 +327,9 @@ async fn run_command(opts: Opts, mut storage: LocalAgentStorage) -> Result<(), R
                 &chain_id,
                 &shutdown_tx,
                 chain_config,
-                &key,
                 agent,
                 manager,
-                // with_queries
+                with_queries
             )
             .await?
         }
@@ -293,16 +338,18 @@ async fn run_command(opts: Opts, mut storage: LocalAgentStorage) -> Result<(), R
                 system::DaemonService::create(output.clone(), &chain_id, opts.no_frills)?;
             }
         }
-        opts::Command::SendFunds { to, denom, amount } => {
+        opts::Command::SendFunds { to, amount, denom } => {
             let amount = u128::from_str_radix(&amount, 10)?;
+            let account_addr = account_addr.clone();
+            let d = denom.unwrap_or(chain_denom);
 
             // Send funds to the given address.
             let res = agent
                 .send_funds(
-                    agent.client.account_id().as_ref(),
+                    &account_addr,
                     to.as_str(),
                     amount,
-                    denom.as_str(),
+                    d.as_str(),
                 )
                 .await;
 
@@ -310,6 +357,7 @@ async fn run_command(opts: Opts, mut storage: LocalAgentStorage) -> Result<(), R
             match res {
                 Ok(tx) => {
                     info!("Funds sent successfully");
+                    // TODO: Would be TIGHT to link to explorer here using the chain registry config
                     info!("TxHash: {}", tx.tx_hash);
                 }
                 Err(err) => Err(err)?,

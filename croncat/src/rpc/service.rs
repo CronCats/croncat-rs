@@ -7,9 +7,7 @@ use std::collections::HashMap;
 use std::str::FromStr;
 use std::sync::Arc;
 use std::time::Duration;
-
-use cosm_orc::orchestrator::Address;
-use cosm_orc::orchestrator::ChainTxResponse;
+use cosm_orc::orchestrator::{Address, ChainTxResponse};
 use cosm_tome::chain::coin::Coin;
 use cosmrs::bip32;
 use cosmrs::crypto::secp256k1::SigningKey;
@@ -17,9 +15,7 @@ use futures_util::Future;
 use rand::seq::SliceRandom;
 use tokio::sync::Mutex;
 use tracing::debug;
-
-use crate::config::ChainConfig;
-use crate::config::ChainDataSource;
+use crate::config::{ChainConfig, ChainDataSource};
 use crate::errors::{eyre, Report};
 use crate::logging::info;
 
@@ -48,7 +44,7 @@ pub enum RpcClientType {
 #[derive(Clone, Debug)]
 pub struct RpcClientService {
     chain_config: ChainConfig,
-    contract_addr: String,
+    contract_addr: Address,
     key: bip32::XPrv,
     source_info: Arc<Mutex<HashMap<String, (ChainDataSource, bool)>>>,
 }
@@ -57,9 +53,9 @@ impl RpcClientService {
     pub async fn new(
         chain_config: ChainConfig,
         key: bip32::XPrv,
-        contract_addr: Option<String>,
+        contract_addr: Option<Address>,
     ) -> Self {
-        let contract_addr = contract_addr.unwrap_or(chain_config.clone().factory);
+        let contract_addr = contract_addr.unwrap_or(Address::from_str(&chain_config.clone().factory.as_str()).unwrap());
         let data_sources =
             Self::pick_best_sources(&chain_config, &chain_config.data_sources()).await;
 
@@ -127,13 +123,18 @@ impl RpcClientService {
             .collect();
 
         // Log how many available sources we have
-        info!(
-            "[{}] {} source(s) available!",
-            chain_config.info.chain_id,
-            data_sources
+        let list: Vec<String> = data_sources
                 .iter()
                 .filter(|(_, (_, disqualified))| !disqualified)
-                .count()
+                .map(|(i, _)| { i.to_owned() })
+                .collect();
+        let plural = if list.len() == 1 { "source" } else { "sources" };
+        info!(
+            "[{}] {} {} available! {:?}",
+            chain_config.info.chain_id,
+            list.len(),
+            plural,
+            list,
         );
 
         data_sources
@@ -187,7 +188,7 @@ impl RpcClientService {
                     match Signer::new(
                         source.rpc.to_string(),
                         self.chain_config.clone(),
-                        Address::from_str(&self.chain_config.factory.clone())?,
+                        self.contract_addr.clone(),
                         self.key.clone(),
                     )
                     .await
@@ -206,7 +207,7 @@ impl RpcClientService {
                     match Querier::new(
                         source.rpc.to_string(),
                         self.chain_config.clone(),
-                        Address::from_str(&self.chain_config.factory.clone())?,
+                        self.contract_addr.clone(),
                     )
                     .await
                     {

@@ -8,6 +8,10 @@ use croncat_sdk_factory::msg::{
 use std::collections::HashMap;
 use std::str::FromStr;
 
+pub fn to_version_key(name: String, version: [u8; 2]) -> String {
+    format!("{}_{}.{}", name, version[0], version[1])
+}
+
 pub struct Factory {
     pub client: RpcClientService,
     pub contract_addr: Address,
@@ -53,7 +57,7 @@ impl Factory {
 
     // load versions: get latest & all versions, put into storage
     pub async fn load(&mut self) -> Result<bool, Report> {
-        let b = if let Some(data) = self.store.get() {
+        let b = if self.store.get().is_some() {
             // Have the unexpired cache data, wooooot!
             true
         } else {
@@ -66,15 +70,13 @@ impl Factory {
             for entry in entries {
                 latest.insert(entry.contract_name.clone(), entry.metadata.version);
                 versions.insert(
-                    (entry.contract_name, entry.metadata.version),
+                    to_version_key(entry.contract_name, entry.metadata.version),
                     entry.metadata,
                 );
             }
 
             // update storage
-            self.store.insert(Some(latest), Some(versions));
-
-            true
+            self.store.insert(Some(latest), Some(versions)).is_ok()
         };
 
         // only need to make sure we loaded y'all
@@ -86,7 +88,7 @@ impl Factory {
         let err = "No version found for {contract_name}";
         if let Some(data) = self.store.get() {
             let version = data.latest.get(&contract_name).expect(err);
-            let metadata = data.versions.get(&(contract_name, *version)).expect(err);
+            let metadata = data.versions.get(&to_version_key(contract_name, *version)).expect(err);
             return Ok(Address::from_str(&metadata.contract_addr.to_string())?);
         }
         Err(eyre!(err))

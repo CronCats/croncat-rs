@@ -80,7 +80,7 @@ impl LocalCacheStorage {
         let dt = Utc::now();
         let expires = dt.timestamp().saturating_add(1 * 60 * 60 * 1000);
 
-        let new_data = if let Some(data) = self.data {
+        let new_data = if let Some(data) = self.data.clone() {
             LocalCacheStorageEntry {
                 expires,
                 latest: latest.unwrap_or(data.latest),
@@ -99,9 +99,9 @@ impl LocalCacheStorage {
     }
 
     /// Retrieve data, only if not expired
-    pub fn get(&self) -> Option<LocalCacheStorageEntry> {
+    pub fn get(&self) -> Option<&LocalCacheStorageEntry> {
         if !self.is_expired() && self.has_latest_versions() {
-            self.data
+            self.data.as_ref()
         } else {
             None
         }
@@ -109,7 +109,7 @@ impl LocalCacheStorage {
 
     /// Check if the data has expired
     pub fn is_expired(&self) -> bool {
-        if let Some(data) = self.data {
+        if let Some(data) = self.data.clone() {
             let dt = Utc::now();
             let now = dt.timestamp();
             now > data.expires
@@ -120,7 +120,7 @@ impl LocalCacheStorage {
 
     /// Check if has latest versions
     pub fn has_latest_versions(&self) -> bool {
-        if let Some(data) = self.data {
+        if let Some(data) = self.data.clone() {
             data.latest.len() > 2
         } else {
             false
@@ -129,7 +129,7 @@ impl LocalCacheStorage {
 
     /// Check if has latest versions
     pub fn has_all_versions(&self) -> bool {
-        if let Some(data) = self.data {
+        if let Some(data) = self.data.clone() {
             data.versions.len() > 2
         } else {
             false

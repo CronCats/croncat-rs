@@ -40,8 +40,8 @@ pub async fn run(
     shutdown_tx: &ShutdownTx,
     config: &ChainConfig,
     key: &ExtendedPrivateKey<SigningKey>,
-    agent: Agent,
-    manager: Manager,
+    agent: Arc<Agent>,
+    manager: Arc<Manager>,
     // TODO: Bring back
     // _with_queries: bool,
 ) -> Result<(), Report> {
@@ -128,8 +128,8 @@ pub async fn run(
         account_status_check_shutdown_rx,
         block_status_accounts_loop,
         config.clone(),
-        agent,
-        manager,
+        agent.clone(),
+        manager.clone(),
     ));
 
     // Process blocks coming in from the blockchain
@@ -140,8 +140,8 @@ pub async fn run(
         task_runner_block_stream_rx,
         task_runner_shutdown_rx,
         block_status_tasks,
-        agent,
-        manager,
+        agent.clone(),
+        manager.clone(),
     ));
 
     // TODO: Bring back!!!!!!!!!!!!!!!!
@@ -203,8 +203,8 @@ pub async fn run_retry(
     shutdown_tx: &ShutdownTx,
     config: &ChainConfig,
     key: &ExtendedPrivateKey<SigningKey>,
-    agent: Agent,
-    manager: Manager,
+    agent: Arc<Agent>,
+    manager: Arc<Manager>,
     // TODO: Bring back
     // _with_queries: bool,
 ) -> Result<(), Report> {

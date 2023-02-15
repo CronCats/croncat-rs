@@ -15,7 +15,7 @@ use croncat::{
     tokio,
 };
 use opts::Opts;
-use std::process::exit;
+use std::{process::exit, sync::Arc};
 
 mod cli;
 mod opts;
@@ -84,36 +84,56 @@ async fn run_command(opts: Opts, mut storage: LocalAgentStorage) -> Result<(), R
     let key = storage.get_agent_signing_key(&opts.agent)?;
 
     // Get an rpc client
-    let factory_client = RpcClientService::new(chain_config.clone(), key, None).await;
+    let factory_client = RpcClientService::new(chain_config.clone(), key.clone(), None).await;
 
     // Bootstrap all the factory stuffz
-    let factory = Factory::new(chain_config.clone(), factory_client).await?;
+    let mut factory = Factory::new(chain_config.clone(), factory_client).await?;
 
     // Get that factory info before moving on
-    if !factory.load().await {
+    if !factory.load().await? {
         return Err(eyre!("Failed to load factory contracts!"));
     }
 
     // Init that agent client lyfe
     let agent_contract_addr = factory.get_contract_addr("agents".to_string()).await?;
-    let agent_client =
-        RpcClientService::new(chain_config.clone(), key, Some(agent_contract_addr)).await;
-    let agent = Agent::new(chain_config.clone(), agent_contract_addr, key, agent_client).await?;
+    let agent_client = RpcClientService::new(
+        chain_config.clone(),
+        key.clone(),
+        Some(agent_contract_addr.to_string()),
+    )
+    .await;
+    // Get the account id
+    let account_addr = agent_client.account_id();
+    let agent = Arc::new(
+        Agent::new(
+            chain_config.clone(),
+            agent_contract_addr,
+            key.clone(),
+            agent_client,
+        )
+        .await?,
+    );
 
     // Init that manager client lyfe
     let manager_contract_addr = factory.get_contract_addr("manager".to_string()).await?;
-    let manager_client =
-        RpcClientService::new(chain_config.clone(), key, Some(manager_contract_addr)).await;
-    let manager = Manager::new(manager_contract_addr, manager_client).await?;
+    let manager_client = RpcClientService::new(
+        chain_config.clone(),
+        key.clone(),
+        Some(manager_contract_addr.clone().to_string()),
+    )
+    .await;
+    let manager =
+        Arc::new(Manager::new(manager_contract_addr.clone(), manager_client.clone()).await?);
 
     // Init that tasks client lyfe
     let tasks_contract_addr = factory.get_contract_addr("manager".to_string()).await?;
-    let tasks_client =
-        RpcClientService::new(chain_config.clone(), key, Some(manager_contract_addr)).await;
-    let tasks = Tasks::new(manager_contract_addr, manager_client).await?;
-
-    // Get the account id
-    let account_addr = agent_client.account_id();
+    let tasks_client = RpcClientService::new(
+        chain_config.clone(),
+        key.clone(),
+        Some(manager_contract_addr.clone().to_string()),
+    )
+    .await;
+    let tasks = Arc::new(Tasks::new(manager_contract_addr.clone(), manager_client).await?);
 
     match opts.cmd {
         opts::Command::Register { payable_account_id } => {
@@ -138,7 +158,6 @@ async fn run_command(opts: Opts, mut storage: LocalAgentStorage) -> Result<(), R
                 }
                 Err(err) => Err(eyre!("Failed to register agent: {}", err))?,
             }
-            Ok(())
         }
         opts::Command::Unregister => {
             let res = agent.unregister().await;
@@ -155,8 +174,6 @@ async fn run_command(opts: Opts, mut storage: LocalAgentStorage) -> Result<(), R
                 }
                 Err(err) => Err(eyre!("Failed to register agent: {}", err))?,
             }
-
-            Ok(())
         }
         opts::Command::Withdraw => {
             let res = manager.withdraw_reward().await;
@@ -173,8 +190,6 @@ async fn run_command(opts: Opts, mut storage: LocalAgentStorage) -> Result<(), R
                 }
                 Err(err) => Err(eyre!("Failed to withdraw reward: {}", err))?,
             }
-
-            Ok(())
         }
         opts::Command::ListAccounts => {
             println!("Account addresses for agent: {}\n", &opts.agent);
@@ -184,8 +199,6 @@ async fn run_command(opts: Opts, mut storage: LocalAgentStorage) -> Result<(), R
                     .get_agent_signing_account_addr(&opts.agent, chain_config.info.bech32_prefix)?;
                 println!("{chain_id}: {account_addr}");
             }
-
-            Ok(())
         }
         opts::Command::Status => {
             // Print info about the agent
@@ -193,7 +206,7 @@ async fn run_command(opts: Opts, mut storage: LocalAgentStorage) -> Result<(), R
             info!("Account ID: {}", account_addr);
 
             // Get the agent status
-            let res = agent.get_status(account_addr).await?;
+            let res = agent.get_status(account_addr).await;
 
             // Handle the result of the query
             match res {
@@ -205,8 +218,6 @@ async fn run_command(opts: Opts, mut storage: LocalAgentStorage) -> Result<(), R
                 }
                 Err(err) => Err(eyre!("Failed to get agent status: {}", err))?,
             }
-
-            Ok(())
         }
         opts::Command::AllTasks { from_index, limit } => {
             let res = tasks.get_all(from_index, limit).await;
@@ -221,8 +232,6 @@ async fn run_command(opts: Opts, mut storage: LocalAgentStorage) -> Result<(), R
                 }
                 Err(err) => Err(eyre!("Failed to get contract tasks: {}", err))?,
             }
-
-            Ok(())
         }
         opts::Command::GetTasks => {
             let res = agent.get_tasks(account_addr.as_str()).await;
@@ -230,23 +239,20 @@ async fn run_command(opts: Opts, mut storage: LocalAgentStorage) -> Result<(), R
             // Handle the result
             match res {
                 Ok(result) => {
-                    info!("Result: {}", result);
+                    info!("Result: {:?}", result);
                 }
                 Err(err) if err.to_string().contains("Agent not registered") => {
                     Err(eyre!("Agent not registered"))?;
                 }
                 Err(err) => Err(eyre!("Failed to get contract tasks: {}", err))?,
             }
-
-            Ok(())
         }
         opts::Command::GenerateMnemonic { new_name, mnemonic } => {
             storage.generate_account(new_name.clone(), mnemonic).await?;
             println!("Generated agent for {new_name}");
-            Ok(())
         }
         opts::Command::Update => {
-            let res = agent.update(signer.account_id().to_string()).await;
+            let res = agent.update(agent.client.account_id().to_string()).await;
 
             // Handle the result
             match res {
@@ -263,10 +269,8 @@ async fn run_command(opts: Opts, mut storage: LocalAgentStorage) -> Result<(), R
                     err
                 ))?,
             }
-
-            Ok(())
         }
-        opts::Command::GetAgent { name } => Ok(storage.display_account(&name)),
+        opts::Command::GetAgent { name } => storage.display_account(&name),
         // TODO: Move "with_queries" to just be config.yaml
         opts::Command::Go { with_queries } => {
             // Create the global shutdown channel
@@ -282,19 +286,20 @@ async fn run_command(opts: Opts, mut storage: LocalAgentStorage) -> Result<(), R
                 manager,
                 // with_queries
             )
-            .await
+            .await?
         }
         opts::Command::SetupService { output } => {
             for (chain_id, _) in config.chains {
                 system::DaemonService::create(output.clone(), &chain_id, opts.no_frills)?;
             }
-            Ok(())
         }
         opts::Command::SendFunds { to, denom, amount } => {
+            let amount = u128::from_str_radix(&amount, 10)?;
+
             // Send funds to the given address.
             let res = agent
                 .send_funds(
-                    signer.account_id().as_ref(),
+                    agent.client.account_id().as_ref(),
                     to.as_str(),
                     amount,
                     denom.as_str(),
@@ -309,8 +314,6 @@ async fn run_command(opts: Opts, mut storage: LocalAgentStorage) -> Result<(), R
                 }
                 Err(err) => Err(err)?,
             }
-
-            Ok(())
         }
     }
 

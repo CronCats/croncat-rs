@@ -165,12 +165,10 @@ impl Agent {
 
         if agent_info.is_none() {
             Err(eyre!("Agent not registered"))
+        } else if let Some(agent) = agent_info.unwrap().agent {
+            Ok(agent.status)
         } else {
-            if let Some(agent) = agent_info.unwrap().agent {
-                Ok(agent.status)
-            } else {
-                Err(eyre!("Agent not registered"))
-            }
+            Err(eyre!("Agent not registered"))
         }
     }
 
@@ -229,13 +227,13 @@ impl Agent {
 /// Check every nth block with [`AtomicIntervalCounter`] for the current account
 /// status of each account the agent watches.
 ///
-pub async fn check_account_status_loop(
+pub async fn check_status_loop(
     mut block_stream_rx: BlockStreamRx,
     mut shutdown_rx: ShutdownRx,
     block_status: Arc<Mutex<AgentStatus>>,
+    chain_config: ChainConfig,
     agent_client: Agent,
     manager_client: Manager,
-    chain_config: ChainConfig,
 ) -> Result<(), Report> {
     let block_counter = AtomicIntervalCounter::new(10);
     let task_handle: tokio::task::JoinHandle<Result<(), Report>> = tokio::task::spawn(async move {

@@ -136,9 +136,9 @@ impl Tasks {
 pub async fn tasks_loop(
     mut block_stream_rx: BlockStreamRx,
     mut shutdown_rx: ShutdownRx,
-    manager_client: Manager,
-    agent_client: Agent,
     block_status: Arc<Mutex<AgentStatus>>,
+    agent_client: Agent,
+    manager_client: Manager,
 ) -> Result<(), Report> {
     let block_consumer_stream: JoinHandle<Result<(), Report>> = tokio::task::spawn(async move {
         while let Ok(block) = block_stream_rx.recv().await {

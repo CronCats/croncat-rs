@@ -19,8 +19,12 @@ use crate::{
     config::ChainConfig,
     errors::{eyre, Report},
     logging::info,
-    modules::{agent, polling::poll_stream_blocks, tasks},
-    rpc::RpcClientService,
+    modules::{
+        agent::{check_status_loop, Agent},
+        manager::Manager,
+        polling::poll_stream_blocks,
+        tasks,
+    },
     tokio,
 };
 
@@ -36,21 +40,15 @@ pub async fn run(
     shutdown_tx: &ShutdownTx,
     config: &ChainConfig,
     key: &ExtendedPrivateKey<SigningKey>,
-    _with_queries: bool,
+    agent: Agent,
+    manager: Manager,
+    // TODO: Bring back
+    // _with_queries: bool,
 ) -> Result<(), Report> {
-    // Setup the chain client.
-    let factory_client = RpcClientService::new(config.clone(), key.clone(), None).await;
-
     // Get the status of the agent
-    let account_id = client.account_id();
-    let status = client
-        .query(move |querier| {
-            let account_id = account_id.clone();
-            async move { querier.get_agent_status(account_id).await }
-        })
-        .await?;
-
-    let account_id = client.account_id();
+    let account_id = agent.account_id();
+    let account_addr = account_id.clone();
+    let status = agent.get_status(account_addr).await?;
     info!("[{}] Agent account id: {}", chain_id, account_id);
     info!("[{}] Initial agent status: {:?}", chain_id, status);
     let status = Arc::new(Mutex::new(status));
@@ -125,25 +123,25 @@ pub async fn run(
     let account_status_check_block_stream_rx = dispatcher_tx.subscribe();
     let block_status = status.clone();
     let block_status_accounts_loop = block_status.clone();
-    let block_status_client = client.clone();
-    let account_status_check_handle = tokio::task::spawn(agent::check_account_status_loop(
+    let account_status_check_handle = tokio::task::spawn(check_status_loop(
         account_status_check_block_stream_rx,
         account_status_check_shutdown_rx,
         block_status_accounts_loop,
-        block_status_client,
         config.clone(),
+        agent,
+        manager,
     ));
 
     // Process blocks coming in from the blockchain
     let task_runner_shutdown_rx = shutdown_tx.subscribe();
     let task_runner_block_stream_rx = dispatcher_tx.subscribe();
-    let tasks_client = client.clone();
     let block_status_tasks = block_status.clone();
     let task_runner_handle = tokio::task::spawn(tasks::tasks_loop(
         task_runner_block_stream_rx,
         task_runner_shutdown_rx,
-        tasks_client,
         block_status_tasks,
+        agent,
+        manager,
     ));
 
     // TODO: Bring back!!!!!!!!!!!!!!!!
@@ -205,13 +203,25 @@ pub async fn run_retry(
     shutdown_tx: &ShutdownTx,
     config: &ChainConfig,
     key: &ExtendedPrivateKey<SigningKey>,
-    with_queries: bool,
+    agent: Agent,
+    manager: Manager,
+    // TODO: Bring back
+    // _with_queries: bool,
 ) -> Result<(), Report> {
     // TODO: Rethink this retry logic
     // let retry_strategy = FixedInterval::from_millis(5000).take(1200);
 
     // Retry::spawn(retry_strategy, || async {
-    run(chain_id, shutdown_tx, config, key, with_queries).await?;
+    run(
+        chain_id,
+        shutdown_tx,
+        config,
+        key,
+        agent,
+        manager,
+        // with_queries
+    )
+    .await?;
     // .map_err(|err| {
     //     error!("[{}] System crashed: {}", &chain_id, err);
     //     error!("[{}] Retrying...", &chain_id);

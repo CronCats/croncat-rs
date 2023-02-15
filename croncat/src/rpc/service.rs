@@ -4,9 +4,13 @@
 //!
 
 use std::collections::HashMap;
+use std::str::FromStr;
 use std::sync::Arc;
 use std::time::Duration;
 
+use cosm_orc::orchestrator::Address;
+use cosm_orc::orchestrator::ChainTxResponse;
+use cosm_tome::chain::coin::Coin;
 use cosmrs::bip32;
 use cosmrs::crypto::secp256k1::SigningKey;
 use futures_util::Future;
@@ -44,18 +48,25 @@ pub enum RpcClientType {
 #[derive(Clone, Debug)]
 pub struct RpcClientService {
     chain_config: ChainConfig,
+    contract_addr: String,
     key: bip32::XPrv,
     source_info: Arc<Mutex<HashMap<String, (ChainDataSource, bool)>>>,
 }
 
 impl RpcClientService {
-    pub async fn new(chain_config: ChainConfig, key: bip32::XPrv) -> Self {
+    pub async fn new(
+        chain_config: ChainConfig,
+        key: bip32::XPrv,
+        contract_addr: Option<String>,
+    ) -> Self {
+        let contract_addr = contract_addr.unwrap_or(chain_config.clone().factory);
         let data_sources =
             Self::pick_best_sources(&chain_config, &chain_config.data_sources()).await;
 
         Self {
             key,
             chain_config,
+            contract_addr,
             source_info: Arc::new(Mutex::new(data_sources)),
         }
     }
@@ -78,8 +89,14 @@ impl RpcClientService {
         for (name, source) in sources {
             let source = source.clone();
             let chain_config = chain_config.clone();
+            let factory_addr = chain_config.clone().factory;
             race_track.add_racer(name, async move {
-                let rpc_client = Querier::new(chain_config, source.rpc.clone()).await?;
+                let rpc_client = Querier::new(
+                    source.rpc.clone(),
+                    chain_config,
+                    Address::from_str(&factory_addr)?,
+                )
+                .await?;
                 // get status from the nodes directly
                 let _ = rpc_client
                     .rpc_client
@@ -170,7 +187,7 @@ impl RpcClientService {
                     match Signer::new(
                         source.rpc.to_string(),
                         self.chain_config.clone(),
-                        self.chain_config.factory.clone(),
+                        Address::from_str(&self.chain_config.factory.clone())?,
                         self.key.clone(),
                     )
                     .await
@@ -186,7 +203,13 @@ impl RpcClientService {
                     },
                 )),
                 RpcCallType::Query => RpcClientType::Query(Box::new(
-                    match Querier::new(self.chain_config.clone(), source.rpc.to_string()).await {
+                    match Querier::new(
+                        source.rpc.to_string(),
+                        self.chain_config.clone(),
+                        Address::from_str(&self.chain_config.factory.clone())?,
+                    )
+                    .await
+                    {
                         Ok(client) => client,
                         Err(e) => {
                             debug!("Failed to create RpcClient for {}: {}", source_key, e);
@@ -251,18 +274,19 @@ impl RpcClientService {
     /// Query the balance of an address.
     /// Returns the balance in the denom set for this client.
     pub async fn query_balance(&self, address: &str) -> Result<Coin, Report> {
-        if self.denom.is_none() {
-            return Err(eyre!("No denom set"));
-        }
-
-        let address = address.parse::<Address>()?;
         let balance = self
-            .client
-            .client
-            .bank_query_balance(address, self.denom.as_ref().unwrap().clone())
+            .query(move |querier| {
+                let address = address.parse::<Address>().unwrap();
+                async move {
+                    querier
+                        .rpc_client
+                        .query_balance(address.to_string().as_str())
+                        .await
+                }
+            })
             .await?;
 
-        Ok(balance.balance)
+        Ok(balance)
     }
 
     /// Send funds to an address.
@@ -273,32 +297,17 @@ impl RpcClientService {
         denom: &str,
         amount: u128,
     ) -> Result<ChainTxResponse, Report> {
-        if self.key.is_none() {
-            return Err(eyre!("No signing key set"));
-        }
-
-        let to = to.parse::<Address>()?;
-        let from = from.parse::<Address>()?;
-        let res = self.
-
         let response = self
-            .client
-            .client
-            .bank_send(
-                SendRequest {
-                    to,
-                    from,
-                    amounts: vec![Coin {
-                        denom: Denom::from_str(denom)?,
-                        amount,
-                    }],
-                },
-                self.key.as_ref().unwrap(),
-                &TxOptions::default(),
-            )
+            .execute(|signer| {
+                let to = to.clone();
+                let from = from.clone();
+                let denom = denom.clone();
+                let amount = amount.clone();
+                async move { signer.rpc_client.send_funds(to, from, denom, amount).await }
+            })
             .await?;
 
-        Ok(response.res)
+        Ok(response)
     }
 }
 

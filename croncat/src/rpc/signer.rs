@@ -5,7 +5,7 @@
 use crate::config::ChainConfig;
 use crate::errors::{eyre, Report};
 use crate::utils::normalize_rpc_url;
-use cosm_orc::orchestrator::ChainResponse;
+use cosm_orc::orchestrator::{Address, ChainResponse};
 use cosmrs::bip32;
 use cosmrs::crypto::secp256k1::SigningKey;
 use cosmrs::AccountId;
@@ -18,7 +18,7 @@ use super::RpcClient;
 #[derive(Clone, Debug)]
 pub struct Signer {
     pub rpc_client: RpcClient,
-    pub contract_addr: String,
+    pub contract_addr: Address,
     pub account_id: AccountId,
 }
 
@@ -26,7 +26,7 @@ impl Signer {
     pub async fn new(
         rpc_url: String,
         cfg: ChainConfig,
-        contract_addr: String,
+        contract_addr: Address,
         key: bip32::XPrv,
     ) -> Result<Self, Report> {
         let rpc_url = normalize_rpc_url(&rpc_url);
@@ -54,13 +54,18 @@ impl Signer {
         })
     }
 
-    pub async fn execute_croncat<S>(&self, msg: S) -> Result<ChainResponse, Report>
+    pub async fn execute_croncat<S>(
+        &self,
+        msg: S,
+        address: Option<Address>,
+    ) -> Result<ChainResponse, Report>
     where
         S: Serialize,
     {
+        let a = address.unwrap_or(self.contract_addr.clone());
         let res = timeout(
             Duration::from_secs_f64(self.rpc_client.timeout_secs),
-            self.rpc_client.wasm_execute(msg),
+            self.rpc_client.wasm_execute(msg, Some(a)),
         )
         .await
         .map_err(|err| {

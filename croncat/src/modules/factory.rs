@@ -1,17 +1,16 @@
 use crate::config::ChainConfig;
-use crate::{
-    rpc::RpcClientService,
-    store::factory::LocalCacheStorage,
-};
+use crate::{rpc::RpcClientService, store::factory::LocalCacheStorage};
 use color_eyre::{eyre::eyre, Report};
+use cosm_orc::orchestrator::Address;
 use croncat_sdk_factory::msg::{
     ContractMetadataInfo, ContractMetadataResponse, EntryResponse, FactoryQueryMsg,
 };
 use std::collections::HashMap;
+use std::str::FromStr;
 
 pub struct Factory {
     pub client: RpcClientService,
-    pub contract_addr: String,
+    pub contract_addr: Address,
     pub store: LocalCacheStorage,
 }
 
@@ -47,7 +46,7 @@ impl Factory {
     ) -> Result<Self, Report> {
         Ok(Self {
             client,
-            contract_addr: cfg.factory,
+            contract_addr: Address::from_str(&cfg.factory)?,
             store: LocalCacheStorage::default(),
         })
     }
@@ -97,8 +96,11 @@ impl Factory {
         let entries: Vec<EntryResponse> = self
             .client
             .query(move |querier| {
+                let contract_addr = self.contract_addr.clone();
                 async move {
-                    querier.query_croncat(FactoryQueryMsg::LatestContracts {}).await
+                    querier
+                        .query_croncat(FactoryQueryMsg::LatestContracts {}, Some(contract_addr))
+                        .await
                 }
             })
             .await?;
@@ -112,9 +114,15 @@ impl Factory {
         let data: ContractMetadataResponse = self
             .client
             .query(move |querier| {
+                let contract_addr = self.contract_addr.clone();
                 let contract_name = contract_name.clone();
                 async move {
-                    querier.query_croncat(FactoryQueryMsg::LatestContract { contract_name }).await
+                    querier
+                        .query_croncat(
+                            FactoryQueryMsg::LatestContract { contract_name },
+                            Some(contract_addr),
+                        )
+                        .await
                 }
             })
             .await?;
@@ -130,15 +138,21 @@ impl Factory {
         let entries: Vec<ContractMetadataInfo> = self
             .client
             .query(move |querier| {
+                let contract_addr = self.contract_addr.clone();
                 let contract_name = contract_name.clone();
                 let from_index = Some(from_index.unwrap_or(0));
                 let limit = Some(limit.unwrap_or(100));
                 async move {
-                    querier.query_croncat(FactoryQueryMsg::VersionsByContractName {
-                        contract_name,
-                        from_index,
-                        limit,
-                    }).await
+                    querier
+                        .query_croncat(
+                            FactoryQueryMsg::VersionsByContractName {
+                                contract_name,
+                                from_index,
+                                limit,
+                            },
+                            Some(contract_addr),
+                        )
+                        .await
                 }
             })
             .await?;
@@ -150,18 +164,19 @@ impl Factory {
         from_index: Option<u64>,
         limit: Option<u64>,
     ) -> Result<Vec<String>, Report> {
-        let from_index = Some(from_index.unwrap_or(0));
-        let limit = Some(limit.unwrap_or(100));
         let entries: Vec<String> = self
             .client
             .query(move |querier| {
+                let contract_addr = self.contract_addr.clone();
                 let from_index = Some(from_index.unwrap_or(0));
                 let limit = Some(limit.unwrap_or(100));
                 async move {
-                    querier.query_croncat(FactoryQueryMsg::ContractNames {
-                        from_index,
-                        limit,
-                    }).await
+                    querier
+                        .query_croncat(
+                            FactoryQueryMsg::ContractNames { from_index, limit },
+                            Some(contract_addr),
+                        )
+                        .await
                 }
             })
             .await?;
@@ -173,18 +188,19 @@ impl Factory {
         from_index: Option<u64>,
         limit: Option<u64>,
     ) -> Result<Vec<EntryResponse>, Report> {
-        let from_index = Some(from_index.unwrap_or(0));
-        let limit = Some(limit.unwrap_or(100));
         let entries: Vec<EntryResponse> = self
             .client
             .query(move |querier| {
+                let contract_addr = self.contract_addr.clone();
                 let from_index = Some(from_index.unwrap_or(0));
                 let limit = Some(limit.unwrap_or(100));
                 async move {
-                    querier.query_croncat(FactoryQueryMsg::AllEntries {
-                        from_index,
-                        limit,
-                    }).await
+                    querier
+                        .query_croncat(
+                            FactoryQueryMsg::AllEntries { from_index, limit },
+                            Some(contract_addr),
+                        )
+                        .await
                 }
             })
             .await?;

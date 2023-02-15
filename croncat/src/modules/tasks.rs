@@ -1,15 +1,13 @@
+use cosm_orc::orchestrator::Address;
 use std::sync::{
     atomic::{AtomicBool, Ordering::SeqCst},
     Arc,
 };
-
 // use cosmos_sdk_proto::tendermint::google::protobuf::Timestamp;
 use croncat_sdk_agents::types::AgentStatus;
 use croncat_sdk_tasks::msg::TasksQueryMsg;
 use croncat_sdk_tasks::types::{TaskInfo, TaskResponse};
 // use croncat_sdk_tasks::types::Boundary;
-use tokio::{sync::Mutex, task::JoinHandle};
-use tracing::error;
 use crate::{
     channels::{BlockStreamRx, ShutdownRx},
     errors::{eyre, Report},
@@ -18,42 +16,42 @@ use crate::{
     rpc::RpcClientService,
     utils::sum_num_tasks,
 };
+use tokio::{sync::Mutex, task::JoinHandle};
+use tracing::error;
 
 use super::{agent::Agent, manager::Manager};
 
 pub struct Tasks {
     pub client: RpcClientService,
-    pub contract_addr: String,
+    pub contract_addr: Address,
 }
 
 impl Tasks {
-    pub async fn new(
-        contract_addr: String,
-        client: RpcClientService,
-    ) -> Result<Self, Report> {
+    pub async fn new(contract_addr: Address, client: RpcClientService) -> Result<Self, Report> {
         Ok(Self {
             client,
             contract_addr,
         })
     }
 
-    pub async fn get_tasks(
+    pub async fn get_all(
         &self,
-        start: Option<u64>,
         from_index: Option<u64>,
         limit: Option<u64>,
     ) -> Result<String, Report> {
         let response: Vec<TaskResponse> = self
             .client
             .query(move |querier| {
-                let start = start.clone();
+                let contract_addr = self.contract_addr.clone();
                 let from_index = from_index.clone();
                 let limit = limit.clone();
                 async move {
-                    querier.query_croncat(TasksQueryMsg::Tasks {
-                        from_index,
-                        limit,
-                    }).await
+                    querier
+                        .query_croncat(
+                            TasksQueryMsg::Tasks { from_index, limit },
+                            Some(contract_addr),
+                        )
+                        .await
                 }
             })
             .await?;
@@ -70,15 +68,21 @@ impl Tasks {
         let res: Vec<TaskInfo> = self
             .client
             .query(move |querier| {
+                let contract_addr = self.contract_addr.clone();
                 let start = start.clone();
                 let from_index = from_index.clone();
                 let limit = limit.clone();
                 async move {
-                    querier.query_croncat(TasksQueryMsg::EventedTasks {
-                        start,
-                        from_index,
-                        limit,
-                    }).await
+                    querier
+                        .query_croncat(
+                            TasksQueryMsg::EventedTasks {
+                                start,
+                                from_index,
+                                limit,
+                            },
+                            Some(contract_addr),
+                        )
+                        .await
                 }
             })
             .await?;
@@ -146,7 +150,7 @@ pub async fn tasks_loop(
                 let tasks_failed = Arc::new(AtomicBool::new(false));
                 let account_addr = agent_client.account_id();
                 let tasks = agent_client
-                    .get_agent_tasks(account_addr.as_str())
+                    .get_tasks(account_addr.as_str())
                     .await
                     .map_err(|err| eyre!("Failed to get agent tasks: {}", err))?;
 

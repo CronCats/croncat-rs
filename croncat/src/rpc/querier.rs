@@ -2,50 +2,55 @@
 //! This module contains the code for querying the croncat contract via HTTP RPC.
 //!
 
+use crate::config::ChainConfig;
+use crate::errors::{eyre, Report};
+use crate::utils::normalize_rpc_url;
+use cosm_orc::orchestrator::Address;
 use serde::de::DeserializeOwned;
 use serde::Serialize;
 use std::time::Duration;
 use tokio::time::timeout;
 
-use crate::config::ChainConfig;
-use crate::errors::{eyre, Report};
-use crate::utils::normalize_rpc_url;
-
 use super::RpcClient;
 
 pub struct Querier {
     pub rpc_client: RpcClient,
-    pub croncat_addr: String,
+    pub contract_addr: Address,
 }
 
 impl std::fmt::Debug for Querier {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.debug_struct("Querier")
-            .field("croncat_addr", &self.croncat_addr)
+            .field("contract_addr", &self.contract_addr)
             .finish()
     }
 }
 
 impl Querier {
-    pub async fn new(cfg: ChainConfig, rpc_url: String) -> Result<Self, Report> {
+    pub async fn new(
+        rpc_url: String,
+        cfg: ChainConfig,
+        contract_addr: Address,
+    ) -> Result<Self, Report> {
         let rpc_url = normalize_rpc_url(&rpc_url);
 
         let rpc_client = RpcClient::new(&cfg, &rpc_url)?;
 
         Ok(Self {
             rpc_client,
-            croncat_addr: cfg.factory,
+            contract_addr,
         })
     }
 
-    pub async fn query_croncat<S, T>(&self, msg: S) -> Result<T, Report>
+    pub async fn query_croncat<S, T>(&self, msg: S, address: Option<Address>) -> Result<T, Report>
     where
         S: Serialize,
         T: DeserializeOwned,
     {
+        let a = address.unwrap_or(self.contract_addr.clone());
         timeout(
             Duration::from_secs_f64(self.rpc_client.timeout_secs),
-            self.rpc_client.wasm_query(msg),
+            self.rpc_client.wasm_query(msg, Some(a)),
         )
         .await
         .map_err(|err| {

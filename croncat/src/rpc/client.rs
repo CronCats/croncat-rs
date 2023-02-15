@@ -83,14 +83,15 @@ impl RpcClient {
     }
 
     /// Query the contract via RPC at a specific address.
-    pub async fn call_wasm_query<S, R>(&self, address: Address, msg: S) -> Result<R, Report>
+    pub async fn wasm_query<S, R>(&self, msg: S, address: Option<Address>) -> Result<R, Report>
     where
         S: Serialize,
         R: DeserializeOwned,
     {
-        // Query the chain
+        // Query the chain -- uses default contract_addr if not specified (factory address)
         // TODO: Assess support for batch settings
-        let response = self.client.client.wasm_query(address, &msg).await?;
+        let a = address.unwrap_or(self.contract_addr.clone());
+        let response = self.client.client.wasm_query(a, &msg).await?;
 
         // Deserialize the response
         let data = response
@@ -100,17 +101,21 @@ impl RpcClient {
         Ok(data)
     }
 
-    /// Query the contract at the factory address.
-    pub async fn wasm_query<S, R>(&self, msg: S) -> Result<R, Report>
-    where
-        S: Serialize,
-        R: DeserializeOwned,
-    {
-        self.call_wasm_query(self.contract_addr.clone(), msg).await
-    }
+    // /// Query the contract at the factory address.
+    // pub async fn wasm_query<S, R>(&self, msg: S) -> Result<R, Report>
+    // where
+    //     S: Serialize,
+    //     R: DeserializeOwned,
+    // {
+    //     self.call_wasm_query(self.contract_addr.clone(), msg).await
+    // }
 
     /// Execute a contract via RPC.
-    pub async fn wasm_execute<S>(&self, msg: S) -> Result<ChainResponse, Report>
+    pub async fn wasm_execute<S>(
+        &self,
+        msg: S,
+        address: Option<Address>,
+    ) -> Result<ChainResponse, Report>
     where
         S: Serialize,
     {
@@ -118,7 +123,9 @@ impl RpcClient {
             return Err(eyre!("No signing key set"));
         }
 
-        // Query the chain
+        // Execute a message on the chain -- uses default contract_addr if not specified (factory address)
+        // TODO: Assess support for batch settings
+        let a = address.unwrap_or(self.contract_addr.clone());
         let response = self
             .client
             .client

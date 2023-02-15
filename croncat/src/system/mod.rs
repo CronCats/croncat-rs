@@ -39,7 +39,7 @@ pub async fn run(
     _with_queries: bool,
 ) -> Result<(), Report> {
     // Setup the chain client.
-    let client = RpcClientService::new(config.clone(), key.clone()).await;
+    let factory_client = RpcClientService::new(config.clone(), key.clone(), None).await;
 
     // Get the status of the agent
     let account_id = client.account_id();

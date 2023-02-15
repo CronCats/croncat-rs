@@ -8,12 +8,9 @@ use croncat::{
     config::Config,
     errors::{eyre, Report},
     logging::{self, error, info},
-    rpc::{RpcClientService, Signer, Querier},
+    modules::{agent::Agent, factory::Factory, manager::Manager, tasks::Tasks},
+    rpc::{Querier, RpcClientService, Signer},
     store::agent::LocalAgentStorage,
-    modules::{
-        agent::Agent,
-        factory::Factory,
-    },
     system,
     tokio,
 };
@@ -83,174 +80,101 @@ async fn run_command(opts: Opts, mut storage: LocalAgentStorage) -> Result<(), R
         .get(&chain_id)
         .ok_or_else(|| eyre!("Chain not found in configuration: {}", chain_id))?;
 
-        // Get the key and create a signer
+    // Get the key and create a signer
     let key = storage.get_agent_signing_key(&opts.agent)?;
 
     // Get an rpc client
-    let client = RpcClientService::new(chain_config.clone(), key).await;
+    let factory_client = RpcClientService::new(chain_config.clone(), key, None).await;
 
     // Bootstrap all the factory stuffz
-    let factory_client = Factory::new(chain_config.clone(), client).await?;
+    let factory = Factory::new(chain_config.clone(), factory_client).await?;
 
     // Get that factory info before moving on
-    if !factory_client.load().await {
+    if !factory.load().await {
         return Err(eyre!("Failed to load factory contracts!"));
     }
 
     // Init that agent client lyfe
-    let agent_contract_addr = factory_client.get_contract_addr("agents".to_string()).await?;
-    let agent_client = Agent::new(chain_config.clone(), agent_contract_addr, key, client).await?;
+    let agent_contract_addr = factory.get_contract_addr("agents".to_string()).await?;
+    let agent_client =
+        RpcClientService::new(chain_config.clone(), key, Some(agent_contract_addr)).await;
+    let agent = Agent::new(chain_config.clone(), agent_contract_addr, key, agent_client).await?;
+
+    // Init that manager client lyfe
+    let manager_contract_addr = factory.get_contract_addr("manager".to_string()).await?;
+    let manager_client =
+        RpcClientService::new(chain_config.clone(), key, Some(manager_contract_addr)).await;
+    let manager = Manager::new(manager_contract_addr, manager_client).await?;
+
+    // Init that tasks client lyfe
+    let tasks_contract_addr = factory.get_contract_addr("manager".to_string()).await?;
+    let tasks_client =
+        RpcClientService::new(chain_config.clone(), key, Some(manager_contract_addr)).await;
+    let tasks = Tasks::new(manager_contract_addr, manager_client).await?;
 
     // Get the account id
     let account_addr = agent_client.account_id();
 
     match opts.cmd {
         opts::Command::Register { payable_account_id } => {
-            // Make sure we have a chain id to run on
-            if opts.chain_id.is_none() {
-                return Err(eyre!("chain-id is required for this command"));
+            // Register the agent
+            let res = agent.register(&payable_account_id).await;
+
+            // Handle the result
+            match res {
+                Ok(result) => {
+                    info!("Agent registered successfully");
+                    let log = result.log;
+                    info!("Result: {}", log);
+                }
+                Err(err) if err.to_string().contains("Agent already exists") => {
+                    Err(eyre!("Agent already registered"))?;
+                }
+                Err(err)
+                    if err.to_string().contains("account")
+                        && err.to_string().contains("not found") =>
+                {
+                    Err(eyre!("Agent account not found on chain"))?;
+                }
+                Err(err) => Err(eyre!("Failed to register agent: {}", err))?,
             }
-            let chain_id = opts.chain_id.unwrap();
-
-            // Get the chain config for the chain we're going to run on
-            let chain_config = config
-                .chains
-                .get(&chain_id)
-                .ok_or_else(|| eyre!("Chain not found in configuration: {}", chain_id))?;
-
-            // Get the key and create a signer
-            let key = storage.get_agent_signing_key(&opts.agent)?;
-
-            // Get an rpc client
-            let client = RpcClientService::new(chain_config.clone(), key).await;
-
-            client
-                .execute(|signer| {
-                    let payable_account_id = payable_account_id.clone();
-
-                    async move {
-                        // Print info about the agent about to be registered
-                        info!("Account ID: {}", signer.account_id());
-                        if payable_account_id.is_some() {
-                            info!(
-                                "Payable account Id: {}",
-                                serde_json::to_string_pretty(&payable_account_id)?
-                            );
-                        }
-
-                        // Register the agent
-                        let query = signer.register_agent(&payable_account_id).await;
-
-                        // Handle the result of the query
-                        match query {
-                            Ok(result) => {
-                                info!("Agent registered successfully");
-                                let log = result.log;
-                                info!("Result: {}", log);
-                            }
-                            Err(err) if err.to_string().contains("Agent already exists") => {
-                                Err(eyre!("Agent already registered"))?;
-                            }
-                            Err(err)
-                                if err.to_string().contains("account")
-                                    && err.to_string().contains("not found") =>
-                            {
-                                Err(eyre!("Agent account not found on chain"))?;
-                            }
-                            Err(err) => Err(eyre!("Failed to register agent: {}", err))?,
-                        }
-                        Ok(())
-                    }
-                })
-                .await?;
+            Ok(())
         }
         opts::Command::Unregister => {
-            // Make sure we have a chain id to run on
-            if opts.chain_id.is_none() {
-                return Err(eyre!("chain-id is required for go command"));
+            let res = agent.unregister().await;
+
+            // Handle the result
+            match res {
+                Ok(result) => {
+                    info!("Agent unregistered successfully");
+                    let log = result.log;
+                    info!("Result: {}", log);
+                }
+                Err(err) if err.to_string().contains("Agent not registered") => {
+                    Err(eyre!("Agent not registered"))?;
+                }
+                Err(err) => Err(eyre!("Failed to register agent: {}", err))?,
             }
-            let chain_id = opts.chain_id.unwrap();
 
-            // Get the chain config for the chain we're going to run on
-            let chain_config = config
-                .chains
-                .get(&chain_id)
-                .ok_or_else(|| eyre!("Chain not found in configuration: {}", chain_id))?;
-
-            // Get the key and create a signer
-            let key = storage.get_agent_signing_key(&opts.agent)?;
-
-            // Get an rpc client
-            let client = RpcClientService::new(chain_config.clone(), key).await;
-
-            client
-                .execute(|signer| async move {
-                    // Print info about the agent about to be registered
-                    info!("Account ID: {}", signer.account_id());
-
-                    // Unregister the agent
-                    let query = signer.unregister_agent().await;
-
-                    // Handle the result of the query
-                    match query {
-                        Ok(result) => {
-                            info!("Agent unregistered successfully");
-                            let log = result.log;
-                            info!("Result: {}", log);
-                        }
-                        Err(err) if err.to_string().contains("Agent not registered") => {
-                            Err(eyre!("Agent not registered"))?;
-                        }
-                        Err(err) => Err(eyre!("Failed to register agent: {}", err))?,
-                    }
-
-                    Ok(())
-                })
-                .await?;
+            Ok(())
         }
         opts::Command::Withdraw => {
-            // Make sure we have a chain id to run on
-            if opts.chain_id.is_none() {
-                return Err(eyre!("chain-id is required for go command"));
+            let res = manager.withdraw_reward().await;
+
+            // Handle the result
+            match res {
+                Ok(result) => {
+                    info!("Agent reward withdrawn successfully");
+                    let log = result.log;
+                    info!("Result: {}", log);
+                }
+                Err(err) if err.to_string().contains("Agent not registered") => {
+                    Err(eyre!("Agent not registered"))?;
+                }
+                Err(err) => Err(eyre!("Failed to withdraw reward: {}", err))?,
             }
-            let chain_id = opts.chain_id.unwrap();
 
-            // Get the chain config for the chain we're going to run on
-            let chain_config = config
-                .chains
-                .get(&chain_id)
-                .ok_or_else(|| eyre!("Chain not found in configuration: {}", chain_id))?;
-
-            // Get the key and create a signer
-            let key = storage.get_agent_signing_key(&opts.agent)?;
-
-            // Get an rpc client
-            let client = RpcClientService::new(chain_config.clone(), key).await;
-
-            client
-                .execute(|signer| async move {
-                    // Print info about the agent about to be registered
-                    info!("Account ID: {}", signer.account_id());
-
-                    // Unregister the agent
-                    let query = signer.withdraw_reward().await;
-
-                    // Handle the result of the query
-                    match query {
-                        Ok(result) => {
-                            info!("Agent reward withdrawn successfully");
-                            let log = result.log;
-                            info!("Result: {}", log);
-                        }
-                        Err(err) if err.to_string().contains("Agent not registered") => {
-                            Err(eyre!("Agent not registered"))?;
-                        }
-                        Err(err) => Err(eyre!("Failed to withdraw reward: {}", err))?,
-                    }
-
-                    Ok(())
-                })
-                .await?;
+            Ok(())
         }
         opts::Command::ListAccounts => {
             println!("Account addresses for agent: {}\n", &opts.agent);
@@ -260,6 +184,8 @@ async fn run_command(opts: Opts, mut storage: LocalAgentStorage) -> Result<(), R
                     .get_agent_signing_account_addr(&opts.agent, chain_config.info.bech32_prefix)?;
                 println!("{chain_id}: {account_addr}");
             }
+
+            Ok(())
         }
         opts::Command::Status => {
             // Print info about the agent
@@ -267,7 +193,7 @@ async fn run_command(opts: Opts, mut storage: LocalAgentStorage) -> Result<(), R
             info!("Account ID: {}", account_addr);
 
             // Get the agent status
-            let res = agent_client.get_agent_status(account_addr).await?;
+            let res = agent.get_status(account_addr).await?;
 
             // Handle the result of the query
             match res {
@@ -279,248 +205,103 @@ async fn run_command(opts: Opts, mut storage: LocalAgentStorage) -> Result<(), R
                 }
                 Err(err) => Err(eyre!("Failed to get agent status: {}", err))?,
             }
+
+            Ok(())
         }
         opts::Command::AllTasks { from_index, limit } => {
-            // Make sure we have a chain id to run on
-            if opts.chain_id.is_none() {
-                return Err(eyre!("chain-id is required for go command"));
+            let res = tasks.get_all(from_index, limit).await;
+
+            // Handle the result
+            match res {
+                Ok(result) => {
+                    info!("Result: {}", result);
+                }
+                Err(err) if err.to_string().contains("Agent not registered") => {
+                    Err(eyre!("Agent not registered"))?;
+                }
+                Err(err) => Err(eyre!("Failed to get contract tasks: {}", err))?,
             }
-            let chain_id = opts.chain_id.unwrap();
 
-            // Get the chain config for the chain we're going to run on
-            let chain_config = config
-                .chains
-                .get(&chain_id)
-                .ok_or_else(|| eyre!("Chain not found in configuration: {}", chain_id))?;
-
-            // Get the key and create a signer
-            let key = storage.get_agent_signing_key(&opts.agent)?;
-
-            // Get an rpc client
-            let client = RpcClientService::new(chain_config.clone(), key).await;
-
-            // Get the account id
-            let account_addr = storage.get_agent_signing_account_addr(
-                &opts.agent,
-                chain_config.info.bech32_prefix.clone(),
-            )?;
-
-            client
-                .query(|querier| {
-                    let account_addr = account_addr.clone();
-                    async move {
-                        // Print info about the agent about to be registered
-                        info!("Account ID: {}", account_addr);
-
-                        // Get the agent status
-                        let query = querier.get_tasks(from_index, limit).await;
-
-                        // Handle the result of the query
-                        match query {
-                            Ok(result) => {
-                                info!("Result: {}", result);
-                            }
-                            Err(err) if err.to_string().contains("Agent not registered") => {
-                                Err(eyre!("Agent not registered"))?;
-                            }
-                            Err(err) => Err(eyre!("Failed to get contract tasks: {}", err))?,
-                        }
-
-                        Ok(())
-                    }
-                })
-                .await?;
+            Ok(())
         }
         opts::Command::GetTasks => {
-            // Make sure we have a chain id to run on
-            if opts.chain_id.is_none() {
-                return Err(eyre!("chain-id is required for go command"));
+            let res = agent.get_tasks(account_addr.as_str()).await;
+
+            // Handle the result
+            match res {
+                Ok(result) => {
+                    info!("Result: {}", result);
+                }
+                Err(err) if err.to_string().contains("Agent not registered") => {
+                    Err(eyre!("Agent not registered"))?;
+                }
+                Err(err) => Err(eyre!("Failed to get contract tasks: {}", err))?,
             }
-            let chain_id = opts.chain_id.unwrap();
 
-            // Get the chain config for the chain we're going to run on
-            let chain_config = config
-                .chains
-                .get(&chain_id)
-                .ok_or_else(|| eyre!("Chain not found in configuration: {}", chain_id))?;
-
-            // Get the key and create a signer
-            let key = storage.get_agent_signing_key(&opts.agent)?;
-
-            // Get an rpc client
-            let client = RpcClientService::new(chain_config.clone(), key).await;
-
-            // Get the account id
-            let account_addr = storage.get_agent_signing_account_addr(
-                &opts.agent,
-                chain_config.info.bech32_prefix.clone(),
-            )?;
-
-            client
-                .query(|querier| {
-                    let account_addr = account_addr.clone();
-
-                    async move {
-                        // Print info about the agent about to be registered
-                        info!("Account ID: {}", account_addr);
-
-                        // Get the agent status
-                        let query = querier.get_agent_tasks(account_addr).await;
-
-                        // Handle the result of the query
-                        match query {
-                            Ok(result) => {
-                                info!("Result: {}", result);
-                            }
-                            Err(err) if err.to_string().contains("Agent not registered") => {
-                                Err(eyre!("Agent not registered"))?;
-                            }
-                            Err(err) => Err(eyre!("Failed to get contract tasks: {}", err))?,
-                        }
-
-                        Ok(())
-                    }
-                })
-                .await?;
+            Ok(())
         }
         opts::Command::GenerateMnemonic { new_name, mnemonic } => {
             storage.generate_account(new_name.clone(), mnemonic).await?;
             println!("Generated agent for {new_name}");
+            Ok(())
         }
         opts::Command::Update => {
-            // Make sure we have a chain id to run on
-            if opts.chain_id.is_none() {
-                return Err(eyre!("chain-id is required for go command"));
+            let res = agent.update(signer.account_id().to_string()).await;
+
+            // Handle the result
+            match res {
+                Ok(result) => {
+                    info!("Agent configuration updated successfully");
+                    let log = result.log;
+                    info!("Result: {}", log);
+                }
+                Err(err) if err.to_string().contains("Agent not registered") => {
+                    Err(eyre!("Agent not registered"))?;
+                }
+                Err(err) => Err(eyre!(
+                    "Failed to update agent configuration on chain: {}",
+                    err
+                ))?,
             }
-            let chain_id = opts.chain_id.unwrap();
 
-            // Get the chain config for the chain we're going to run on
-            let chain_config = config
-                .chains
-                .get(&chain_id)
-                .ok_or_else(|| eyre!("Chain not found in configuration: {}", chain_id))?;
-
-            // Get the key and create a signer
-            let key = storage.get_agent_signing_key(&opts.agent)?;
-
-            // Get an rpc client
-            let client = RpcClientService::new(chain_config.clone(), key).await;
-
-            client
-                .execute(|signer| async move {
-                    // Print info about the agent about to be registered
-                    info!("Account ID: {}", signer.account_id());
-
-                    // Unregister the agent
-                    let query = signer.update_agent(signer.account_id().to_string()).await;
-
-                    // Handle the result of the query
-                    match query {
-                        Ok(result) => {
-                            info!("Agent configuration updated successfully");
-                            let log = result.log;
-                            info!("Result: {}", log);
-                        }
-                        Err(err) if err.to_string().contains("Agent not registered") => {
-                            Err(eyre!("Agent not registered"))?;
-                        }
-                        Err(err) => Err(eyre!(
-                            "Failed to update agent configuration on chain: {}",
-                            err
-                        ))?,
-                    }
-
-                    Ok(())
-                })
-                .await?;
+            Ok(())
         }
-        opts::Command::GetAgent { name } => storage.display_account(&name),
+        opts::Command::GetAgent { name } => Ok(storage.display_account(&name)),
+        // TODO: Move "with_queries" to just be config.yaml
         opts::Command::Go { with_queries } => {
-            // Make sure we have a chain id to run on
-            if opts.chain_id.is_none() {
-                return Err(eyre!("chain-id is required for go command"));
-            }
-            let chain_id = opts.chain_id.unwrap();
-
-            // Get the key for the agent signing account
-            let key = storage.get_agent_signing_key(&opts.agent)?;
-
-            // Get the chain config for the chain we're going to run on
-            let chain_config = config
-                .chains
-                .get(&chain_id)
-                .ok_or_else(|| eyre!("Chain not found in configuration: {}", chain_id))?;
-
             // Create the global shutdown channel
             let (shutdown_tx, _shutdown_rx) = create_shutdown_channel();
 
             // Run the agent on the chain
-            system::run_retry(&chain_id, &shutdown_tx, chain_config, &key, with_queries).await?;
+            system::run_retry(&chain_id, &shutdown_tx, chain_config, &key, with_queries).await
         }
         opts::Command::SetupService { output } => {
             for (chain_id, _) in config.chains {
                 system::DaemonService::create(output.clone(), &chain_id, opts.no_frills)?;
             }
+            Ok(())
         }
         opts::Command::SendFunds { to, denom, amount } => {
-            // Make sure we have a chain id to run on
-            if opts.chain_id.is_none() {
-                return Err(eyre!("chain-id is required for go command"));
+            // Send funds to the given address.
+            let res = agent
+                .send_funds(
+                    signer.account_id().as_ref(),
+                    to.as_str(),
+                    amount,
+                    denom.as_str(),
+                )
+                .await;
+
+            // Handle the result of the transaction
+            match res {
+                Ok(tx) => {
+                    info!("Funds sent successfully");
+                    info!("TxHash: {}", tx.tx_hash);
+                }
+                Err(err) => Err(err)?,
             }
-            let chain_id = opts.chain_id.unwrap();
 
-            // Get the chain config for the chain we're going to run on
-            let chain_config = config
-                .chains
-                .get(&chain_id)
-                .ok_or_else(|| eyre!("Chain not found in configuration: {}", chain_id))?;
-
-            // Get the key and create a signer
-            let key = storage.get_agent_signing_key(&opts.agent)?;
-
-            // Get an rpc client
-            let client = RpcClientService::new(chain_config.clone(), key).await;
-
-            // Parse the amount
-            let amount = amount
-                .parse::<u128>()
-                .map_err(|e| eyre!("Invalid send amount: {}", e))?;
-
-            client
-                .execute(|signer| {
-                    let to = to.clone();
-                    let denom = denom.clone();
-
-                    async move {
-                        // Print info about the agent sending funds
-                        info!("Account ID: {}", signer.account_id());
-
-                        // Print info about the amount and denom being sent.
-                        info!("Sending {}{} to {}", amount, denom, to);
-
-                        // Send funds to the given address.
-                        let query = signer
-                            .send_funds(
-                                signer.account_id().as_ref(),
-                                to.as_str(),
-                                amount,
-                                denom.as_str(),
-                            )
-                            .await;
-
-                        // Handle the result of the transaction
-                        match query {
-                            Ok(tx) => {
-                                info!("Funds sent successfully");
-                                info!("TxHash: {}", tx.tx_hash);
-                            }
-                            Err(err) => Err(err)?,
-                        }
-
-                        Ok(())
-                    }
-                })
-                .await?;
+            Ok(())
         }
     }
 

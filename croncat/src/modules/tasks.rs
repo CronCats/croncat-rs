@@ -14,6 +14,7 @@ use crate::{
     logging::info,
     monitor::ping_uptime_monitor,
     rpc::RpcClientService,
+    store::tasks::LocalEventStorage,
     utils::sum_num_tasks,
 };
 use tokio::{sync::Mutex, task::JoinHandle};
@@ -24,13 +25,40 @@ use super::{agent::Agent, manager::Manager};
 pub struct Tasks {
     pub client: RpcClientService,
     pub contract_addr: Address,
+    pub store: LocalEventStorage,
 }
+
+// FLOW:
+// - check if local cache has tasks ready, if at all
+//   - if no tasks, go get from chain - using current chain context
+//   - if tasks, load into local cache & storage
+// - return known tasks
+//
+// NOTE: why "events"? because these are task data that get triggered upon certain events
+//
+// Example Data:
+// {
+//   // when this cache should get removed/updated
+//   expires: 1696407069536,
+//   // Index based tasks
+//   events: {
+//     // Index here is the starting block height based on boundary (if task has it)
+//     // NOTE: Non-boundary tasks will always have index be zero
+//     300001: {
+//         // key: Task Hash, value: Task
+//         "osmosistestnet:f9a4e4e6f0dc427db55086fc4dba14f3244b392b4c5b46b72": {
+//             ...Task Data
+//         }
+//     }
+//   }
+// }
 
 impl Tasks {
     pub async fn new(contract_addr: Address, client: RpcClientService) -> Result<Self, Report> {
         Ok(Self {
             client,
             contract_addr,
+            store: LocalEventStorage::default(),
         })
     }
 

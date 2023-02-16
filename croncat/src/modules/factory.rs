@@ -1,4 +1,6 @@
+use crate::channels::{BlockStreamRx, ShutdownRx};
 use crate::config::ChainConfig;
+use crate::utils::AtomicIntervalCounter;
 use crate::{rpc::RpcClientService, store::factory::LocalCacheStorage};
 use color_eyre::{eyre::eyre, Report};
 use cosm_orc::orchestrator::Address;
@@ -7,6 +9,8 @@ use croncat_sdk_factory::msg::{
 };
 use std::collections::HashMap;
 use std::str::FromStr;
+use std::sync::Arc;
+use tracing::info;
 
 pub fn to_version_key(name: String, version: [u8; 2]) -> String {
     format!("{}_{}.{}", name, version[0], version[1])
@@ -56,10 +60,11 @@ impl Factory {
     }
 
     // load versions: get latest & all versions, put into storage
+    // NOTE: Result returns if it was reloaded or not
     pub async fn load(&mut self) -> Result<bool, Report> {
         let b = if self.store.get().is_some() {
             // Have the unexpired cache data, wooooot!
-            true
+            false
         } else {
             // Go get latest version data
             let mut latest = HashMap::new();
@@ -81,6 +86,16 @@ impl Factory {
 
         // only need to make sure we loaded y'all
         Ok(b)
+    }
+
+    pub async fn get_expiry(&mut self) -> Result<i64, Report> {
+        let ts = if let Some(data) = self.store.get() {
+            data.expires
+        } else {
+            0
+        };
+
+        Ok(ts)
     }
 
     // get contract addr for contract_name, by version or default latest
@@ -211,4 +226,32 @@ impl Factory {
             .await?;
         Ok(entries)
     }
+}
+
+///
+/// Check every nth block with [`AtomicIntervalCounter`] if factory cache needs refresh
+///
+pub async fn refresh_factory_loop(
+    mut block_stream_rx: BlockStreamRx,
+    mut shutdown_rx: ShutdownRx,
+    chain_id: Arc<String>,
+    mut factory_client: Factory,
+) -> Result<(), Report> {
+    let block_counter = AtomicIntervalCounter::new(200);
+    let task_handle: tokio::task::JoinHandle<Result<(), Report>> = tokio::task::spawn(async move {
+        while let Ok(_block) = block_stream_rx.recv().await {
+            block_counter.tick();
+            if block_counter.is_at_interval() && factory_client.load().await? {
+                info!("[{}] Factory Cache Reloaded", chain_id);
+            }
+        }
+        Ok(())
+    });
+
+    tokio::select! {
+        Ok(task) = task_handle => {task?}
+        _ = shutdown_rx.recv() => {}
+    }
+
+    Ok(())
 }

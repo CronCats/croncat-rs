@@ -19,6 +19,7 @@ use crate::{
     logging::info,
     modules::{
         agent::{check_status_loop, Agent},
+        factory::{refresh_factory_loop, Factory},
         manager::Manager,
         polling::poll_stream_blocks,
         tasks,
@@ -37,6 +38,7 @@ pub async fn run(
     chain_id: &String,
     shutdown_tx: &ShutdownTx,
     config: &ChainConfig,
+    factory: Factory,
     agent: Arc<Agent>,
     manager: Arc<Manager>,
     // TODO: Bring back
@@ -115,6 +117,16 @@ pub async fn run(
         }
     });
 
+    // Factory Cache checks
+    let factory_cache_check_shutdown_rx = shutdown_tx.subscribe();
+    let factory_cache_check_block_stream_rx = dispatcher_tx.subscribe();
+    let factory_cache_check_handle = tokio::task::spawn(refresh_factory_loop(
+        factory_cache_check_block_stream_rx,
+        factory_cache_check_shutdown_rx,
+        Arc::new(chain_id.clone()),
+        factory,
+    ));
+
     // Account status checks
     let account_status_check_shutdown_rx = shutdown_tx.subscribe();
     let account_status_check_block_stream_rx = dispatcher_tx.subscribe();
@@ -182,6 +194,7 @@ pub async fn run(
         sequencer_handle,
         dispatcher_handle,
         provider_system_handle,
+        factory_cache_check_handle,
         account_status_check_handle,
         task_runner_handle,
         // queries_runner_handle,
@@ -201,6 +214,7 @@ pub async fn run_retry(
     chain_id: &String,
     shutdown_tx: &ShutdownTx,
     config: &ChainConfig,
+    factory: Factory,
     agent: Arc<Agent>,
     manager: Arc<Manager>,
     with_queries: bool,
@@ -209,7 +223,16 @@ pub async fn run_retry(
     // let retry_strategy = FixedInterval::from_millis(5000).take(1200);
 
     // Retry::spawn(retry_strategy, || async {
-    run(chain_id, shutdown_tx, config, agent, manager, with_queries).await?;
+    run(
+        chain_id,
+        shutdown_tx,
+        config,
+        factory,
+        agent,
+        manager,
+        with_queries,
+    )
+    .await?;
     // .map_err(|err| {
     //     error!("[{}] System crashed: {}", &chain_id, err);
     //     error!("[{}] Retrying...", &chain_id);

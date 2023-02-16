@@ -4,15 +4,13 @@
 
 use croncat::{
     channels::create_shutdown_channel,
-    //    client::{BankQueryClient, QueryBank},
     config::Config,
     errors::{eyre, Report},
     logging::{self, error, info},
     modules::{agent::Agent, factory::Factory, manager::Manager, tasks::Tasks},
     rpc::RpcClientService,
     store::agent::LocalAgentStorage,
-    system,
-    tokio,
+    system, tokio,
 };
 use opts::Opts;
 use std::{process::exit, sync::Arc};
@@ -55,11 +53,6 @@ async fn main() -> Result<(), Report> {
         exit(1);
     }
 
-    // // Say goodbye if no no-frills
-    // if !opts.no_frills {
-    //     println!("\n🐱 Cron Cat says: Goodbye / さようなら\n");
-    // }
-
     Ok(())
 }
 
@@ -94,8 +87,8 @@ async fn run_command(opts: Opts, mut storage: LocalAgentStorage) -> Result<(), R
     let mut factory = Factory::new(chain_config.clone(), factory_client).await?;
 
     // Get that factory info before moving on
-    if !factory.load().await? {
-        return Err(eyre!("Failed to load factory contracts!"));
+    if factory.load().await? {
+        info!("[{}] Factory Cache Reloaded", chain_id);
     }
 
     // Init that agent client lyfe
@@ -249,9 +242,9 @@ async fn run_command(opts: Opts, mut storage: LocalAgentStorage) -> Result<(), R
             }
         }
         opts::Command::Status => {
-            let err_helper = eyre!("Agent not registered, please make sure above account has funds then run the command: `cargo run register`");
             // Print info about the agent
             let account_addr = account_addr.clone();
+            let err_helper = eyre!("Agent not registered, please make sure your account '{}' has funds then run the command: `cargo run register`", account_addr);
 
             // Get the agent status
             let res = agent.get(account_addr.as_str()).await?;
@@ -337,6 +330,7 @@ async fn run_command(opts: Opts, mut storage: LocalAgentStorage) -> Result<(), R
                 &chain_id,
                 &shutdown_tx,
                 chain_config,
+                factory,
                 agent,
                 manager,
                 with_queries,

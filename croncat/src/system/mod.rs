@@ -2,10 +2,10 @@
 //! The croncat system daemon.
 //!
 
-use std::sync::Arc;
 use croncat_pipeline::{
     try_flat_join, Dispatcher, ProviderSystem, ProviderSystemMonitor, Sequencer,
 };
+use std::sync::Arc;
 use tokio::{
     sync::{broadcast, mpsc, Mutex},
     task::JoinHandle,
@@ -209,15 +209,7 @@ pub async fn run_retry(
     // let retry_strategy = FixedInterval::from_millis(5000).take(1200);
 
     // Retry::spawn(retry_strategy, || async {
-    run(
-        chain_id,
-        shutdown_tx,
-        config,
-        agent,
-        manager,
-        with_queries
-    )
-    .await?;
+    run(chain_id, shutdown_tx, config, agent, manager, with_queries).await?;
     // .map_err(|err| {
     //     error!("[{}] System crashed: {}", &chain_id, err);
     //     error!("[{}] Retrying...", &chain_id);

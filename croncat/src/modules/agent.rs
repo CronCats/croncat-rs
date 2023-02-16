@@ -125,7 +125,7 @@ impl Agent {
         let res = self
             .client
             .query(move |querier| {
-                let account_id = account_id.clone();
+                let account_id = <&str>::clone(&account_id);
                 let contract_addr = self.contract_addr.clone();
 
                 async move {
@@ -176,7 +176,7 @@ impl Agent {
         let res: Option<AgentTaskResponse> = self
             .client
             .query(move |querier| {
-                let account_id = account_id.clone();
+                let account_id = <&str>::clone(&account_id);
                 let contract_addr = self.contract_addr.clone();
 
                 async move {
@@ -196,8 +196,7 @@ impl Agent {
 
     pub async fn query_native_balance(&self, account: Option<String>) -> Result<Coin, Report> {
         let account_id: String = account
-            .unwrap_or(self.account_id.clone())
-            .clone()
+            .unwrap_or_else(|| self.account_id.clone())
             .to_string();
         self.client.query_balance(account_id.as_str()).await
     }

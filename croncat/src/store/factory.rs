@@ -1,5 +1,5 @@
-use color_eyre::{eyre::eyre, Report};
 use chrono::Utc;
+use color_eyre::{eyre::eyre, Report};
 use croncat_sdk_factory::msg::ContractMetadataInfo;
 use serde::{Deserialize, Serialize};
 use std::{collections::HashMap, fs, path::PathBuf};
@@ -68,7 +68,10 @@ impl LocalCacheStorage {
             fs::create_dir_all(p)?
         };
 
-        let r = fs::write(data_file, serde_json::to_string_pretty(&self.data.clone().unwrap())?);
+        let r = fs::write(
+            data_file,
+            serde_json::to_string_pretty(&self.data.clone().unwrap())?,
+        );
 
         if r.is_ok() {
             Ok(())
@@ -85,7 +88,7 @@ impl LocalCacheStorage {
     ) -> Result<Option<LocalCacheStorageEntry>, Report> {
         // Expires after 1 hour
         let dt = Utc::now();
-        let expires = dt.timestamp().saturating_add(1 * 60 * 60);
+        let expires = dt.timestamp().saturating_add(60 * 60);
 
         let new_data = if let Some(data) = self.data.clone() {
             LocalCacheStorageEntry {
@@ -96,8 +99,8 @@ impl LocalCacheStorage {
         } else {
             LocalCacheStorageEntry {
                 expires,
-                latest: latest.unwrap_or(HashMap::new()),
-                versions: versions.unwrap_or(HashMap::new()),
+                latest: latest.unwrap_or_default(),
+                versions: versions.unwrap_or_default(),
             }
         };
         self.data = Some(new_data.clone());

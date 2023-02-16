@@ -47,7 +47,7 @@ impl Querier {
         S: Serialize,
         T: DeserializeOwned,
     {
-        let a = address.unwrap_or(self.contract_addr.clone());
+        let a = address.unwrap_or_else(|| self.contract_addr.clone());
         timeout(
             Duration::from_secs_f64(self.rpc_client.timeout_secs),
             self.rpc_client.wasm_query(msg, Some(a)),

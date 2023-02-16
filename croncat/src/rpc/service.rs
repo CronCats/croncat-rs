@@ -3,21 +3,21 @@
 //! This uses multiple approaches to ensure that the service is always available.
 //!
 
-use std::collections::HashMap;
-use std::str::FromStr;
-use std::sync::Arc;
-use std::time::Duration;
+use crate::config::{ChainConfig, ChainDataSource};
+use crate::errors::{eyre, Report};
+use crate::logging::info;
 use cosm_orc::orchestrator::{Address, ChainTxResponse};
 use cosm_tome::chain::coin::Coin;
 use cosmrs::bip32;
 use cosmrs::crypto::secp256k1::SigningKey;
 use futures_util::Future;
 use rand::seq::SliceRandom;
+use std::collections::HashMap;
+use std::str::FromStr;
+use std::sync::Arc;
+use std::time::Duration;
 use tokio::sync::Mutex;
 use tracing::debug;
-use crate::config::{ChainConfig, ChainDataSource};
-use crate::errors::{eyre, Report};
-use crate::logging::info;
 
 use super::Querier;
 use super::Signer;
@@ -55,7 +55,8 @@ impl RpcClientService {
         key: bip32::XPrv,
         contract_addr: Option<Address>,
     ) -> Self {
-        let contract_addr = contract_addr.unwrap_or(Address::from_str(&chain_config.clone().factory.as_str()).unwrap());
+        let contract_addr = contract_addr
+            .unwrap_or_else(|| Address::from_str(chain_config.clone().factory.as_str()).unwrap());
         let data_sources =
             Self::pick_best_sources(&chain_config, &chain_config.data_sources()).await;
 
@@ -124,10 +125,10 @@ impl RpcClientService {
 
         // Log how many available sources we have
         let list: Vec<String> = data_sources
-                .iter()
-                .filter(|(_, (_, disqualified))| !disqualified)
-                .map(|(i, _)| { i.to_owned() })
-                .collect();
+            .iter()
+            .filter(|(_, (_, disqualified))| !disqualified)
+            .map(|(i, _)| i.to_owned())
+            .collect();
         let plural = if list.len() == 1 { "source" } else { "sources" };
         info!(
             "[{}] {} {} available! {:?}",
@@ -300,10 +301,10 @@ impl RpcClientService {
     ) -> Result<ChainTxResponse, Report> {
         let response = self
             .execute(|signer| {
-                let to = to.clone();
-                let from = from.clone();
-                let denom = denom.clone();
-                let amount = amount.clone();
+                let to = to;
+                let from = from;
+                let denom = denom;
+                let amount = amount;
                 async move { signer.rpc_client.send_funds(to, from, denom, amount).await }
             })
             .await?;

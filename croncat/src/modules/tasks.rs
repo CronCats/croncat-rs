@@ -43,8 +43,8 @@ impl Tasks {
             .client
             .query(move |querier| {
                 let contract_addr = self.contract_addr.clone();
-                let from_index = from_index.clone();
-                let limit = limit.clone();
+                let from_index = from_index;
+                let limit = limit;
                 async move {
                     querier
                         .query_croncat(
@@ -69,9 +69,9 @@ impl Tasks {
             .client
             .query(move |querier| {
                 let contract_addr = self.contract_addr.clone();
-                let start = start.clone();
-                let from_index = from_index.clone();
-                let limit = limit.clone();
+                let start = start;
+                let from_index = from_index;
+                let limit = limit;
                 async move {
                     querier
                         .query_croncat(
@@ -156,7 +156,13 @@ pub async fn tasks_loop(
                     .map_err(|err| eyre!("Failed to get agent tasks: {}", err))?;
 
                 if let Some(tasks) = tasks {
-                    info!("[{}] Block {} :: Block Tasks: {}, Cron Tasks: {}", chain_id, block.header().height, tasks.stats.num_block_tasks, tasks.stats.num_cron_tasks);
+                    info!(
+                        "[{}] Block {} :: Block Tasks: {}, Cron Tasks: {}",
+                        chain_id,
+                        block.header().height,
+                        tasks.stats.num_block_tasks,
+                        tasks.stats.num_cron_tasks
+                    );
 
                     // TODO: Change this to batch, if possible!
                     for _ in 0..sum_num_tasks(&tasks) {
@@ -173,7 +179,11 @@ pub async fn tasks_loop(
                         }
                     }
                 } else {
-                    info!("[{}] No tasks for block (height: {})", chain_id, block.header().height);
+                    info!(
+                        "[{}] No tasks for block (height: {})",
+                        chain_id,
+                        block.header().height
+                    );
                 }
 
                 if !tasks_failed.load(SeqCst) {

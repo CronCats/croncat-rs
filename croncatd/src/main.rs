@@ -46,7 +46,7 @@ async fn main() -> Result<(), Report> {
     // Run a command and handle errors
     if let Err(err) = run_command(opts.clone(), storage).await {
         error!("{}", err);
-        
+
         if opts.debug {
             error!("Command failed: {}", opts.cmd);
             return Err(err);
@@ -81,7 +81,7 @@ async fn run_command(opts: Opts, mut storage: LocalAgentStorage) -> Result<(), R
     let chain_denom = if let Some(token) = fee_token {
         token.denom
     } else {
-        chain_config.clone().denom.unwrap_or("".to_string())
+        chain_config.clone().denom.unwrap_or_default()
     };
 
     // Get the key and create a signer
@@ -150,11 +150,12 @@ async fn run_command(opts: Opts, mut storage: LocalAgentStorage) -> Result<(), R
                     let account_addr = account_addr.clone();
                     info!("Agent {} registered successfully! 😻", account_addr);
 
-                    let status = result.find_event_tags("wasm".to_string(), "agent_status".to_string());
+                    let status =
+                        result.find_event_tags("wasm".to_string(), "agent_status".to_string());
                     for s in status {
                         info!("Agent is {}", s.value);
                         info!("Now run the command: `cargo run go`");
-                        if s.value != "active".to_string() {
+                        if s.value != *"active" {
                             info!("Make sure to keep your agent running, it will automatically become active when enough tasks exist.");
                         }
                     }
@@ -206,7 +207,9 @@ async fn run_command(opts: Opts, mut storage: LocalAgentStorage) -> Result<(), R
                     }
                 }
                 Err(err) if err.to_string().contains("Agent not registered") => {
-                    Err(eyre!("Agent doesnt exist, must first register and do tasks."))?;
+                    Err(eyre!(
+                        "Agent doesnt exist, must first register and do tasks."
+                    ))?;
                 }
                 Err(err) => Err(eyre!("Failed to unregister agent: {}", err))?,
             }
@@ -229,7 +232,9 @@ async fn run_command(opts: Opts, mut storage: LocalAgentStorage) -> Result<(), R
                     }
                 }
                 Err(err) if err.to_string().contains("Agent not registered") => {
-                    Err(eyre!("Agent doesnt exist, must first register and do tasks."))?;
+                    Err(eyre!(
+                        "Agent doesnt exist, must first register and do tasks."
+                    ))?;
                 }
                 Err(err) => Err(eyre!("Failed to withdraw reward: {}", err))?,
             }
@@ -253,8 +258,10 @@ async fn run_command(opts: Opts, mut storage: LocalAgentStorage) -> Result<(), R
 
             if let Some(result) = res {
                 if let Some(info) = result.agent {
-                    let c = agent.query_native_balance(Some(account_addr.clone())).await?;
-                    let b = format!("{:?} {}", c.amount, c.denom.to_string());
+                    let c = agent
+                        .query_native_balance(Some(account_addr.clone()))
+                        .await?;
+                    let b = format!("{:?} {}", c.amount, c.denom);
                     info!("\n\nStatus: {:?}\nAddress: {}\nReward Address: {}\nEarned Rewards: {:?} {}\nCurrent Balance: {}\n\n", info.status, account_addr, info.payable_account_id.to_string(), u128::from(info.balance), chain_denom, b);
                     return Ok(());
                 } else {
@@ -283,7 +290,10 @@ async fn run_command(opts: Opts, mut storage: LocalAgentStorage) -> Result<(), R
             let result = agent.get_tasks(account_addr.as_str()).await?;
 
             if let Some(res) = result {
-                info!("Block Tasks: {}, Cron Tasks: {}", res.stats.num_block_tasks, res.stats.num_cron_tasks);
+                info!(
+                    "Block Tasks: {}, Cron Tasks: {}",
+                    res.stats.num_block_tasks, res.stats.num_cron_tasks
+                );
                 return Ok(());
             } else {
                 Err(eyre!("Failed to get agent tasks"))?
@@ -329,7 +339,7 @@ async fn run_command(opts: Opts, mut storage: LocalAgentStorage) -> Result<(), R
                 chain_config,
                 agent,
                 manager,
-                with_queries
+                with_queries,
             )
             .await?
         }
@@ -339,18 +349,13 @@ async fn run_command(opts: Opts, mut storage: LocalAgentStorage) -> Result<(), R
             }
         }
         opts::Command::SendFunds { to, amount, denom } => {
-            let amount = u128::from_str_radix(&amount, 10)?;
+            let amount = amount.parse::<u128>()?;
             let account_addr = account_addr.clone();
             let d = denom.unwrap_or(chain_denom);
 
             // Send funds to the given address.
             let res = agent
-                .send_funds(
-                    &account_addr,
-                    to.as_str(),
-                    amount,
-                    d.as_str(),
-                )
+                .send_funds(&account_addr, to.as_str(), amount, d.as_str())
                 .await;
 
             // Handle the result of the transaction

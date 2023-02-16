@@ -91,7 +91,7 @@ impl RpcClient {
     {
         // Query the chain -- uses default contract_addr if not specified (factory address)
         // TODO: Assess support for batch settings
-        let a = address.unwrap_or(self.contract_addr.clone());
+        let a = address.unwrap_or_else(|| self.contract_addr.clone());
         let response = self.client.client.wasm_query(a, &msg).await?;
 
         // Deserialize the response
@@ -126,7 +126,7 @@ impl RpcClient {
 
         // Execute a message on the chain -- uses default contract_addr if not specified (factory address)
         // TODO: Assess support for batch settings
-        let a = address.unwrap_or(self.contract_addr.clone());
+        let a = address.unwrap_or_else(|| self.contract_addr.clone());
         let response = self
             .client
             .client

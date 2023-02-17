@@ -166,7 +166,6 @@ pub async fn run(
                 evented_task_runner_shutdown_rx,
                 block_status_evented_tasks,
                 Arc::new(chain_id.clone()),
-                agent.clone(),
                 manager.clone(),
                 tasks.clone(),
             ))
@@ -176,6 +175,17 @@ pub async fn run(
     } else {
         tokio::task::spawn(async { Ok(()) })
     };
+
+    // TODO: Bring back!
+    // // Tasks Cache checks
+    // let tasks_cache_check_shutdown_rx = shutdown_tx.subscribe();
+    // let tasks_cache_check_block_stream_rx = dispatcher_tx.subscribe();
+    // let tasks_cache_check_handle = tokio::task::spawn(refresh_tasks_cache_loop(
+    //     tasks_cache_check_block_stream_rx,
+    //     tasks_cache_check_shutdown_rx,
+    //     Arc::new(chain_id.clone()),
+    //     tasks,
+    // ));
 
     // Ctrl-C handler
     let ctrl_c_shutdown_tx = shutdown_tx.clone();
@@ -207,6 +217,7 @@ pub async fn run(
         account_status_check_handle,
         task_runner_handle,
         evented_task_runner_handle,
+        // tasks_cache_check_handle,
     );
 
     // If any of the tasks failed, we need to propagate the error.

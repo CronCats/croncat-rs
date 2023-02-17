@@ -8,7 +8,7 @@ use std::{
     },
 };
 use tendermint::Time;
-// use cosmos_sdk_proto::tendermint::google::protobuf::Timestamp;
+use crate::utils::AtomicIntervalCounter;
 use croncat_sdk_agents::types::AgentStatus;
 use croncat_sdk_tasks::msg::TasksQueryMsg;
 use croncat_sdk_tasks::types::{CroncatQuery, TaskInfo, TaskResponse};
@@ -101,6 +101,19 @@ impl Tasks {
 
     // gets ranged tasks, occurring for specified range
     pub async fn ranged(&self, index: u64) -> Result<Option<Vec<&TaskInfo>>, Report> {
+        // TODO: Filter within boundary
+        // let in_boundary = match task.boundary {
+        //     Some(Boundary::Height { start, end }) => {
+        //         let height = block.header().height.value();
+        //         start.map_or(true, |s| s.u64() >= height)
+        //             && end.map_or(true, |e| e.u64() <= height)
+        //     }
+        //     Some(Boundary::Time { start, end }) => {
+        //         start.map_or(true, |s| s.nanos() >= time_nanos)
+        //             && end.map_or(true, |e| e.nanos() >= time_nanos)
+        //     }
+        //     None => true,
+        // };
         Ok(self.store.get_events_by_index(Some(index)))
     }
 
@@ -284,6 +297,35 @@ impl Tasks {
 }
 
 ///
+/// Check every nth block with [`AtomicIntervalCounter`] if tasks cache needs refresh
+///
+pub async fn refresh_tasks_cache_loop(
+    mut block_stream_rx: BlockStreamRx,
+    mut shutdown_rx: ShutdownRx,
+    chain_id: Arc<String>,
+    mut tasks_client: Tasks,
+) -> Result<(), Report> {
+    // TODO: Figure out best interval here!
+    let block_counter = AtomicIntervalCounter::new(50);
+    let task_handle: tokio::task::JoinHandle<Result<(), Report>> = tokio::task::spawn(async move {
+        while let Ok(_block) = block_stream_rx.recv().await {
+            block_counter.tick();
+            if block_counter.is_at_interval() && tasks_client.load().await? {
+                info!("[{}] Tasks Cache Reloaded", chain_id);
+            }
+        }
+        Ok(())
+    });
+
+    tokio::select! {
+        Ok(task) = task_handle => {task?}
+        _ = shutdown_rx.recv() => {}
+    }
+
+    Ok(())
+}
+
+///
 /// Do work on blocks that are sent from the ws stream.
 ///
 pub async fn scheduled_tasks_loop(
@@ -384,7 +426,6 @@ pub async fn evented_tasks_loop(
     mut shutdown_rx: ShutdownRx,
     block_status: Arc<Mutex<AgentStatus>>,
     chain_id: Arc<String>,
-    _agent_client: Arc<Agent>,
     manager_client: Arc<Manager>,
     tasks_client: Arc<Tasks>,
 ) -> Result<(), Report> {

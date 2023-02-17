@@ -105,6 +105,7 @@ cargo run go --agent mainnet --chain-id uni-5
         gas_adjustment: 1.5
         rpc_timeout: 4.0
         denom: "ujunox"
+        include_evented_tasks: false
         custom_sources:
             "Cats R US 🙀":
                 rpc: http://192.168.1.13

@@ -1,6 +1,6 @@
 use chrono::Utc;
 use color_eyre::{eyre::eyre, Report};
-use croncat_sdk_tasks::types::Task;
+use croncat_sdk_tasks::types::TaskInfo;
 use serde::{Deserialize, Serialize};
 use std::{
   collections::{HashMap, BTreeMap},
@@ -18,7 +18,7 @@ const LOCAL_STORAGE_FILENAME: &str = "events.json";
 pub struct LocalEventsStorageEntry {
     pub expires: i64,
     // is sorted for ranged execution
-    pub events: BTreeMap<u64, HashMap<String, Task>>,
+    pub events: BTreeMap<u64, HashMap<String, TaskInfo>>,
 }
 
 /// Store key pairs on disk and allow access to the data.
@@ -78,7 +78,7 @@ impl LocalEventStorage {
     pub fn insert(
         &mut self,
         index: u64,
-        events: Vec<(String, Task)>,
+        events: Vec<(String, TaskInfo)>,
     ) -> Result<(), Report> {
         // Expires after 1 hour, updates any time we get new data
         let dt = Utc::now();
@@ -92,8 +92,8 @@ impl LocalEventStorage {
             data.events.insert(index, event_range);
             self.data = Some(data);
         } else {
-            let mut e: BTreeMap<u64, HashMap<String, Task>> = BTreeMap::new();
-            let mut items: HashMap<String, Task> = HashMap::new();
+            let mut e: BTreeMap<u64, HashMap<String, TaskInfo>> = BTreeMap::new();
+            let mut items: HashMap<String, TaskInfo> = HashMap::new();
             for (k, v) in events {
                 items.insert(k, v);
             }
@@ -113,7 +113,7 @@ impl LocalEventStorage {
         // Expires immediately, so we know to grab moar datazzzz
         let dt = Utc::now();
         let expires = dt.timestamp();
-        let events: BTreeMap<u64, HashMap<String, Task>> = BTreeMap::new();
+        let events: BTreeMap<u64, HashMap<String, TaskInfo>> = BTreeMap::new();
         self.data = Some(LocalEventsStorageEntry {
             expires,
             events,
@@ -148,7 +148,7 @@ impl LocalEventStorage {
     }
 
     /// Retrieve ranged events
-    pub fn get_events_by_index(&self, index: Option<u64>) -> Option<Vec<&Task>> {
+    pub fn get_events_by_index(&self, index: Option<u64>) -> Option<Vec<&TaskInfo>> {
         if !self.is_expired() && self.has_events() {
             if let Some(data) = self.data.as_ref() {
                 let idx = index.unwrap_or_default();

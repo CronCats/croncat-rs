@@ -1,6 +1,6 @@
 use std::collections::HashMap;
 use std::str::FromStr;
-
+use cosmwasm_std::Binary;
 use color_eyre::{eyre::eyre, Report};
 use cosm_orc::config::cfg::Config as CosmOrcConfig;
 use cosm_orc::config::ChainConfig as CosmOrcChainConfig;
@@ -19,6 +19,11 @@ use crate::utils::DERIVATION_PATH;
 
 /// The default RPC call timeout.
 pub const DEFAULT_TIMEOUT: f64 = 20.0;
+
+pub struct BatchMsg {
+    pub msg: Binary,
+    pub contract_addr: Address,
+}
 
 /// An RPC client for querying the croncat contract.
 #[derive(Clone)]
@@ -136,6 +141,41 @@ impl RpcClient {
                     msg: &msg,
                     funds: vec![],
                 },
+                self.key.as_ref().unwrap(),
+                &TxOptions::default(),
+            )
+            .await?;
+
+        // return the response data
+        Ok(response.res)
+    }
+
+    /// Execute batch via RPC.
+    pub async fn wasm_execute_batch(
+        &self,
+        msgs: Vec<BatchMsg>,
+    ) -> Result<ChainTxResponse, Report> {
+        if self.key.is_none() {
+            return Err(eyre!("No signing key set"));
+        }
+
+        let mut reqs = Vec::with_capacity(msgs.len());
+
+        // format for reqs
+        for m in msgs {
+            reqs.push(ExecRequest {
+                address: m.contract_addr,
+                msg: m.msg,
+                funds: vec![],
+            })
+        }
+
+        // Execute a message on the chain -- uses default contract_addr if not specified (factory address)
+        let response = self
+            .client
+            .client
+            .wasm_execute_batch(
+                reqs,
                 self.key.as_ref().unwrap(),
                 &TxOptions::default(),
             )

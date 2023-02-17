@@ -12,8 +12,7 @@ use cosmrs::AccountId;
 use serde::Serialize;
 use std::time::Duration;
 use tokio::time::timeout;
-
-use super::RpcClient;
+use super::client::{BatchMsg, RpcClient};
 
 #[derive(Clone, Debug)]
 pub struct Signer {
@@ -66,6 +65,26 @@ impl Signer {
         let res = timeout(
             Duration::from_secs_f64(self.rpc_client.timeout_secs),
             self.rpc_client.wasm_execute(msg, Some(a)),
+        )
+        .await
+        .map_err(|err| {
+            eyre!(
+                "Timeout ({}s) while executing wasm: {}",
+                self.rpc_client.timeout_secs,
+                err
+            )
+        })??;
+
+        Ok(res)
+    }
+
+    pub async fn execute_batch(
+        &self,
+        msgs: Vec<BatchMsg>,
+    ) -> Result<ChainTxResponse, Report> {
+        let res = timeout(
+            Duration::from_secs_f64(self.rpc_client.timeout_secs),
+            self.rpc_client.wasm_execute_batch(msgs),
         )
         .await
         .map_err(|err| {

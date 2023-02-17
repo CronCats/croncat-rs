@@ -21,8 +21,8 @@ use crate::{
         agent::{check_status_loop, Agent},
         factory::{refresh_factory_loop, Factory},
         manager::Manager,
+        tasks::{Tasks, scheduled_tasks_loop, evented_tasks_loop},
         polling::poll_stream_blocks,
-        tasks,
     },
     tokio,
 };
@@ -41,8 +41,7 @@ pub async fn run(
     factory: Factory,
     agent: Arc<Agent>,
     manager: Arc<Manager>,
-    // TODO: Bring back
-    _with_queries: bool,
+    tasks: Arc<Tasks>,
 ) -> Result<(), Report> {
     // Get the status of the agent
     let account_id = agent.account_id();
@@ -142,31 +141,41 @@ pub async fn run(
         manager.clone(),
     ));
 
-    // Process blocks coming in from the blockchain
+    // Process scheduled tasks based on block stream
     let task_runner_shutdown_rx = shutdown_tx.subscribe();
     let task_runner_block_stream_rx = dispatcher_tx.subscribe();
     let block_status_tasks = block_status.clone();
-    let task_runner_handle = tokio::task::spawn(tasks::tasks_loop(
+    let task_runner_handle = tokio::task::spawn(scheduled_tasks_loop(
         task_runner_block_stream_rx,
         task_runner_shutdown_rx,
         block_status_tasks,
         Arc::new(chain_id.clone()),
         agent.clone(),
         manager.clone(),
+        tasks.clone(),
     ));
 
-    // TODO: Bring back!!!!!!!!!!!!!!!!
-    // // Check queries if enabled
-    // let queries_runner_handle = if with_queries {
-    //     tokio::task::spawn(tasks::queries_loop(
-    //         dispatcher_tx.subscribe(),
-    //         shutdown_tx.subscribe(),
-    //         client,
-    //         block_status,
-    //     ))
-    // } else {
-    //     tokio::task::spawn(async { Ok(()) })
-    // };
+    // Process evented tasks, if they're ready
+    let evented_task_runner_shutdown_rx = shutdown_tx.subscribe();
+    let evented_task_runner_block_stream_rx = dispatcher_tx.subscribe();
+    let block_status_evented_tasks = block_status.clone();
+    let evented_task_runner_handle = if let Some(b) = config.include_evented_tasks {
+        if b {
+            tokio::task::spawn(evented_tasks_loop(
+                evented_task_runner_block_stream_rx,
+                evented_task_runner_shutdown_rx,
+                block_status_evented_tasks,
+                Arc::new(chain_id.clone()),
+                agent.clone(),
+                manager.clone(),
+                tasks.clone(),
+            ))
+        } else {
+            tokio::task::spawn(async { Ok(()) })
+        }
+    } else {
+        tokio::task::spawn(async { Ok(()) })
+    };
 
     // Ctrl-C handler
     let ctrl_c_shutdown_tx = shutdown_tx.clone();
@@ -197,7 +206,7 @@ pub async fn run(
         factory_cache_check_handle,
         account_status_check_handle,
         task_runner_handle,
-        // queries_runner_handle,
+        evented_task_runner_handle,
     );
 
     // If any of the tasks failed, we need to propagate the error.
@@ -217,7 +226,7 @@ pub async fn run_retry(
     factory: Factory,
     agent: Arc<Agent>,
     manager: Arc<Manager>,
-    with_queries: bool,
+    tasks: Arc<Tasks>,
 ) -> Result<(), Report> {
     // TODO: Rethink this retry logic
     // let retry_strategy = FixedInterval::from_millis(5000).take(1200);
@@ -230,7 +239,7 @@ pub async fn run_retry(
         factory,
         agent,
         manager,
-        with_queries,
+        tasks,
     )
     .await?;
     // .map_err(|err| {

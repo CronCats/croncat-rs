@@ -124,13 +124,14 @@ async fn run_command(opts: Opts, mut storage: LocalAgentStorage) -> Result<(), R
 
     // Init that tasks client lyfe
     let tasks_contract_addr = factory.get_contract_addr("tasks".to_string()).await?;
+    let generic_querier_addr = factory.get_contract_addr("mod_generic".to_string()).await?;
     let tasks_client = RpcClientService::new(
         chain_config.clone(),
         key.clone(),
         Some(tasks_contract_addr.clone()),
     )
     .await;
-    let tasks = Arc::new(Tasks::new(tasks_contract_addr.clone(), tasks_client).await?);
+    let tasks = Arc::new(Tasks::new(tasks_contract_addr.clone(), tasks_client, generic_querier_addr).await?);
 
     match opts.cmd {
         opts::Command::Register { payable_account_id } => {
@@ -320,8 +321,7 @@ async fn run_command(opts: Opts, mut storage: LocalAgentStorage) -> Result<(), R
             }
         }
         opts::Command::GetAgentKeys { name } => storage.display_account(&name),
-        // TODO: Move "with_queries" to just be config.yaml
-        opts::Command::Go { with_queries } => {
+        opts::Command::Go {} => {
             // Create the global shutdown channel
             let (shutdown_tx, _shutdown_rx) = create_shutdown_channel();
 
@@ -333,7 +333,7 @@ async fn run_command(opts: Opts, mut storage: LocalAgentStorage) -> Result<(), R
                 factory,
                 agent,
                 manager,
-                with_queries,
+                tasks,
             )
             .await?
         }

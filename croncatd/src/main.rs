@@ -131,7 +131,14 @@ async fn run_command(opts: Opts, mut storage: LocalAgentStorage) -> Result<(), R
         Some(tasks_contract_addr.clone()),
     )
     .await;
-    let tasks = Arc::new(Tasks::new(tasks_contract_addr.clone(), tasks_client, generic_querier_addr).await?);
+    let tasks = Arc::new(
+        Tasks::new(
+            tasks_contract_addr.clone(),
+            tasks_client,
+            generic_querier_addr,
+        )
+        .await?,
+    );
 
     match opts.cmd {
         opts::Command::Register { payable_account_id } => {

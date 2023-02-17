@@ -2,6 +2,7 @@
 //! RPC client service that can be used to execute and query the croncat on chain.
 //!
 
+use super::client::{BatchMsg, RpcClient};
 use crate::config::ChainConfig;
 use crate::errors::{eyre, Report};
 use crate::utils::normalize_rpc_url;
@@ -12,7 +13,6 @@ use cosmrs::AccountId;
 use serde::Serialize;
 use std::time::Duration;
 use tokio::time::timeout;
-use super::client::{BatchMsg, RpcClient};
 
 #[derive(Clone, Debug)]
 pub struct Signer {
@@ -78,10 +78,7 @@ impl Signer {
         Ok(res)
     }
 
-    pub async fn execute_batch(
-        &self,
-        msgs: Vec<BatchMsg>,
-    ) -> Result<ChainTxResponse, Report> {
+    pub async fn execute_batch(&self, msgs: Vec<BatchMsg>) -> Result<ChainTxResponse, Report> {
         let res = timeout(
             Duration::from_secs_f64(self.rpc_client.timeout_secs),
             self.rpc_client.wasm_execute_batch(msgs),

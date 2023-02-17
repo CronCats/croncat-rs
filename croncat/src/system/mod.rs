@@ -21,8 +21,8 @@ use crate::{
         agent::{check_status_loop, Agent},
         factory::{refresh_factory_loop, Factory},
         manager::Manager,
-        tasks::{Tasks, scheduled_tasks_loop, evented_tasks_loop},
         polling::poll_stream_blocks,
+        tasks::{evented_tasks_loop, scheduled_tasks_loop, Tasks},
     },
     tokio,
 };

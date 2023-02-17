@@ -3,9 +3,9 @@ use color_eyre::{eyre::eyre, Report};
 use croncat_sdk_tasks::types::TaskInfo;
 use serde::{Deserialize, Serialize};
 use std::{
-  collections::{HashMap, BTreeMap},
-  fs,
-  path::PathBuf
+    collections::{BTreeMap, HashMap},
+    fs,
+    path::PathBuf,
 };
 
 use super::get_storage_path;
@@ -13,7 +13,7 @@ use super::get_storage_path;
 /// Where our [`LocalEventStorage`] will be stored.
 const LOCAL_STORAGE_FILENAME: &str = "events.json";
 
-// 
+//
 #[derive(Serialize, Deserialize, Clone)]
 pub struct LocalEventsStorageEntry {
     pub expires: i64,
@@ -75,17 +75,17 @@ impl LocalEventStorage {
     }
 
     /// Insert a items into the data set.
-    pub fn insert(
-        &mut self,
-        index: u64,
-        events: Vec<(String, TaskInfo)>,
-    ) -> Result<(), Report> {
+    pub fn insert(&mut self, index: u64, events: Vec<(String, TaskInfo)>) -> Result<(), Report> {
         // Expires after 1 hour, updates any time we get new data
         let dt = Utc::now();
         let expires = dt.timestamp().saturating_add(60 * 60);
 
         if let Some(mut data) = self.data.clone() {
-            let mut event_range = data.events.get(&index).unwrap_or(&HashMap::new()).to_owned();
+            let mut event_range = data
+                .events
+                .get(&index)
+                .unwrap_or(&HashMap::new())
+                .to_owned();
             for (k, v) in events {
                 event_range.insert(k, v);
             }
@@ -98,10 +98,7 @@ impl LocalEventStorage {
                 items.insert(k, v);
             }
             e.insert(index, items);
-            self.data = Some(LocalEventsStorageEntry {
-                expires,
-                events: e,
-            });
+            self.data = Some(LocalEventsStorageEntry { expires, events: e });
         }
 
         self.write_to_disk()?;
@@ -114,19 +111,13 @@ impl LocalEventStorage {
         let dt = Utc::now();
         let expires = dt.timestamp();
         let events: BTreeMap<u64, HashMap<String, TaskInfo>> = BTreeMap::new();
-        self.data = Some(LocalEventsStorageEntry {
-            expires,
-            events,
-        });
+        self.data = Some(LocalEventsStorageEntry { expires, events });
         self.write_to_disk()?;
         Ok(())
     }
 
     /// Clear all data less than or equal to an index, but NOT 0th index
-    pub fn clear_lte_index(
-        &mut self,
-        index: &u64,
-    ) -> Result<(), Report> {
+    pub fn clear_lte_index(&mut self, index: &u64) -> Result<(), Report> {
         if let Some(mut data) = self.data.clone() {
             // NOTE: use of unstable library feature 'btree_drain_filter' -- see issue #70530 <https://github.com/rust-lang/rust/issues/70530> for more information
             // data.events.drain_filter(|k, _v| k <= index && k != &0).collect();
@@ -167,9 +158,9 @@ impl LocalEventStorage {
         if let Some(data) = self.data.clone() {
             if !data.events.is_empty() {
                 let base_total: u64 = if let Some(hm_tasks) = data.events.get(&0) {
-                  hm_tasks.len() as u64
+                    hm_tasks.len() as u64
                 } else {
-                  0
+                    0
                 };
                 let mut range_total: u64 = 0;
                 for (_k, hm_tasks) in data.events.range(1..) {
@@ -180,7 +171,7 @@ impl LocalEventStorage {
                 (0, 0)
             }
         } else {
-          (0, 0)
+            (0, 0)
         }
     }
 

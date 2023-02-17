@@ -1,6 +1,3 @@
-use std::collections::HashMap;
-use std::str::FromStr;
-use cosmwasm_std::Binary;
 use color_eyre::{eyre::eyre, Report};
 use cosm_orc::config::cfg::Config as CosmOrcConfig;
 use cosm_orc::config::ChainConfig as CosmOrcChainConfig;
@@ -11,8 +8,11 @@ use cosm_orc::orchestrator::{ChainTxResponse, Coin, Key};
 use cosm_tome::chain::request::TxOptions;
 use cosm_tome::modules::bank::model::SendRequest;
 use cosm_tome::modules::cosmwasm::model::ExecRequest;
+use cosmwasm_std::Binary;
 use serde::de::DeserializeOwned;
 use serde::Serialize;
+use std::collections::HashMap;
+use std::str::FromStr;
 
 use crate::config::ChainConfig;
 use crate::utils::DERIVATION_PATH;
@@ -151,10 +151,7 @@ impl RpcClient {
     }
 
     /// Execute batch via RPC.
-    pub async fn wasm_execute_batch(
-        &self,
-        msgs: Vec<BatchMsg>,
-    ) -> Result<ChainTxResponse, Report> {
+    pub async fn wasm_execute_batch(&self, msgs: Vec<BatchMsg>) -> Result<ChainTxResponse, Report> {
         if self.key.is_none() {
             return Err(eyre!("No signing key set"));
         }
@@ -174,11 +171,7 @@ impl RpcClient {
         let response = self
             .client
             .client
-            .wasm_execute_batch(
-                reqs,
-                self.key.as_ref().unwrap(),
-                &TxOptions::default(),
-            )
+            .wasm_execute_batch(reqs, self.key.as_ref().unwrap(), &TxOptions::default())
             .await?;
 
         // return the response data

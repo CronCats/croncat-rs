@@ -1,19 +1,23 @@
 use cosm_orc::orchestrator::Address;
 use cosmwasm_std::from_binary;
-use std::{sync::{
-    atomic::{AtomicBool, Ordering::SeqCst},
-    Arc,
-}, str::FromStr};
+use std::{
+    str::FromStr,
+    sync::{
+        atomic::{AtomicBool, Ordering::SeqCst},
+        Arc,
+    },
+};
+use tendermint::Time;
 // use cosmos_sdk_proto::tendermint::google::protobuf::Timestamp;
 use croncat_sdk_agents::types::AgentStatus;
 use croncat_sdk_tasks::msg::TasksQueryMsg;
-use croncat_sdk_tasks::types::{TaskInfo, TaskResponse, CroncatQuery};
+use croncat_sdk_tasks::types::{CroncatQuery, TaskInfo, TaskResponse};
 use mod_sdk::types::QueryResponse;
 // use croncat_sdk_tasks::types::Boundary;
 use crate::{
     channels::{BlockStreamRx, ShutdownRx},
     errors::{eyre, Report},
-    logging::{info, debug},
+    logging::{debug, info},
     monitor::ping_uptime_monitor,
     rpc::RpcClientService,
     store::tasks::LocalEventStorage,
@@ -57,7 +61,11 @@ pub struct Tasks {
 // }
 
 impl Tasks {
-    pub async fn new(contract_addr: Address, client: RpcClientService, generic_querier_addr: Address) -> Result<Self, Report> {
+    pub async fn new(
+        contract_addr: Address,
+        client: RpcClientService,
+        generic_querier_addr: Address,
+    ) -> Result<Self, Report> {
         Ok(Self {
             client,
             contract_addr,
@@ -84,6 +92,16 @@ impl Tasks {
     // stats helper
     pub async fn get_stats(&self) -> Result<(u64, u64), Report> {
         Ok(self.store.get_stats())
+    }
+
+    // only gets unbounded tasks
+    pub async fn unbounded(&self) -> Result<Option<Vec<&TaskInfo>>, Report> {
+        Ok(self.store.get_events_by_index(None))
+    }
+
+    // gets ranged tasks, occurring for specified range
+    pub async fn ranged(&self, index: u64) -> Result<Option<Vec<&TaskInfo>>, Report> {
+        Ok(self.store.get_events_by_index(Some(index)))
     }
 
     pub async fn get_all(
@@ -126,10 +144,7 @@ impl Tasks {
                 async move {
                     querier
                         .query_croncat(
-                            TasksQueryMsg::EventedIds {
-                                from_index,
-                                limit,
-                            },
+                            TasksQueryMsg::EventedIds { from_index, limit },
                             Some(contract_addr),
                         )
                         .await
@@ -177,9 +192,7 @@ impl Tasks {
 
         // Step 1: Get all the ids
         loop {
-            let current_iteration = self
-                .get_evented_ids(Some(from_index), Some(limit))
-                .await?;
+            let current_iteration = self.get_evented_ids(Some(from_index), Some(limit)).await?;
             let last_iteration = current_iteration.len() < limit as usize;
             evented_ids.extend(current_iteration);
             if last_iteration {
@@ -198,7 +211,12 @@ impl Tasks {
                     .get_evented_tasks(Some(id), Some(from_index), Some(limit))
                     .await?;
                 let last_iteration = current_iteration.len() < limit as usize;
-                evented_tasks.extend(current_iteration.into_iter().map(|t| (t.task_hash.clone(), t)).collect::<Vec<(String, TaskInfo)>>());
+                evented_tasks.extend(
+                    current_iteration
+                        .into_iter()
+                        .map(|t| (t.task_hash.clone(), t))
+                        .collect::<Vec<(String, TaskInfo)>>(),
+                );
                 if last_iteration {
                     break;
                 }
@@ -214,42 +232,54 @@ impl Tasks {
 
     // submit the same queries that will re-evaluate on-chain
     // Just need to get all to eval "true" to submit to the chain
+    // Return task hash of validated task
     pub async fn validate_queries(
         &self,
-        queries: Vec<CroncatQuery>,
-    ) -> Result<(), Report> {
-        // Process all the queries
-        let mut filtered_q = queries.clone();
-        filtered_q.retain(|q| q.check_result);
+        query_sets: Vec<(String, Vec<CroncatQuery>)>,
+    ) -> Result<Vec<String>, Report> {
+        let mut ready_hashes: Vec<String> = Vec::new();
 
-        // TODO: This needs to change to be BATCH query! Too much latency here...
-        for q in filtered_q.iter() {
-            let res: Result<QueryResponse, Report> = self
-                .client
-                .query(move |querier| {
-                    let deser_msg: CroncatQuery = from_binary(&q.msg).expect("Deser query msg failed");
-                    async move {
-                        querier
-                            .query_croncat(
-                                deser_msg,
-                                Some(Address::from_str(q.contract_addr.as_str())?),
-                            )
-                            .await
+        // Process all the queries
+        for (task_hash, query_set) in query_sets {
+            let mut filtered_q = query_set.clone();
+            filtered_q.retain(|q| q.check_result);
+
+            // TODO: This needs to change to be BATCH query! Too much latency here...
+            for q in filtered_q.iter() {
+                let res: Result<QueryResponse, Report> = self
+                    .client
+                    .query(move |querier| {
+                        let deser_msg: CroncatQuery =
+                            from_binary(&q.msg).expect("Deser query msg failed");
+                        async move {
+                            querier
+                                .query_croncat(
+                                    deser_msg,
+                                    Some(Address::from_str(q.contract_addr.as_str())?),
+                                )
+                                .await
+                        }
+                    })
+                    .await;
+
+                // Eval if result false, if so break!
+                match res {
+                    // likely this was because the response payload didnt match
+                    Err(_) => {
+                        break;
                     }
-                })
-                .await;
-            
-            // Eval if result false, if so break!
-            match res {
-                // likely this was because the response payload didnt match
-                Err(_) => { break; }
-                Ok(data) => {
-                    if !data.result { break; }
+                    Ok(data) => {
+                        if !data.result {
+                            break;
+                        } else {
+                            ready_hashes.push(task_hash.clone());
+                        }
+                    }
                 }
             }
         }
 
-        Ok(())
+        Ok(ready_hashes)
     }
 }
 
@@ -284,7 +314,7 @@ pub async fn scheduled_tasks_loop(
                     let stats = tasks_client.get_stats().await?;
 
                     info!(
-                        "[{}] Block {} :: Block Tasks: {}, Cron Tasks: {}, Evented Unbounded: {}, Evented Indexed: {}",
+                        "[{}] Block {} :: Block: {}, Cron: {}, Unbounded: {}, Ranged: {}",
                         chain_id,
                         block.header().height,
                         tasks.stats.num_block_tasks,
@@ -296,15 +326,27 @@ pub async fn scheduled_tasks_loop(
                     // TODO: Limit batches to max gas 3_000_000-6_000_000 (also could be set per-chain since stargaze has higher limits for example)
                     // Batch proxy_call's for known task counts
                     let tasks_failed = tasks_failed.clone();
-                    let task_count: usize = u64::from(tasks.stats.num_block_tasks.saturating_add(tasks.stats.num_cron_tasks)) as usize;
-                    match manager_client.proxy_call_batch(task_count).await {
-                        Ok(pc_res) => {
-                            debug!("Result: {:?}", pc_res.res.log);
-                            info!("Finished task batch - TX: {}, Blk: {}, Evts: {}", pc_res.tx_hash, pc_res.height, pc_res.events.len());
-                        }
-                        Err(err) => {
-                            tasks_failed.store(true, SeqCst);
-                            error!("Something went wrong during proxy_call_batch: {}", err);
+                    let task_count: usize = u64::from(
+                        tasks
+                            .stats
+                            .num_block_tasks
+                            .saturating_add(tasks.stats.num_cron_tasks),
+                    ) as usize;
+                    if task_count > 0 {
+                        match manager_client.proxy_call_batch(task_count).await {
+                            Ok(pc_res) => {
+                                debug!("Result: {:?}", pc_res.res.log);
+                                info!(
+                                    "Finished task batch - TX: {}, Blk: {}, Evts: {}",
+                                    pc_res.tx_hash,
+                                    pc_res.height,
+                                    pc_res.events.len()
+                                );
+                            }
+                            Err(err) => {
+                                tasks_failed.store(true, SeqCst);
+                                error!("Something went wrong during proxy_call_batch: {}", err);
+                            }
                         }
                     }
                 } else {
@@ -332,17 +374,23 @@ pub async fn scheduled_tasks_loop(
     Ok(())
 }
 
+// FLOW:
+// - get the stack of ranged evented tasks
+// - organize into batched queries (batch of batched task level queries)
+// - evaluate queries, filter batch down to valid tasks
+// - batch execute valid tasks
 pub async fn evented_tasks_loop(
     mut block_stream_rx: BlockStreamRx,
     mut shutdown_rx: ShutdownRx,
     block_status: Arc<Mutex<AgentStatus>>,
-    _chain_id: Arc<String>,
+    chain_id: Arc<String>,
     _agent_client: Arc<Agent>,
-    _manager_client: Arc<Manager>,
-    _tasks_client: Arc<Tasks>,
+    manager_client: Arc<Manager>,
+    tasks_client: Arc<Tasks>,
 ) -> Result<(), Report> {
+    // TODO: Question for Seedyrom: can this while loop invalidate once block passed?
     let block_consumer_stream: JoinHandle<Result<(), Report>> = tokio::task::spawn(async move {
-        while let Ok(_block) = block_stream_rx.recv().await {
+        while let Ok(block) = block_stream_rx.recv().await {
             let locked_status = block_status.lock().await;
             let is_active = *locked_status == AgentStatus::Active;
             // unlocking it ASAP
@@ -350,44 +398,94 @@ pub async fn evented_tasks_loop(
             if is_active {
                 let tasks_failed = Arc::new(AtomicBool::new(false));
 
-                // FLOW:
-                // - get the stack of ranged evented tasks
-                // - organize into batched queries (batch of batched task level queries)
-                // - evaluate queries, filter batch down to valid tasks
-                // - batch execute valid tasks
-
                 // Stack 0: Unbounded evented tasks
                 // - These will get queried every block
-                // let unbounded = task_client.unbounded().await?;
+                // - NOTE: These will be lower priority than ranged
+                let unbounded = tasks_client.unbounded().await?;
 
                 // Stack 1: Ranged evented tasks
                 // - These will get queried every block, as long as the index is lt block height/timestamp
-                // let unbounded_height = task_client.ranged(block.header().height).await?;
-                // let unbounded_timestamp = task_client.ranged(block.header().time).await?;
+                let header = block.header();
+                let ranged_height = tasks_client.ranged(header.height.value()).await?;
+                let ranged_timestamp = tasks_client
+                    .ranged(
+                        header
+                            .time
+                            .duration_since(Time::from_unix_timestamp(0, 0).unwrap())
+                            .unwrap()
+                            .as_secs(),
+                    )
+                    .await?;
 
+                // Accumulate: get all the tasks ready to be queried
+                // Priority order: block height, block timestamp, unbounded
+                let mut query_sets: Vec<(String, Vec<CroncatQuery>)> = Vec::new();
+                let rhqs = ranged_height.map(|mut rh| -> Vec<(String, Vec<CroncatQuery>)> {
+                    rh.retain(|r| r.queries.is_some());
+                    rh.iter()
+                        .map(|r| (r.task_hash.clone(), r.queries.clone().unwrap()))
+                        .collect()
+                });
+                let rtqs = ranged_timestamp.map(|mut rt| -> Vec<(String, Vec<CroncatQuery>)> {
+                    rt.retain(|r| r.queries.is_some());
+                    rt.iter()
+                        .map(|r| (r.task_hash.clone(), r.queries.clone().unwrap()))
+                        .collect()
+                });
+                let ubqs = unbounded.map(|mut ub| -> Vec<(String, Vec<CroncatQuery>)> {
+                    ub.retain(|r| r.queries.is_some());
+                    ub.iter()
+                        .map(|r| (r.task_hash.clone(), r.queries.clone().unwrap()))
+                        .collect()
+                });
+                if let Some(rh) = rhqs {
+                    query_sets.extend(rh);
+                }
+                if let Some(rt) = rtqs {
+                    query_sets.extend(rt);
+                }
+                if let Some(ub) = ubqs {
+                    query_sets.extend(ub);
+                }
 
-                // let account_addr = agent_client.account_id();
-                // let tasks = agent_client
-                //     .get_tasks(account_addr.as_str())
-                //     .await
-                //     .map_err(|err| eyre!("Failed to get agent tasks: {}", err))?;
+                // Validate: get all
+                let task_hashes = tasks_client.validate_queries(query_sets).await?;
 
-                // if let Some(tasks) = tasks {
-                //     // TODO: Change this to batch, if possible!
-                //     for _ in 0..sum_num_tasks(&tasks) {
-                //         let tasks_failed = tasks_failed.clone();
+                if !task_hashes.is_empty() {
+                    // also get info about evented stats
+                    let stats = tasks_client.get_stats().await?;
 
-                //         match manager_client.proxy_call(None).await {
-                //             Ok(proxy_call_res) => {
-                //                 info!("Finished task: {}", proxy_call_res.res.log);
-                //             }
-                //             Err(err) => {
-                //                 tasks_failed.store(true, SeqCst);
-                //                 error!("Something went wrong during proxy_call: {}", err);
-                //             }
-                //         }
-                //     }
-                // }
+                    info!(
+                        "[{}] Evented Tasks {}, Block {}, Unbounded: {}, Ranged: {}",
+                        chain_id,
+                        task_hashes.len(),
+                        block.header().height,
+                        stats.0,
+                        stats.1,
+                    );
+
+                    // Batch proxy_call's for task_hashes
+                    // TODO: Limit batches to max gas 3_000_000-6_000_000 (also could be set per-chain since stargaze has higher limits for example)
+                    let tasks_failed = tasks_failed.clone();
+                    match manager_client.proxy_call_evented_batch(task_hashes).await {
+                        Ok(pc_res) => {
+                            debug!("Result: {:?}", pc_res.res.log);
+                            info!(
+                                "Finished evented task batch - TX: {}, Blk: {}, Evts: {}",
+                                pc_res.tx_hash,
+                                pc_res.height,
+                                pc_res.events.len()
+                            );
+                        }
+                        Err(err) => {
+                            tasks_failed.store(true, SeqCst);
+                            error!(
+                                "Something went wrong during proxy_call_evented_batch: {}",
+                                err
+                            );
+                        }
+                    }
+                }
 
                 if !tasks_failed.load(SeqCst) {
                     ping_uptime_monitor().await;

@@ -1,5 +1,10 @@
+use crate::utils::AtomicIntervalCounter;
 use cosm_orc::orchestrator::Address;
 use cosmwasm_std::from_binary;
+use croncat_sdk_agents::types::AgentStatus;
+use croncat_sdk_tasks::msg::TasksQueryMsg;
+use croncat_sdk_tasks::types::{CroncatQuery, TaskInfo, TaskResponse};
+use mod_sdk::types::QueryResponse;
 use std::{
     str::FromStr,
     sync::{
@@ -8,11 +13,6 @@ use std::{
     },
 };
 use tendermint::Time;
-use crate::utils::AtomicIntervalCounter;
-use croncat_sdk_agents::types::AgentStatus;
-use croncat_sdk_tasks::msg::TasksQueryMsg;
-use croncat_sdk_tasks::types::{CroncatQuery, TaskInfo, TaskResponse};
-use mod_sdk::types::QueryResponse;
 // use croncat_sdk_tasks::types::Boundary;
 use crate::{
     channels::{BlockStreamRx, ShutdownRx},

@@ -131,7 +131,7 @@ async fn run_command(opts: Opts, mut storage: LocalAgentStorage) -> Result<(), R
         Some(tasks_contract_addr.clone()),
     )
     .await;
-    let mut tasks = Arc::new(
+    let tasks = Arc::new(
         Tasks::new(
             tasks_contract_addr.clone(),
             tasks_client,

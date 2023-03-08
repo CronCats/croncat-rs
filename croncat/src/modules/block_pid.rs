@@ -111,8 +111,10 @@ impl BlockPid {
         let block_offset = if let Some(offset) = block_diff.checked_sub(now) {
           offset
         } else {
+          // TODO: Get back to this?
           // Gotta go NOW since "now" is greater than expected next block timestamp
-          Duration::from_millis(10)
+          // Duration::from_millis(10)
+          avg_duration
         };
         (block_offset, avg_variance)
     }

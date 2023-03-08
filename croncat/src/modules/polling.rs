@@ -17,6 +17,7 @@ use super::block_pid::BlockPid;
 type BlockStream =
     Pin<Box<dyn TryStream<Item = Result<Block, Report>, Ok = Block, Error = Report> + Send>>;
 
+// TODO: Migrate to
 type StatusStream =
     Pin<Box<dyn TryStream<Item = Result<Block, Report>, Ok = Block, Error = Report> + Send>>;
 
@@ -29,51 +30,9 @@ pub fn poll_stream_blocks(http_rpc_host: String, poll_duration_secs: f64) -> Blo
         let mut block_pid_cache = BlockPid::default();
         let mut previous_block: Height = Height::default();
 
-        // // since block heights are ~6secs, don't want to have timeout 30 seconds for failures
-        // // let poll_timeout_duration = Duration::from_secs_f64(poll_duration_secs);
-        // let poll_timeout_duration = Duration::from_secs_f64(2.0);
-        // loop {
-        //     let mut block_height: Height = Height::default();
-        //     let mut next_duration = Duration::from_secs_f64(poll_duration_secs);
-        //     let mut next_variance: u64 = 14;
-        //     let rpc_request_start = SystemTime::now();
-        //     println!("rpc_request_start {:?}", rpc_request_start);
-        //     // match timeout(poll_timeout_duration, client.latest_block()).await {
-        //     match timeout(poll_timeout_duration, client.status()) {
-        //         Ok(Ok(status)) => {
-        //             // For debugging - find out the RPC latency
-        //             println!("RPC Latency {:?} {:?}", rpc_request_start.elapsed(), SystemTime::now());
-
-        //             let info = status.sync_info;
-        //             // debug!("[{}] Polled block {}", block.header().chain_id, block.header().height);
-        //             println!("Polled block {:?} {:?}", info.latest_block_height, info.latest_block_time);
-
-        //             println!("PRE_YIELD {:?}", rpc_request_start.elapsed());
-        //             // yield tendermint::block::n();
-        //             println!("POST_YIELD {:?}", rpc_request_start.elapsed());
-        //         }
-        //         Ok(Err(err)) => {
-        //             debug!("Failed to get latest block: {}", err);
-        //         }
-        //         Err(err) => {
-        //             debug!("Timed out getting latest block: {}", err);
-        //         }
-        //     }
-        //     println!("HERE {:?}", rpc_request_start.elapsed());
-        //     // sleep(Duration::from_secs_f64(poll_duration_secs)).await;
-        //     // Wait
-        //     // Make sure the block height changed, if not we need to get next height ASAP!
-        //     if previous_block == block_height {
-        //         sleep(Duration::from_millis(next_variance)).await;
-        //     } else {
-        //         previous_block = block_height;
-        //         sleep(next_duration).await;
-        //     }
-        // }
-
         // since block heights are ~6secs, don't want to have timeout 30 seconds for failures
-        // let poll_timeout_duration = Duration::from_secs_f64(poll_duration_secs);
-        let poll_timeout_duration = Duration::from_secs_f64(2.0);
+        let poll_timeout_duration = Duration::from_secs_f64(poll_duration_secs);
+        // let poll_timeout_duration = Duration::from_secs_f64(10.0);
         loop {
             let mut block_height: Height = Height::default();
             let mut next_duration = Duration::from_secs_f64(poll_duration_secs);
@@ -112,22 +71,20 @@ pub fn poll_stream_blocks(http_rpc_host: String, poll_duration_secs: f64) -> Blo
                         block_millis,
                     );
 
-                    // TODO: Trying this? REmove if lame?
-                    // poll_timeout_duration = next_duration;
                     println!(
                         "Estimated next block time (duration: {:?}) variance {:?}",
                         next_duration, next_variance
                     );
 
-                    println!("PRE_YIELD {:?}", rpc_request_start.elapsed());
                     yield block.into();
-                    println!("POST_YIELD {:?}", rpc_request_start.elapsed());
                 }
                 Ok(Err(err)) => {
                     debug!("Failed to get latest block: {}", err);
+                    println!("Failed to get latest block: {}", err);
                 }
                 Err(err) => {
                     debug!("Timed out getting latest block: {}", err);
+                    println!("Timed out getting latest block: {}", err);
                 }
             }
             println!("HERE {:?}", rpc_request_start.elapsed());
@@ -135,10 +92,13 @@ pub fn poll_stream_blocks(http_rpc_host: String, poll_duration_secs: f64) -> Blo
             // Wait
             // Make sure the block height changed, if not we need to get next height ASAP!
             if previous_block == block_height {
+                println!("previous_block SAMMMEEEE {:?} waiting {:?}", block_height, next_variance);
                 sleep(Duration::from_millis(next_variance)).await;
-            } else {
                 previous_block = block_height;
+            } else {
+                println!("block_height NEWWWWWWWW {:?} waiting {:?}", block_height, next_duration);
                 sleep(next_duration).await;
+                previous_block = block_height;
             }
         }
     })

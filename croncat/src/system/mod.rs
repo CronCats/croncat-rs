@@ -71,26 +71,26 @@ pub async fn run(
     }
 
     // Provider system monitor updates.
-    let (provider_system_monitor_tx, _provider_system_monitor_rx) = mpsc::channel(100);
-    let provider_system_monitor = ProviderSystemMonitor::new(
-        provider_system.get_provider_states(),
-        provider_system_monitor_tx,
-    );
+    // let (provider_system_monitor_tx, _provider_system_monitor_rx) = mpsc::channel(100);
+    // let provider_system_monitor = ProviderSystemMonitor::new(
+    //     provider_system.get_provider_states(),
+    //     provider_system_monitor_tx,
+    // );
 
     // Monitor the provider system for updates.
     let provider_system_handle = tokio::spawn(async move { provider_system.produce().await });
-    let _provider_system_monitor_handle =
-        tokio::spawn(async move { provider_system_monitor.monitor(6000).await });
-    let provider_system_monitor_display_chain_id = chain_id.clone();
-    let _provider_system_monitor_display_handle = tokio::spawn(async move {
-        let mut provider_system_monitor_rx = _provider_system_monitor_rx;
-        while let Some(provider_states) = provider_system_monitor_rx.recv().await {
-            debug!(
-                "[{}] Provider states: {:#?}",
-                provider_system_monitor_display_chain_id, provider_states
-            );
-        }
-    });
+    // let _provider_system_monitor_handle =
+    //     tokio::spawn(async move { provider_system_monitor.monitor(1000).await });
+    // let provider_system_monitor_display_chain_id = chain_id.clone();
+    // let _provider_system_monitor_display_handle = tokio::spawn(async move {
+    //     let mut provider_system_monitor_rx = _provider_system_monitor_rx;
+    //     while let Some(provider_states) = provider_system_monitor_rx.recv().await {
+    //         debug!(
+    //             "[{}] Provider states: {:#?}",
+    //             provider_system_monitor_display_chain_id, provider_states
+    //         );
+    //     }
+    // });
 
     // Sequence the blocks we receive from the block stream. This is necessary because we may receive
     // blocks from multiple sources, and we need to ensure that we process them in order.

@@ -3,6 +3,7 @@
 //!
 
 // Features
+#![feature(map_first_last)]
 
 // Export tokio and async-broadcast for convenience and version management
 pub use tokio;

@@ -644,7 +644,7 @@ dependencies = [
 
 [[package]]
 name = "croncat"
-version = "0.3.0"
+version = "0.3.1"
 dependencies = [
  "async-stream",
  "async-trait",
@@ -692,9 +692,9 @@ dependencies = [
 
 [[package]]
 name = "croncat-mod-generic"
-version = "0.1.0"
+version = "0.1.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "90615d0891f4814ab98adc9670feaeec3afd1d625b8340d257de2c68584abed6"
+checksum = "3b2a87cf37e6d76bd68cd83eae20aaeb90cbb3a9aeab31aab4ad08aa8567ec1a"
 dependencies = [
  "cosmwasm-schema",
  "cosmwasm-std",
@@ -717,9 +717,9 @@ dependencies = [
 
 [[package]]
 name = "croncat-sdk-agents"
-version = "0.1.1"
+version = "0.1.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "5b3a0fb5da38f09c5aa15574c386dcf09b6a3ee0314a7c24b6e2532eb19060f6"
+checksum = "7a404ec5bc0614c43a1416ac24556595a5e197f9157a8bb5b7e9ee970cf181b7"
 dependencies = [
  "cosmwasm-schema",
  "cosmwasm-std",
@@ -730,20 +730,21 @@ dependencies = [
 
 [[package]]
 name = "croncat-sdk-core"
-version = "0.1.1"
+version = "0.1.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "370cc4741ea1bfddd1f8872c53ef421d5db048e704afc2078021ee33fe548d6a"
+checksum = "6217a7d0cae0d3dadfc72250b710ee34ba09dd48925efb0601ade8fd3c777a94"
 dependencies = [
  "cosmwasm-schema",
  "cosmwasm-std",
  "cw20",
+ "thiserror",
 ]
 
 [[package]]
 name = "croncat-sdk-factory"
-version = "0.1.1"
+version = "0.1.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "b48891ff7179906db99da1088e74643a4ba4b17a8c65c2b8cff7c5ffe69f8f19"
+checksum = "5863205343d454535d408655970b05c5a2c6e55631665a5b9e5700de4cc0f94c"
 dependencies = [
  "cosmwasm-schema",
  "cosmwasm-std",
@@ -752,9 +753,9 @@ dependencies = [
 
 [[package]]
 name = "croncat-sdk-manager"
-version = "0.1.1"
+version = "0.1.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "5b594689fd80fb2f60699f296cbfc45f0e056e6efd07fa6abda252bec54afe2f"
+checksum = "8fb7d5ea988aef428b3ed6e654142f9b6e4e432f3b6ab6ae88208ce7703eecfa"
 dependencies = [
  "cosmwasm-schema",
  "cosmwasm-std",
@@ -765,9 +766,9 @@ dependencies = [
 
 [[package]]
 name = "croncat-sdk-tasks"
-version = "0.1.1"
+version = "0.1.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "5237642d4ef590ec6c5aefc3484d458f085ee7b09104bcb381b68b15f562292a"
+checksum = "0a4332f24bf7ad28bc04d3410ba7882950357a9e1e61b9f7a933e4e50eb8417c"
 dependencies = [
  "cosmwasm-schema",
  "cosmwasm-std",
@@ -1893,9 +1894,9 @@ dependencies = [
 
 [[package]]
 name = "mod-sdk"
-version = "0.1.1"
+version = "0.1.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "541f6e42c38d10ba9e2c726d911ec7f3bb7e1e9996cecec8f8bdd964f1c4a89a"
+checksum = "186ad6595e31bec4d0be886428727eaf1d0a42df1893727bf8fcae0e69b7081e"
 dependencies = [
  "cosmwasm-schema",
  "cosmwasm-std",

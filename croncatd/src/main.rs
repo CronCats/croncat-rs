@@ -178,6 +178,10 @@ async fn run_command(opts: Opts, mut storage: LocalAgentStorage) -> Result<(), R
                     let account_addr = account_addr.clone();
                     Err(eyre!("Agent {} already registered", account_addr))?;
                 }
+                Err(err) if err.to_string().contains("Agent registration currently operates on a whitelist") => {
+                    let account_addr = account_addr.clone();
+                    Err(eyre!("Agent {} needs whitelist approval, please submit request to CronCat DAO", account_addr))?;
+                }
                 Err(err)
                     if err.to_string().contains("account")
                         && err.to_string().contains("not found") =>

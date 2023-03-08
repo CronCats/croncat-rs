@@ -3,7 +3,7 @@ use cosm_orc::orchestrator::Address;
 use cosmwasm_std::from_binary;
 use croncat_sdk_agents::types::AgentStatus;
 use croncat_sdk_tasks::msg::TasksQueryMsg;
-use croncat_sdk_tasks::types::{CroncatQuery, TaskInfo, TaskResponse};
+use croncat_sdk_tasks::types::{CroncatQuery, TaskInfo};
 use mod_sdk::types::QueryResponse;
 use std::{
     str::FromStr,
@@ -122,7 +122,7 @@ impl Tasks {
         from_index: Option<u64>,
         limit: Option<u64>,
     ) -> Result<String, Report> {
-        let response: Vec<TaskResponse> = self
+        let response: Vec<TaskInfo> = self
             .client
             .query(move |querier| {
                 let contract_addr = self.contract_addr.clone();

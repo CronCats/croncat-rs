@@ -107,7 +107,8 @@ impl BlockPid {
         // 1678305821.521s len
         // 1678305821.915s diff
         // 5.263s          avg dur
-        println!("The badddd things {:?}", block_diff.checked_sub(now));
+        println!("The badddd things {:?} {:?}", block_diff.checked_sub(now), now.checked_sub(block_diff));
+        println!("------- DISTANCE FROM LAST BLOCK {:?} {:?} {:?}", now_timestamp - block_timestamp, now_timestamp, block_timestamp);
         let block_offset = if let Some(offset) = block_diff.checked_sub(now) {
           offset
         } else {
@@ -115,6 +116,12 @@ impl BlockPid {
           // Gotta go NOW since "now" is greater than expected next block timestamp
           // Duration::from_millis(10)
           avg_duration
+          // TODO: Take the min of (avg_duration, now - block_diff)????
+          // think the math is wrong here 
+          // std::cmp::min(
+          //   avg_duration,
+          //   now.checked_sub(block_diff).unwrap()
+          // )
         };
         (block_offset, avg_variance)
     }

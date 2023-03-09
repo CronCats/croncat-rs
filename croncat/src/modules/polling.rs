@@ -48,9 +48,6 @@ pub fn poll_stream_blocks(http_rpc_host: String, poll_duration_secs: f64) -> Blo
                     let block = block.block;
                     debug!("[{}] Polled block {}", block.header().chain_id, block.header().height);
                     println!("[{}] Polled block {}", block.header().chain_id, block.header().height);
-                    let now = SystemTime::now();
-                    let now_epoch = now.duration_since(UNIX_EPOCH).expect("Time went backwards bruh");
-                    let now_millis = now_epoch.as_millis();
                     let block_millis = block.header().time.duration_since(Time::unix_epoch()).unwrap().as_millis();
                     block_height = block.header().height;
 
@@ -64,6 +61,9 @@ pub fn poll_stream_blocks(http_rpc_host: String, poll_duration_secs: f64) -> Blo
                     }
                     println!("block_pid_cache {:?} {:?}", block_pid_cache.current, block_pid_cache.height);
 
+                    let now = SystemTime::now();
+                    let now_epoch = now.duration_since(UNIX_EPOCH).expect("Time went backwards bruh");
+                    let now_millis = now_epoch.as_millis();
                     println!("all the things {:?} {:?} {:?}", block_height.clone().value(), now_millis, block_millis);
                     (next_duration, next_variance) = block_pid_cache.get_next(
                         now_millis,
@@ -92,11 +92,11 @@ pub fn poll_stream_blocks(http_rpc_host: String, poll_duration_secs: f64) -> Blo
             // Wait
             // Make sure the block height changed, if not we need to get next height ASAP!
             if previous_block == block_height {
-                println!("previous_block SAMMMEEEE {:?} waiting {:?}", block_height, next_variance);
+                println!("previous_block SAMMMEEEE {:?} dur {:?} waiting {:?}", block_height, next_duration, next_variance);
                 sleep(Duration::from_millis(next_variance)).await;
                 previous_block = block_height;
             } else {
-                println!("block_height NEWWWWWWWW {:?} waiting {:?}", block_height, next_duration);
+                println!("block_height NEWWWWWWWW {:?} dur {:?} waiting {:?}", block_height, next_variance, next_duration);
                 sleep(next_duration).await;
                 previous_block = block_height;
             }

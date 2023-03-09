@@ -7,7 +7,7 @@ use tracing::{error, info};
 
 use crate::config::ChainConfig;
 use crate::{
-    channels::{BlockStreamRx, ShutdownRx},
+    channels::{StatusStreamRx, ShutdownRx},
     rpc::RpcClientService,
     utils::AtomicIntervalCounter,
 };
@@ -227,7 +227,7 @@ impl Agent {
 /// status of each account the agent watches.
 ///
 pub async fn check_status_loop(
-    mut block_stream_rx: BlockStreamRx,
+    mut block_stream_rx: StatusStreamRx,
     mut shutdown_rx: ShutdownRx,
     block_status: Arc<Mutex<AgentStatus>>,
     chain_id: Arc<String>,
@@ -242,7 +242,7 @@ pub async fn check_status_loop(
             if block_counter.is_at_interval() {
                 info!(
                     "Checking agents statuses for block (height: {})",
-                    block.header().height
+                    block.inner.sync_info.latest_block_height
                 );
                 let account_id = agent_client.account_id();
                 let agent = agent_client.get(account_id.as_str()).await?;

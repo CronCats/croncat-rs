@@ -34,7 +34,8 @@ impl BlockPid {
     /// Response: (avg duration, avg variance)
     pub fn compute_avgs(&mut self) -> BlockPidDiff {
         // Remove over threshold, so data doesnt get out of hand
-        if self.height.len() > 1000usize {
+        // TODO: Change!!!!!
+        if self.height.len() > 5usize {
           self.height.pop_first();
         }
 
@@ -101,27 +102,14 @@ impl BlockPid {
         let now = Duration::from_millis(now_timestamp.try_into().unwrap());
         let block_len = Duration::from_millis(block_timestamp.try_into().unwrap()).checked_add(avg_duration).unwrap();
         let block_diff = block_len.checked_add(variance_millis).unwrap();
-        println!("The insider things {:?} {:?} {:?} {:?} {:?}", now, block_timestamp, block_len, block_diff, avg_duration);
-        // 1678305824.513s now
-        // 1678305816.258s ts
-        // 1678305821.521s len
-        // 1678305821.915s diff
-        // 5.263s          avg dur
-        println!("The badddd things {:?} {:?}", block_diff.checked_sub(now), now.checked_sub(block_diff));
-        println!("------- DISTANCE FROM LAST BLOCK {:?} {:?} {:?}", now_timestamp - block_timestamp, now_timestamp, block_timestamp);
         let block_offset = if let Some(offset) = block_diff.checked_sub(now) {
           offset
         } else {
-          // TODO: Get back to this?
-          // Gotta go NOW since "now" is greater than expected next block timestamp
-          // Duration::from_millis(10)
-          avg_duration
-          // TODO: Take the min of (avg_duration, now - block_diff)????
-          // think the math is wrong here 
-          // std::cmp::min(
-          //   avg_duration,
-          //   now.checked_sub(block_diff).unwrap()
-          // )
+          // TODO: take into account latency inside the non-duration
+          std::cmp::min(
+            avg_duration,
+            now.checked_sub(block_diff).unwrap()
+          )
         };
         (block_offset, avg_variance)
     }

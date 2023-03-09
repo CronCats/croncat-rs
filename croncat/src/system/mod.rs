@@ -3,7 +3,7 @@
 //!
 
 use croncat_pipeline::{
-    try_flat_join, Dispatcher, ProviderSystem, ProviderSystemMonitor, Sequencer,
+    try_flat_join, Dispatcher, ProviderSystem, Sequencer,
 };
 use std::sync::Arc;
 use tokio::{
@@ -107,11 +107,11 @@ pub async fn run(
     let mut block_stream_info_rx = dispatcher_tx.subscribe();
     let block_stream_chain_id = chain_id.clone();
     let _block_stream_info_handle = tokio::task::spawn(async move {
-        while let Ok(block) = block_stream_info_rx.recv().await {
+        while let Ok(status) = block_stream_info_rx.recv().await {
             debug!(
                 "[{}] Processing block (height: {})",
                 block_stream_chain_id,
-                block.header().height,
+                status.inner.sync_info.latest_block_height,
             );
         }
     });

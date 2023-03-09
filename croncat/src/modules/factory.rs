@@ -1,4 +1,4 @@
-use crate::channels::{BlockStreamRx, ShutdownRx};
+use crate::channels::{ShutdownRx, StatusStreamRx};
 use crate::config::ChainConfig;
 use crate::utils::AtomicIntervalCounter;
 use crate::{rpc::RpcClientService, store::factory::LocalCacheStorage};
@@ -232,14 +232,15 @@ impl Factory {
 /// Check every nth block with [`AtomicIntervalCounter`] if factory cache needs refresh
 ///
 pub async fn refresh_factory_loop(
-    mut block_stream_rx: BlockStreamRx,
+    mut block_stream_rx: StatusStreamRx,
     mut shutdown_rx: ShutdownRx,
     chain_id: Arc<String>,
     mut factory_client: Factory,
 ) -> Result<(), Report> {
     let block_counter = AtomicIntervalCounter::new(200);
     let task_handle: tokio::task::JoinHandle<Result<(), Report>> = tokio::task::spawn(async move {
-        while let Ok(_block) = block_stream_rx.recv().await {
+        while let Ok(block) = block_stream_rx.recv().await {
+            println!("Current block {:?}", block.inner.sync_info.latest_block_height);
             block_counter.tick();
             if block_counter.is_at_interval() && factory_client.load().await? {
                 info!("[{}] Factory Cache Reloaded", chain_id);

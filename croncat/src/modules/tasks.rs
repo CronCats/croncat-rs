@@ -15,7 +15,7 @@ use std::{
 use tendermint::Time;
 // use croncat_sdk_tasks::types::Boundary;
 use crate::{
-    channels::{BlockStreamRx, ShutdownRx},
+    channels::{StatusStreamRx, ShutdownRx},
     errors::{eyre, Report},
     logging::{debug, info},
     monitor::ping_uptime_monitor,
@@ -300,7 +300,7 @@ impl Tasks {
 /// Check every nth block with [`AtomicIntervalCounter`] if tasks cache needs refresh
 ///
 pub async fn refresh_tasks_cache_loop(
-    mut block_stream_rx: BlockStreamRx,
+    mut block_stream_rx: StatusStreamRx,
     mut shutdown_rx: ShutdownRx,
     chain_id: Arc<String>,
     mut tasks_client: Tasks,
@@ -329,7 +329,7 @@ pub async fn refresh_tasks_cache_loop(
 /// Do work on blocks that are sent from the ws stream.
 ///
 pub async fn scheduled_tasks_loop(
-    mut block_stream_rx: BlockStreamRx,
+    mut block_stream_rx: StatusStreamRx,
     mut shutdown_rx: ShutdownRx,
     block_status: Arc<Mutex<AgentStatus>>,
     chain_id: Arc<String>,
@@ -358,7 +358,7 @@ pub async fn scheduled_tasks_loop(
                     info!(
                         "[{}] Block {} :: Block: {}, Cron: {}, Unbounded: {}, Ranged: {}",
                         chain_id,
-                        block.header().height,
+                        block.inner.sync_info.latest_block_height,
                         tasks.stats.num_block_tasks,
                         tasks.stats.num_cron_tasks,
                         stats.0,
@@ -395,7 +395,7 @@ pub async fn scheduled_tasks_loop(
                     info!(
                         "[{}] No tasks for block (height: {})",
                         chain_id,
-                        block.header().height
+                        block.inner.sync_info.latest_block_height
                     );
                 }
 
@@ -422,7 +422,7 @@ pub async fn scheduled_tasks_loop(
 // - evaluate queries, filter batch down to valid tasks
 // - batch execute valid tasks
 pub async fn evented_tasks_loop(
-    mut block_stream_rx: BlockStreamRx,
+    mut block_stream_rx: StatusStreamRx,
     mut shutdown_rx: ShutdownRx,
     block_status: Arc<Mutex<AgentStatus>>,
     chain_id: Arc<String>,
@@ -446,12 +446,12 @@ pub async fn evented_tasks_loop(
 
                 // Stack 1: Ranged evented tasks
                 // - These will get queried every block, as long as the index is lt block height/timestamp
-                let header = block.header();
-                let ranged_height = tasks_client.ranged(header.height.value()).await?;
+                let header = block.inner.sync_info;
+                let ranged_height = tasks_client.ranged(header.latest_block_height.into()).await?;
                 let ranged_timestamp = tasks_client
                     .ranged(
                         header
-                            .time
+                            .latest_block_time
                             .duration_since(Time::from_unix_timestamp(0, 0).unwrap())
                             .unwrap()
                             .as_secs(),
@@ -500,7 +500,7 @@ pub async fn evented_tasks_loop(
                         "[{}] Evented Tasks {}, Block {}, Unbounded: {}, Ranged: {}",
                         chain_id,
                         task_hashes.len(),
-                        block.header().height,
+                        header.latest_block_height,
                         stats.0,
                         stats.1,
                     );

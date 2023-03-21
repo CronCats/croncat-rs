@@ -59,7 +59,7 @@ pub fn poll_stream_blocks(http_rpc_host: String, poll_duration_secs: f64) -> Sta
                     let now = SystemTime::now();
                     let now_epoch = now.duration_since(UNIX_EPOCH).expect("Time went backwards bruh");
                     let now_millis = now_epoch.as_millis();
-                    println!("DISTANCE FROM LAST BLOCK {:?} {:?} {:?} {:?}", now_millis - block_millis, now_millis, block_millis, block_height);
+                    debug!("DISTANCE FROM LAST BLOCK {:?} {:?} {:?} {:?}", now_millis - block_millis, now_millis, block_millis, block_height);
 
                     let (next_duration, next_variance) = block_pid_cache.get_next(
                         now_millis,

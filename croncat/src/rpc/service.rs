@@ -94,7 +94,7 @@ impl RpcClientService {
                     Address::from_str(&factory_addr)?,
                 )
                 .await?;
-                // get status from the nodes directly
+                // get block height from the nodes directly
                 let _ = rpc_client
                     .rpc_client
                     .client
@@ -173,8 +173,7 @@ impl RpcClientService {
                     return Err(last_error.unwrap());
                 }
 
-                // TODO: This should be a more specific error
-                return Err(eyre!("No valid data sources available"));
+                return Err(eyre!("No valid rpc sources available"));
             }
 
             let source_key = source_keys
@@ -196,6 +195,7 @@ impl RpcClientService {
                     {
                         Ok(client) => client,
                         Err(e) => {
+                            println!("Failed to create RpcClient for {}: {}", source_key, e);
                             debug!("Failed to create RpcClient for {}: {}", source_key, e);
                             let (_, bad) = source_info.get_mut(&source_key).unwrap();
                             *bad = true;
@@ -206,7 +206,7 @@ impl RpcClientService {
                 )),
                 RpcCallType::Query => RpcClientType::Query(Box::new(
                     match Querier::new(
-                        source.rpc.to_string(),
+                        source.clone().rpc.to_string(),
                         self.chain_config.clone(),
                         self.contract_addr.clone(),
                     )
@@ -214,6 +214,7 @@ impl RpcClientService {
                     {
                         Ok(client) => client,
                         Err(e) => {
+                            println!("Failed to create RpcCallType::Query for {}: {}", source_key, e);
                             debug!("Failed to create RpcClient for {}: {}", source_key, e);
                             let (_, bad) = source_info.get_mut(&source_key).unwrap();
                             *bad = true;
@@ -224,6 +225,7 @@ impl RpcClientService {
                 )),
             };
 
+            // TODO: ONLY mark as bad IF the /status endpoint doesnt return, otherwise provider is not considered bad.
             match f(rpc_client).await {
                 Ok(result) => {
                     return Ok(result);
@@ -233,11 +235,14 @@ impl RpcClientService {
                     break Err(e);
                 }
                 Err(e) => {
+                    // TODO: Assess ChainResponse { code: Err(18) ???
+                    println!("Error calling chain for {}: {}", source_key, e);
                     debug!("Error calling chain for {}: {}", source_key, e);
-                    let (_, bad) = source_info.get_mut(&source_key).unwrap();
-                    *bad = true;
-                    last_error = Some(e);
-                    continue;
+                    // let (_, bad) = source_info.get_mut(&source_key).unwrap();
+                    // *bad = true;
+                    // last_error = Some(e);
+                    // continue;
+                    break Err(e);
                 }
             }
         }

@@ -1,10 +1,13 @@
+use crate::config::ChainConfig;
+use crate::store::tasks::EventType;
 use crate::utils::AtomicIntervalCounter;
 use cosm_orc::orchestrator::Address;
-use cosmwasm_std::from_binary;
+use cosmwasm_std::Timestamp;
 use croncat_sdk_agents::types::AgentStatus;
 use croncat_sdk_tasks::msg::TasksQueryMsg;
-use croncat_sdk_tasks::types::{CroncatQuery, TaskInfo};
+use croncat_sdk_tasks::types::{CroncatQuery, TaskInfo, Boundary};
 use mod_sdk::types::QueryResponse;
+use serde_json::Value;
 use std::{
     str::FromStr,
     sync::{
@@ -15,7 +18,7 @@ use std::{
 use tendermint::Time;
 // use croncat_sdk_tasks::types::Boundary;
 use crate::{
-    channels::{StatusStreamRx, ShutdownRx},
+    channels::{ShutdownRx, StatusStreamRx},
     errors::{eyre, Report},
     logging::{debug, info},
     monitor::ping_uptime_monitor,
@@ -30,6 +33,7 @@ use super::{agent::Agent, manager::Manager};
 pub struct Tasks {
     pub client: RpcClientService,
     pub contract_addr: Address,
+    pub chain_id: String,
     pub store: LocalEventStorage,
     // for helping with batch query validation
     pub generic_querier_addr: Address,
@@ -62,14 +66,17 @@ pub struct Tasks {
 
 impl Tasks {
     pub async fn new(
+        cfg: ChainConfig,
         contract_addr: Address,
         client: RpcClientService,
         generic_querier_addr: Address,
     ) -> Result<Self, Report> {
+        let chain_id = cfg.info.chain_id;
         Ok(Self {
             client,
             contract_addr,
-            store: LocalEventStorage::default(),
+            chain_id: chain_id.clone(),
+            store: LocalEventStorage::new(Some(chain_id)),
             generic_querier_addr,
         })
     }
@@ -90,17 +97,18 @@ impl Tasks {
     }
 
     // stats helper
-    pub async fn get_stats(&self) -> Result<(u64, u64), Report> {
+    pub async fn get_stats(&self) -> Result<(u64, u64, u64, u64), Report> {
         Ok(self.store.get_stats())
     }
 
     // only gets unbounded tasks
-    pub async fn unbounded(&self) -> Result<Option<Vec<&TaskInfo>>, Report> {
-        Ok(self.store.get_events_by_index(None))
+    pub async fn unbounded(&self, kind: EventType) -> Result<Option<Vec<&TaskInfo>>, Report> {
+        Ok(self.store.get_events_by_index(None, kind))
     }
 
     // gets ranged tasks, occurring for specified range
-    pub async fn ranged(&self, index: u64) -> Result<Option<Vec<&TaskInfo>>, Report> {
+    // TODO: for upcoming future block prep
+    pub async fn ranged(&self, index: u64, kind: EventType) -> Result<Option<Vec<&TaskInfo>>, Report> {
         // TODO: Filter within boundary
         // let in_boundary = match task.boundary {
         //     Some(Boundary::Height { start, end }) => {
@@ -114,7 +122,17 @@ impl Tasks {
         //     }
         //     None => true,
         // };
-        Ok(self.store.get_events_by_index(Some(index)))
+        Ok(self.store.get_events_lte_index(Some(index), kind))
+    }
+
+    // gets ranged tasks, occurring for specified range
+    pub async fn get_ended_tasks_hashes(&mut self, index: &u64, time: &Timestamp) -> Result<Vec<String>, Report> {
+        self.store.clear_ended_tasks(index, time)
+    }
+
+    // gets ranged tasks, occurring for specified range
+    pub async fn cleanup_empty(&mut self) -> Result<(), Report> {
+        self.store.clear_empty_indexes()
     }
 
     pub async fn get_all(
@@ -168,6 +186,7 @@ impl Tasks {
     }
 
     // get evented tasks with pagination
+    // NOTE: These come back as both block height & time based, so we need to discern which type after the fact
     pub async fn get_evented_tasks(
         &self,
         start: Option<u64>,
@@ -216,7 +235,8 @@ impl Tasks {
 
         // Step 1: Get all the data from ids
         for id in evented_ids {
-            let mut evented_tasks: Vec<(String, TaskInfo)> = Vec::new();
+            let mut height_tasks: Vec<(String, TaskInfo)> = Vec::new();
+            let mut time_tasks: Vec<(String, TaskInfo)> = Vec::new();
             from_index = 0;
             loop {
                 // pagination at specific index
@@ -224,12 +244,21 @@ impl Tasks {
                     .get_evented_tasks(Some(id), Some(from_index), Some(limit))
                     .await?;
                 let last_iteration = current_iteration.len() < limit as usize;
-                evented_tasks.extend(
-                    current_iteration
-                        .into_iter()
-                        .map(|t| (t.task_hash.clone(), t))
-                        .collect::<Vec<(String, TaskInfo)>>(),
-                );
+
+                // loop the tasks found and insert in the correct bucket of events
+                for task in current_iteration {
+                    match task.boundary {
+                        Boundary::Height(_) => {
+                            let task_hash = task.task_hash.clone();
+                            height_tasks.push((task_hash, task));
+                        },
+                        Boundary::Time(_) => {
+                            let task_hash = task.task_hash.clone();
+                            time_tasks.push((task_hash, task));
+                        },
+                    }
+                }
+
                 if last_iteration {
                     break;
                 }
@@ -237,7 +266,12 @@ impl Tasks {
             }
 
             // update storage
-            self.store.insert(id, evented_tasks)?;
+            if !height_tasks.is_empty() {
+                self.store.insert(EventType::Block, id, height_tasks)?;
+            }
+            if !time_tasks.is_empty() {
+                self.store.insert(EventType::Time, id, time_tasks)?;
+            }
         }
 
         Ok(())
@@ -256,14 +290,15 @@ impl Tasks {
         for (task_hash, query_set) in query_sets {
             let mut filtered_q = query_set.clone();
             filtered_q.retain(|q| q.check_result);
+            println!("validate task_hash {:?}", task_hash);
 
             // TODO: This needs to change to be BATCH query! Too much latency here...
             for q in filtered_q.iter() {
                 let res: Result<QueryResponse, Report> = self
                     .client
                     .query(move |querier| {
-                        let deser_msg: CroncatQuery =
-                            from_binary(&q.msg).expect("Deser query msg failed");
+                        let deser_msg: Value =
+                            serde_json::from_slice(&q.msg).expect("Deser query msg failed");
                         async move {
                             querier
                                 .query_croncat(
@@ -275,16 +310,25 @@ impl Tasks {
                     })
                     .await;
 
+                // TODO: For errors with a query - potentially return the task hash so the task can get cleaned up.
+                // - This would have to check `stop_on_fail` as well as other boundary/interval things.
+
                 // Eval if result false, if so break!
                 match res {
                     // likely this was because the response payload didnt match
+                    Err(err) if err.to_string().contains("No valid data sources available") => {
+                        println!("TODO: No valid data sources available -- needs coverage to refresh?");
+                        break;
+                    }
                     Err(_) => {
                         break;
                     }
                     Ok(data) => {
+                        println!("validate task_hash data {:?} {:?}", task_hash, data);
                         if !data.result {
                             break;
                         } else {
+                            println!("task_hash data {:?} {:?}", task_hash, serde_json::from_slice::<Value>(&data.data));
                             ready_hashes.push(task_hash.clone());
                         }
                     }
@@ -292,6 +336,7 @@ impl Tasks {
             }
         }
 
+        // TODO: Dedupe, if theres any remote chance it could  happen
         Ok(ready_hashes)
     }
 }
@@ -303,14 +348,17 @@ pub async fn refresh_tasks_cache_loop(
     mut block_stream_rx: StatusStreamRx,
     mut shutdown_rx: ShutdownRx,
     chain_id: Arc<String>,
-    mut tasks_client: Tasks,
+    tasks_client: Arc<Mutex<Tasks>>,
 ) -> Result<(), Report> {
+    // initialize previous cache ASAP first
+    tasks_client.lock().await.load().await?;
+
     // TODO: Figure out best interval here!
-    let block_counter = AtomicIntervalCounter::new(50);
+    let block_counter = AtomicIntervalCounter::new(10);
     let task_handle: tokio::task::JoinHandle<Result<(), Report>> = tokio::task::spawn(async move {
         while let Ok(_block) = block_stream_rx.recv().await {
             block_counter.tick();
-            if block_counter.is_at_interval() && tasks_client.load().await? {
+            if block_counter.is_at_interval() && tasks_client.lock().await.load().await? {
                 info!("[{}] Tasks Cache Reloaded", chain_id);
             }
         }
@@ -335,7 +383,7 @@ pub async fn scheduled_tasks_loop(
     chain_id: Arc<String>,
     agent_client: Arc<Agent>,
     manager_client: Arc<Manager>,
-    tasks_client: Arc<Tasks>,
+    tasks_client: Arc<Mutex<Tasks>>,
 ) -> Result<(), Report> {
     let block_consumer_stream: JoinHandle<Result<(), Report>> = tokio::task::spawn(async move {
         while let Ok(block) = block_stream_rx.recv().await {
@@ -353,16 +401,18 @@ pub async fn scheduled_tasks_loop(
 
                 if let Some(tasks) = tasks {
                     // also get info about evented stats
-                    let stats = tasks_client.get_stats().await?;
+                    let stats = tasks_client.lock().await.get_stats().await?;
 
                     info!(
-                        "[{}] Block {} :: Block: {}, Cron: {}, Unbounded: {}, Ranged: {}",
+                        "[{}] Block {} :: Block: {}, Cron: {}, Unbounded HT: {}, Ranged HT: {}, Unbounded TM: {}, Ranged TM: {}",
                         chain_id,
                         block.inner.sync_info.latest_block_height,
                         tasks.stats.num_block_tasks,
                         tasks.stats.num_cron_tasks,
                         stats.0,
                         stats.1,
+                        stats.2,
+                        stats.3,
                     );
 
                     // TODO: Limit batches to max gas 3_000_000-6_000_000 (also could be set per-chain since stargaze has higher limits for example)
@@ -394,8 +444,7 @@ pub async fn scheduled_tasks_loop(
                 } else {
                     info!(
                         "[{}] No tasks for block (height: {})",
-                        chain_id,
-                        block.inner.sync_info.latest_block_height
+                        chain_id, block.inner.sync_info.latest_block_height
                     );
                 }
 
@@ -427,7 +476,7 @@ pub async fn evented_tasks_loop(
     block_status: Arc<Mutex<AgentStatus>>,
     chain_id: Arc<String>,
     manager_client: Arc<Manager>,
-    tasks_client: Arc<Tasks>,
+    tasks_client_mut: Arc<Mutex<Tasks>>,
 ) -> Result<(), Report> {
     // TODO: Question for Seedyrom: can this while loop invalidate once block passed?
     let block_consumer_stream: JoinHandle<Result<(), Report>> = tokio::task::spawn(async move {
@@ -438,16 +487,20 @@ pub async fn evented_tasks_loop(
             std::mem::drop(locked_status);
             if is_active {
                 let tasks_failed = Arc::new(AtomicBool::new(false));
+                let mut tasks_client = tasks_client_mut.lock().await;
 
                 // Stack 0: Unbounded evented tasks
                 // - These will get queried every block
                 // - NOTE: These will be lower priority than ranged
-                let unbounded = tasks_client.unbounded().await?;
+                let unbounded = tasks_client.unbounded(EventType::Block).await?;
+                println!("unbounded {:?}", unbounded);
 
                 // Stack 1: Ranged evented tasks
                 // - These will get queried every block, as long as the index is lt block height/timestamp
                 let header = block.inner.sync_info;
-                let ranged_height = tasks_client.ranged(header.latest_block_height.into()).await?;
+                let ranged_height = tasks_client
+                    .ranged(header.latest_block_height.into(), EventType::Block)
+                    .await?;
                 let ranged_timestamp = tasks_client
                     .ranged(
                         header
@@ -455,8 +508,13 @@ pub async fn evented_tasks_loop(
                             .duration_since(Time::from_unix_timestamp(0, 0).unwrap())
                             .unwrap()
                             .as_secs(),
+                            EventType::Time,
                     )
                     .await?;
+                println!(
+                    "ranged_height ranged_timestamp {:?} {:?}",
+                    ranged_height, ranged_timestamp
+                );
 
                 // Accumulate: get all the tasks ready to be queried
                 // Priority order: block height, block timestamp, unbounded
@@ -490,19 +548,39 @@ pub async fn evented_tasks_loop(
                 }
 
                 // Validate: get all
-                let task_hashes = tasks_client.validate_queries(query_sets).await?;
+                let mut task_hashes: Vec<String> =
+                    tasks_client.validate_queries(query_sets).await?;
+
+                // Based on end-boundary, skip validation of queries so we can cleanup tasks state, if any exist
+                if task_hashes.is_empty() {
+                    // if we are bored, have our agent thumbs twiddling, attempt to do some cleanup for missed/passed evented taasks
+                    task_hashes = tasks_client
+                        .get_ended_tasks_hashes(
+                            &header.latest_block_height.into(),
+                            &Timestamp::from_seconds(
+                                header.latest_block_time.duration_since(Time::from_unix_timestamp(0, 0).unwrap())
+                            .unwrap()
+                            .as_secs()
+                            )
+                            // &header.latest_block_time.into()
+                        )
+                        .await?;
+                }
+                println!("task_hashes {:?}", task_hashes);
 
                 if !task_hashes.is_empty() {
                     // also get info about evented stats
                     let stats = tasks_client.get_stats().await?;
 
                     info!(
-                        "[{}] Evented Tasks {}, Block {}, Unbounded: {}, Ranged: {}",
+                        "[{}] Evented Tasks {}, Block {}, Unbounded HT: {}, Ranged HT: {}, Unbounded TM: {}, Ranged TM: {}",
                         chain_id,
                         task_hashes.len(),
                         header.latest_block_height,
                         stats.0,
                         stats.1,
+                        stats.2,
+                        stats.3,
                     );
 
                     // Batch proxy_call's for task_hashes
@@ -517,6 +595,9 @@ pub async fn evented_tasks_loop(
                                 pc_res.height,
                                 pc_res.events.len()
                             );
+
+                            // TODO: Remove tasks from cache that have "remove_task" or "ended_task" logs next to their task_hash
+                            println!("FULL TX RESULT {:?}", pc_res);
                         }
                         Err(err) => {
                             tasks_failed.store(true, SeqCst);
@@ -527,6 +608,12 @@ pub async fn evented_tasks_loop(
                         }
                     }
                 }
+                // TODO: ! ADD BACK
+                // else {
+                //     println!("DOIN ALL KINDS OF CLEANPU");
+                //     // use idle opps to cleanup empty states
+                //     let _ = tasks_client.cleanup_empty();
+                // }
 
                 if !tasks_failed.load(SeqCst) {
                     ping_uptime_monitor().await;

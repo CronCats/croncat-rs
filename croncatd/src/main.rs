@@ -10,7 +10,8 @@ use croncat::{
     modules::{agent::Agent, factory::Factory, manager::Manager, tasks::Tasks},
     rpc::RpcClientService,
     store::agent::LocalAgentStorage,
-    system, tokio,
+    system,
+    tokio::{self, sync::Mutex},
 };
 use opts::Opts;
 use std::{process::exit, sync::Arc};
@@ -131,14 +132,15 @@ async fn run_command(opts: Opts, mut storage: LocalAgentStorage) -> Result<(), R
         Some(tasks_contract_addr.clone()),
     )
     .await;
-    let tasks = Arc::new(
+    let tasks = Arc::new(Mutex::new(
         Tasks::new(
+            chain_config.clone(),
             tasks_contract_addr.clone(),
             tasks_client,
             generic_querier_addr,
         )
         .await?,
-    );
+    ));
 
     match opts.cmd {
         opts::Command::Register { payable_account_id } => {
@@ -178,9 +180,16 @@ async fn run_command(opts: Opts, mut storage: LocalAgentStorage) -> Result<(), R
                     let account_addr = account_addr.clone();
                     Err(eyre!("Agent {} already registered", account_addr))?;
                 }
-                Err(err) if err.to_string().contains("Agent registration currently operates on a whitelist") => {
+                Err(err)
+                    if err
+                        .to_string()
+                        .contains("Agent registration currently operates on a whitelist") =>
+                {
                     let account_addr = account_addr.clone();
-                    Err(eyre!("Agent {} needs whitelist approval, please submit request to CronCat DAO", account_addr))?;
+                    Err(eyre!(
+                        "Agent {} needs whitelist approval, please submit request to CronCat DAO",
+                        account_addr
+                    ))?;
                 }
                 Err(err)
                     if err.to_string().contains("account")
@@ -277,7 +286,7 @@ async fn run_command(opts: Opts, mut storage: LocalAgentStorage) -> Result<(), R
             }
         }
         opts::Command::AllTasks { from_index, limit } => {
-            let res = tasks.get_all(from_index, limit).await;
+            let res = tasks.lock().await.get_all(from_index, limit).await;
 
             // Handle the result
             match res {

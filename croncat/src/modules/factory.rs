@@ -19,6 +19,7 @@ pub fn to_version_key(name: String, version: [u8; 2]) -> String {
 pub struct Factory {
     pub client: RpcClientService,
     pub contract_addr: Address,
+    pub chain_id: String,
     pub store: LocalCacheStorage,
 }
 
@@ -52,10 +53,12 @@ impl Factory {
         cfg: ChainConfig,
         client: RpcClientService,
     ) -> Result<Self, Report> {
+        let chain_id = cfg.info.chain_id;
         Ok(Self {
             client,
             contract_addr: Address::from_str(&cfg.factory)?,
-            store: LocalCacheStorage::default(),
+            chain_id: chain_id.clone(),
+            store: LocalCacheStorage::new(Some(chain_id)),
         })
     }
 
@@ -239,8 +242,7 @@ pub async fn refresh_factory_loop(
 ) -> Result<(), Report> {
     let block_counter = AtomicIntervalCounter::new(200);
     let task_handle: tokio::task::JoinHandle<Result<(), Report>> = tokio::task::spawn(async move {
-        while let Ok(block) = block_stream_rx.recv().await {
-            println!("Current block {:?}", block.inner.sync_info.latest_block_height);
+        while let Ok(_block) = block_stream_rx.recv().await {
             block_counter.tick();
             if block_counter.is_at_interval() && factory_client.load().await? {
                 info!("[{}] Factory Cache Reloaded", chain_id);

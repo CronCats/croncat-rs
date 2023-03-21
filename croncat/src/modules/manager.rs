@@ -1,9 +1,9 @@
 use crate::{
     errors::Report,
-    rpc::{client::BatchMsg, RpcClientService},
+    rpc::RpcClientService,
 };
 use cosm_orc::orchestrator::{Address, ChainTxResponse};
-use cosmwasm_std::to_binary;
+use cosm_tome::modules::cosmwasm::model::ExecRequest;
 use croncat_sdk_manager::msg::ManagerExecuteMsg;
 
 pub struct Manager {
@@ -40,12 +40,13 @@ impl Manager {
     pub async fn proxy_call_batch(&self, count: usize) -> Result<ChainTxResponse, Report> {
         self.client
             .execute(|signer| {
-                let mut reqs: Vec<BatchMsg> = Vec::with_capacity(count);
+                let mut reqs: Vec<ExecRequest<ManagerExecuteMsg>> = Vec::with_capacity(count);
                 let contract_addr = self.contract_addr.clone();
                 for _ in 0..count {
-                    reqs.push(BatchMsg {
-                        msg: to_binary(&ManagerExecuteMsg::ProxyCall { task_hash: None }).unwrap(),
-                        contract_addr: contract_addr.clone(),
+                    reqs.push(ExecRequest {
+                        address: contract_addr.clone(),
+                        msg: ManagerExecuteMsg::ProxyCall { task_hash: None },
+                        funds: vec![],
                     });
                 }
                 async move { signer.execute_batch(reqs).await }
@@ -60,15 +61,15 @@ impl Manager {
     ) -> Result<ChainTxResponse, Report> {
         self.client
             .execute(|signer| {
-                let mut reqs: Vec<BatchMsg> = Vec::with_capacity(tash_hashes.len());
+                let mut reqs: Vec<ExecRequest<ManagerExecuteMsg>> = Vec::with_capacity(tash_hashes.len());
                 let contract_addr = self.contract_addr.clone();
                 for task_hash in tash_hashes.iter() {
-                    reqs.push(BatchMsg {
-                        msg: to_binary(&ManagerExecuteMsg::ProxyCall {
+                    reqs.push(ExecRequest {
+                        address: contract_addr.clone(),
+                        msg: ManagerExecuteMsg::ProxyCall {
                             task_hash: Some(task_hash.to_string()),
-                        })
-                        .unwrap(),
-                        contract_addr: contract_addr.clone(),
+                        },
+                        funds: vec![],
                     });
                 }
                 async move { signer.execute_batch(reqs).await }

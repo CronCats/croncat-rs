@@ -22,7 +22,7 @@ use crate::{
         factory::{refresh_factory_loop, Factory},
         manager::Manager,
         polling::poll_stream_blocks,
-        tasks::{evented_tasks_loop, scheduled_tasks_loop, Tasks},
+        tasks::{evented_tasks_loop, scheduled_tasks_loop, refresh_tasks_cache_loop, Tasks},
     },
     tokio,
 };
@@ -41,7 +41,7 @@ pub async fn run(
     factory: Factory,
     agent: Arc<Agent>,
     manager: Arc<Manager>,
-    tasks: Arc<Tasks>,
+    tasks: Arc<Mutex<Tasks>>,
 ) -> Result<(), Report> {
     // Get the status of the agent
     let account_id = agent.account_id();
@@ -176,16 +176,23 @@ pub async fn run(
         tokio::task::spawn(async { Ok(()) })
     };
 
-    // TODO: Bring back!
-    // // Tasks Cache checks
-    // let tasks_cache_check_shutdown_rx = shutdown_tx.subscribe();
-    // let tasks_cache_check_block_stream_rx = dispatcher_tx.subscribe();
-    // let tasks_cache_check_handle = tokio::task::spawn(refresh_tasks_cache_loop(
-    //     tasks_cache_check_block_stream_rx,
-    //     tasks_cache_check_shutdown_rx,
-    //     Arc::new(chain_id.clone()),
-    //     tasks,
-    // ));
+    // Tasks Cache checks
+    let tasks_cache_check_shutdown_rx = shutdown_tx.subscribe();
+    let tasks_cache_check_block_stream_rx = dispatcher_tx.subscribe();
+    let tasks_cache_check_handle = if let Some(b) = config.include_evented_tasks {
+        if b {
+            tokio::task::spawn(refresh_tasks_cache_loop(
+                tasks_cache_check_block_stream_rx,
+                tasks_cache_check_shutdown_rx,
+                Arc::new(chain_id.clone()),
+                tasks,
+            ))
+        } else {
+            tokio::task::spawn(async { Ok(()) })
+        }
+    } else {
+        tokio::task::spawn(async { Ok(()) })
+    };
 
     // Ctrl-C handler
     let ctrl_c_shutdown_tx = shutdown_tx.clone();
@@ -217,7 +224,7 @@ pub async fn run(
         account_status_check_handle,
         task_runner_handle,
         evented_task_runner_handle,
-        // tasks_cache_check_handle,
+        tasks_cache_check_handle,
     );
 
     // If any of the tasks failed, we need to propagate the error.
@@ -237,7 +244,7 @@ pub async fn run_retry(
     factory: Factory,
     agent: Arc<Agent>,
     manager: Arc<Manager>,
-    tasks: Arc<Tasks>,
+    tasks: Arc<Mutex<Tasks>>,
 ) -> Result<(), Report> {
     // TODO: Rethink this retry logic
     // let retry_strategy = FixedInterval::from_millis(5000).take(1200);

@@ -30,29 +30,45 @@ impl std::fmt::Debug for LocalCacheStorageEntry {
 /// Store key pairs on disk and allow access to the data.
 pub struct LocalCacheStorage {
     pub path: PathBuf,
+    pub path_prefix: Option<String>,
     data: Option<LocalCacheStorageEntry>,
 }
 
 impl LocalCacheStorage {
     /// Create a new [`LocalCacheStorage`] instance with the default directory.
-    pub fn new() -> Self {
-        Self::from_path(get_storage_path())
+    pub fn new(path_prefix: Option<String>) -> Self {
+        let p = get_storage_path();
+        Self {
+            path: p,
+            path_prefix,
+            data: None,
+        }
     }
 
     /// Create a [`LocalCacheStorage`] instance at a specified path,
     /// if the data already exists at the directory we load it.
-    pub fn from_path(path: PathBuf) -> Self {
-        let data_file = path.join(LOCAL_STORAGE_FILENAME);
+    pub fn from_path(&self, path: PathBuf) -> Self {
+        let data_file = path
+            .join(self.path_prefix.clone().unwrap_or_default())
+            .join(LOCAL_STORAGE_FILENAME);
 
         // Load from the agent data file if it exists
         if data_file.exists() {
             let json_data = fs::read_to_string(data_file).unwrap();
             let data =
                 serde_json::from_str(json_data.as_str()).expect("Failed to parse agent JSON data");
-            Self { path, data }
+            Self {
+                path,
+                path_prefix: self.path_prefix.clone(),
+                data,
+            }
         } else {
             // Otherwise create a new hashmap
-            Self { path, data: None }
+            Self {
+                path,
+                path_prefix: self.path_prefix.clone(),
+                data: None,
+            }
         }
     }
 
@@ -61,7 +77,10 @@ impl LocalCacheStorage {
         if self.data.is_none() {
             return Err(eyre!("No factory data to write"));
         }
-        let data_file = self.path.join(LOCAL_STORAGE_FILENAME);
+        let data_file = self
+            .path
+            .join(self.path_prefix.clone().unwrap_or_default())
+            .join(LOCAL_STORAGE_FILENAME);
 
         // Create the directory to store our data if it doesn't exist
         if let Some(p) = data_file.parent() {
@@ -149,6 +168,6 @@ impl LocalCacheStorage {
 
 impl Default for LocalCacheStorage {
     fn default() -> Self {
-        Self::new()
+        Self::new(None)
     }
 }

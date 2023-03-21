@@ -8,7 +8,6 @@ use cosm_orc::orchestrator::{ChainTxResponse, Coin, Key};
 use cosm_tome::chain::request::TxOptions;
 use cosm_tome::modules::bank::model::SendRequest;
 use cosm_tome::modules::cosmwasm::model::ExecRequest;
-use cosmwasm_std::Binary;
 use serde::de::DeserializeOwned;
 use serde::Serialize;
 use std::collections::HashMap;
@@ -19,11 +18,6 @@ use crate::utils::DERIVATION_PATH;
 
 /// The default RPC call timeout.
 pub const DEFAULT_TIMEOUT: f64 = 20.0;
-
-pub struct BatchMsg {
-    pub msg: Binary,
-    pub contract_addr: Address,
-}
 
 /// An RPC client for querying the croncat contract.
 #[derive(Clone)]
@@ -151,7 +145,9 @@ impl RpcClient {
     }
 
     /// Execute batch via RPC.
-    pub async fn wasm_execute_batch(&self, msgs: Vec<BatchMsg>) -> Result<ChainTxResponse, Report> {
+    pub async fn wasm_execute_batch<S>(&self, msgs: Vec<ExecRequest<S>>) -> Result<ChainTxResponse, Report> where
+        S: Serialize
+    {
         if self.key.is_none() {
             return Err(eyre!("No signing key set"));
         }
@@ -160,11 +156,7 @@ impl RpcClient {
 
         // format for reqs
         for m in msgs {
-            reqs.push(ExecRequest {
-                address: m.contract_addr,
-                msg: m.msg,
-                funds: vec![],
-            })
+            reqs.push(m)
         }
 
         // Execute a message on the chain -- uses default contract_addr if not specified (factory address)

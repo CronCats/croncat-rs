@@ -1,7 +1,7 @@
 use crate::config::ChainConfig;
 use crate::store::tasks::EventType;
 use crate::utils::AtomicIntervalCounter;
-use cosm_orc::orchestrator::Address;
+use cosm_orc::orchestrator::{Address, ChainTxResponse};
 use cosmwasm_std::Timestamp;
 use croncat_sdk_agents::types::AgentStatus;
 use croncat_sdk_tasks::msg::TasksQueryMsg;
@@ -130,9 +130,35 @@ impl Tasks {
         self.store.clear_ended_tasks(index, time)
     }
 
-    // gets ranged tasks, occurring for specified range
-    pub async fn cleanup_empty(&mut self) -> Result<(), Report> {
-        self.store.clear_empty_indexes()
+    // Find any task hash's that have events with ended attributes and clean from cache
+    pub async fn clean_ended_tasks_from_chain_tx(&mut self, tx: ChainTxResponse) -> Result<(), Report> {
+        let mut task_hashes: Vec<String> = vec![];
+        for event in tx.events {
+            if event.type_str == "wasm".to_string() {
+                let mut task_hash: Option<String> = None;
+                let mut ended = false;
+                for attr in &event.attributes {
+                    if attr.key == "task_hash".to_string() {
+                        task_hash = Some(attr.value.clone());
+                    }
+                    if attr.key == "lifecycle".to_string() && attr.value == "task_ended".to_string() {
+                        ended = true
+                    }
+                }
+                if let Some(hash) = task_hash {
+                    if ended {
+                        task_hashes.push(hash);
+                    }
+                }
+            }
+        }
+
+        // loop remove the found task_hash's
+        for hash in task_hashes {
+            self.store.remove_task_by_hash(hash.as_str())?;
+        }
+
+        Ok(())
     }
 
     pub async fn get_all(
@@ -309,6 +335,7 @@ impl Tasks {
                         }
                     })
                     .await;
+                println!("Validate QUERY res {:?}", res);
 
                 // TODO: For errors with a query - potentially return the task hash so the task can get cleaned up.
                 // - This would have to check `stop_on_fail` as well as other boundary/interval things.
@@ -383,7 +410,7 @@ pub async fn scheduled_tasks_loop(
     chain_id: Arc<String>,
     agent_client: Arc<Agent>,
     manager_client: Arc<Manager>,
-    tasks_client: Arc<Mutex<Tasks>>,
+    tasks_client_mut: Arc<Mutex<Tasks>>,
 ) -> Result<(), Report> {
     let block_consumer_stream: JoinHandle<Result<(), Report>> = tokio::task::spawn(async move {
         while let Ok(block) = block_stream_rx.recv().await {
@@ -400,11 +427,12 @@ pub async fn scheduled_tasks_loop(
                     .map_err(|err| eyre!("Failed to get agent tasks: {}", err))?;
 
                 if let Some(tasks) = tasks {
+                    let mut tasks_client = tasks_client_mut.lock().await;
                     // also get info about evented stats
-                    let stats = tasks_client.lock().await.get_stats().await?;
+                    let stats = tasks_client.get_stats().await?;
 
                     info!(
-                        "[{}] Block {} :: Block: {}, Cron: {}, Unbounded HT: {}, Ranged HT: {}, Unbounded TM: {}, Ranged TM: {}",
+                        "[{}] Block {} :: Block: {}, Cron: {}, H0: {}, RH: {}, T0: {}, RT: {}",
                         chain_id,
                         block.inner.sync_info.latest_block_height,
                         tasks.stats.num_block_tasks,
@@ -434,6 +462,9 @@ pub async fn scheduled_tasks_loop(
                                     pc_res.height,
                                     pc_res.events.len()
                                 );
+
+                                println!("FULL SCHEDULED TX RESULT {:?}", pc_res);
+                                tasks_client.clean_ended_tasks_from_chain_tx(pc_res).await?;
                             }
                             Err(err) => {
                                 tasks_failed.store(true, SeqCst);
@@ -493,7 +524,7 @@ pub async fn evented_tasks_loop(
                 // - These will get queried every block
                 // - NOTE: These will be lower priority than ranged
                 let unbounded = tasks_client.unbounded(EventType::Block).await?;
-                println!("unbounded {:?}", unbounded);
+                println!("BASE 0 {:?}", unbounded);
 
                 // Stack 1: Ranged evented tasks
                 // - These will get queried every block, as long as the index is lt block height/timestamp
@@ -512,7 +543,7 @@ pub async fn evented_tasks_loop(
                     )
                     .await?;
                 println!(
-                    "ranged_height ranged_timestamp {:?} {:?}",
+                    "Range Height {:?} Time {:?}",
                     ranged_height, ranged_timestamp
                 );
 
@@ -552,8 +583,8 @@ pub async fn evented_tasks_loop(
                     tasks_client.validate_queries(query_sets).await?;
 
                 // Based on end-boundary, skip validation of queries so we can cleanup tasks state, if any exist
+                // if we are bored, have our agent thumbs twiddling, attempt to do some cleanup for missed/passed evented taasks
                 if task_hashes.is_empty() {
-                    // if we are bored, have our agent thumbs twiddling, attempt to do some cleanup for missed/passed evented taasks
                     task_hashes = tasks_client
                         .get_ended_tasks_hashes(
                             &header.latest_block_height.into(),
@@ -562,7 +593,6 @@ pub async fn evented_tasks_loop(
                             .unwrap()
                             .as_secs()
                             )
-                            // &header.latest_block_time.into()
                         )
                         .await?;
                 }
@@ -573,7 +603,7 @@ pub async fn evented_tasks_loop(
                     let stats = tasks_client.get_stats().await?;
 
                     info!(
-                        "[{}] Evented Tasks {}, Block {}, Unbounded HT: {}, Ranged HT: {}, Unbounded TM: {}, Ranged TM: {}",
+                        "[{}] Evented Tasks {}, Block {}, H0: {}, RH: {}, T0: {}, RT: {}",
                         chain_id,
                         task_hashes.len(),
                         header.latest_block_height,
@@ -586,7 +616,7 @@ pub async fn evented_tasks_loop(
                     // Batch proxy_call's for task_hashes
                     // TODO: Limit batches to max gas 3_000_000-6_000_000 (also could be set per-chain since stargaze has higher limits for example)
                     let tasks_failed = tasks_failed.clone();
-                    match manager_client.proxy_call_evented_batch(task_hashes).await {
+                    match manager_client.proxy_call_evented_batch(task_hashes.clone()).await {
                         Ok(pc_res) => {
                             debug!("Result: {:?}", pc_res.res.log);
                             info!(
@@ -596,8 +626,8 @@ pub async fn evented_tasks_loop(
                                 pc_res.events.len()
                             );
 
-                            // TODO: Remove tasks from cache that have "remove_task" or "ended_task" logs next to their task_hash
                             println!("FULL TX RESULT {:?}", pc_res);
+                            tasks_client.clean_ended_tasks_from_chain_tx(pc_res).await?;
                         }
                         Err(err) => {
                             tasks_failed.store(true, SeqCst);
@@ -608,12 +638,6 @@ pub async fn evented_tasks_loop(
                         }
                     }
                 }
-                // TODO: ! ADD BACK
-                // else {
-                //     println!("DOIN ALL KINDS OF CLEANPU");
-                //     // use idle opps to cleanup empty states
-                //     let _ = tasks_client.cleanup_empty();
-                // }
 
                 if !tasks_failed.load(SeqCst) {
                     ping_uptime_monitor().await;

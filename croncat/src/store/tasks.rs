@@ -168,8 +168,7 @@ impl LocalEventStorage {
             });
         }
 
-        // TODO: Cleanup empty indexes here?
-
+        self.clear_empty_indexes()?;
         self.write_to_disk()?;
         Ok(())
     }
@@ -230,7 +229,6 @@ impl LocalEventStorage {
                     indexed_set.remove(&hash);
                 }
             }
-            println!("CHECK THIS GOT REMOVED RIGHT: data.height_based {:?}", data.height_based);
             for (_, indexed_set) in data.time_based.iter_mut() {
                 let mut to_remove = Vec::new();
 
@@ -249,7 +247,6 @@ impl LocalEventStorage {
                     indexed_set.remove(&hash);
                 }
             }
-            println!("CHECK THIS GOT REMOVED RIGHT: data.time_based {:?}", data.time_based);
 
             data.time_based.retain(|_, v| !v.is_empty());
 
@@ -380,7 +377,7 @@ impl LocalEventStorage {
                     range_height_total = range_height_total.saturating_add(hm_tasks.len() as u64);
                 }
                 let mut range_time_total: u64 = 0;
-                for (_, hm_tasks) in data.height_based.range(1..) {
+                for (_, hm_tasks) in data.time_based.range(1..) {
                     range_time_total = range_time_total.saturating_add(hm_tasks.len() as u64);
                 }
                 (base_height_total, range_height_total, base_time_total, range_time_total)

@@ -159,11 +159,18 @@ impl RpcClient {
             reqs.push(m)
         }
 
+        let default_tx_options = TxOptions::default();
+        let tx_options = TxOptions {
+            memo: "GMEOW 😻 https://Cron.Cat".to_string(),
+            ..default_tx_options
+        };
+        println!("tx_options {:?}", tx_options);
+
         // Execute a message on the chain -- uses default contract_addr if not specified (factory address)
         let response = self
             .client
             .client
-            .wasm_execute_batch(reqs, self.key.as_ref().unwrap(), &TxOptions::default())
+            .wasm_execute_batch(reqs, self.key.as_ref().unwrap(), &tx_options)
             .await?;
 
         // return the response data

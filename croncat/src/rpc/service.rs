@@ -12,7 +12,7 @@ use cosmrs::bip32;
 use cosmrs::crypto::secp256k1::SigningKey;
 use futures_util::Future;
 use rand::seq::SliceRandom;
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 use std::str::FromStr;
 use std::sync::Arc;
 use std::time::Duration;
@@ -99,9 +99,20 @@ impl RpcClientService {
         // Create a racetrack for testing sources.
         let mut race_track = RaceTrack::disqualify_after(Duration::from_secs(5));
 
+        // Seen sources
+        let mut seen_sources = HashSet::new();
+
         // Race all the sources and check that they connect to RPC.
         for (name, source) in sources {
             let source = source.clone();
+
+            // If we've seen the before then skip it.
+            if source.rpc.is_empty() || seen_sources.contains(&source.rpc) {
+                continue;
+            }
+            // Add the source to the seen sources.
+            seen_sources.insert(source.rpc.clone());
+
             let chain_config = chain_config.clone();
             let factory_addr = chain_config.clone().factory;
             race_track.add_racer(name, async move {

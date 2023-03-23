@@ -64,17 +64,17 @@ impl RpcClientService {
         let contract_addr = contract_addr
             .unwrap_or_else(|| Address::from_str(chain_config.clone().factory.as_str()).unwrap());
 
-        let mut sources = RPC_SOURCES.lock().await;
+        let mut global_sources = RPC_SOURCES.lock().await;
 
-        let data_sources = if sources.is_empty() {
+        let data_sources = if global_sources.is_empty() {
             let data_sources =
                 Self::pick_best_sources(&chain_config, &chain_config.data_sources()).await;
             for (provider, data_source) in data_sources.iter() {
-                sources.insert(provider.clone(), data_source.clone());
+                global_sources.insert(provider.clone(), data_source.clone());
             }
             data_sources
         } else {
-            sources.clone()
+            global_sources.clone()
         };
 
         Self {

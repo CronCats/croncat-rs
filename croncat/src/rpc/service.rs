@@ -12,7 +12,7 @@ use cosmrs::bip32;
 use cosmrs::crypto::secp256k1::SigningKey;
 use futures_util::Future;
 use rand::seq::SliceRandom;
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 use std::str::FromStr;
 use std::sync::Arc;
 use std::time::Duration;
@@ -21,6 +21,12 @@ use tracing::debug;
 
 use super::Querier;
 use super::Signer;
+
+type RpcSources = Arc<Mutex<HashMap<String, (ChainDataSource, bool)>>>;
+
+lazy_static::lazy_static! {
+    pub(crate) static ref RPC_SOURCES: RpcSources = Arc::new(Mutex::new(HashMap::new()));
+}
 
 #[derive(Debug)]
 pub enum ServiceFailure {
@@ -46,7 +52,7 @@ pub struct RpcClientService {
     chain_config: ChainConfig,
     contract_addr: Address,
     key: bip32::XPrv,
-    source_info: Arc<Mutex<HashMap<String, (ChainDataSource, bool)>>>,
+    source_info: RpcSources,
 }
 
 impl RpcClientService {
@@ -57,8 +63,19 @@ impl RpcClientService {
     ) -> Self {
         let contract_addr = contract_addr
             .unwrap_or_else(|| Address::from_str(chain_config.clone().factory.as_str()).unwrap());
-        let data_sources =
-            Self::pick_best_sources(&chain_config, &chain_config.data_sources()).await;
+
+        let mut global_sources = RPC_SOURCES.lock().await;
+
+        let data_sources = if global_sources.is_empty() {
+            let data_sources =
+                Self::pick_best_sources(&chain_config, &chain_config.data_sources()).await;
+            for (provider, data_source) in data_sources.iter() {
+                global_sources.insert(provider.clone(), data_source.clone());
+            }
+            data_sources
+        } else {
+            global_sources.clone()
+        };
 
         Self {
             key,
@@ -82,9 +99,20 @@ impl RpcClientService {
         // Create a racetrack for testing sources.
         let mut race_track = RaceTrack::disqualify_after(Duration::from_secs(5));
 
+        // Seen sources
+        let mut seen_sources = HashSet::new();
+
         // Race all the sources and check that they connect to RPC.
         for (name, source) in sources {
             let source = source.clone();
+
+            // If we've seen the before then skip it.
+            if source.rpc.is_empty() || seen_sources.contains(&source.rpc) {
+                continue;
+            }
+            // Add the source to the seen sources.
+            seen_sources.insert(source.rpc.clone());
+
             let chain_config = chain_config.clone();
             let factory_addr = chain_config.clone().factory;
             race_track.add_racer(name, async move {
@@ -195,7 +223,7 @@ impl RpcClientService {
                     {
                         Ok(client) => client,
                         Err(e) => {
-                            println!("Failed to create RpcClient for {}: {}", source_key, e);
+                            println!("Failed to create RpcClient for {source_key}: {e}");
                             debug!("Failed to create RpcClient for {}: {}", source_key, e);
                             let (_, bad) = source_info.get_mut(&source_key).unwrap();
                             *bad = true;
@@ -214,7 +242,7 @@ impl RpcClientService {
                     {
                         Ok(client) => client,
                         Err(e) => {
-                            println!("Failed to create RpcCallType::Query for {}: {}", source_key, e);
+                            println!("Failed to create RpcCallType::Query for {source_key}: {e}");
                             debug!("Failed to create RpcClient for {}: {}", source_key, e);
                             let (_, bad) = source_info.get_mut(&source_key).unwrap();
                             *bad = true;
@@ -236,7 +264,7 @@ impl RpcClientService {
                 }
                 Err(e) => {
                     // TODO: Assess ChainResponse { code: Err(18) ???
-                    println!("Error calling chain for {}: {}", source_key, e);
+                    println!("Error calling chain for {source_key}: {e}");
                     debug!("Error calling chain for {}: {}", source_key, e);
                     // let (_, bad) = source_info.get_mut(&source_key).unwrap();
                     // *bad = true;

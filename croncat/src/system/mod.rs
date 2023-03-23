@@ -2,9 +2,7 @@
 //! The croncat system daemon.
 //!
 
-use croncat_pipeline::{
-    try_flat_join, Dispatcher, ProviderSystem, Sequencer,
-};
+use croncat_pipeline::{try_flat_join, Dispatcher, ProviderSystem, Sequencer};
 use std::sync::Arc;
 use tokio::{
     sync::{broadcast, mpsc, Mutex},
@@ -22,7 +20,7 @@ use crate::{
         factory::{refresh_factory_loop, Factory},
         manager::Manager,
         polling::poll_stream_blocks,
-        tasks::{evented_tasks_loop, scheduled_tasks_loop, refresh_tasks_cache_loop, Tasks},
+        tasks::{evented_tasks_loop, refresh_tasks_cache_loop, scheduled_tasks_loop, Tasks},
     },
     tokio,
 };
@@ -110,8 +108,7 @@ pub async fn run(
         while let Ok(status) = block_stream_info_rx.recv().await {
             debug!(
                 "[{}] Processing block (height: {})",
-                block_stream_chain_id,
-                status.inner.sync_info.latest_block_height,
+                block_stream_chain_id, status.inner.sync_info.latest_block_height,
             );
         }
     });

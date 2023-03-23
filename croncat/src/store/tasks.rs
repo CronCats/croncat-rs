@@ -1,7 +1,7 @@
 use chrono::Utc;
 use color_eyre::{eyre::eyre, Report};
-use cosmwasm_std::{Uint64, Timestamp};
-use croncat_sdk_tasks::types::{TaskInfo, BoundaryHeight, BoundaryTime};
+use cosmwasm_std::{Timestamp, Uint64};
+use croncat_sdk_tasks::types::{BoundaryHeight, BoundaryTime, TaskInfo};
 use serde::{Deserialize, Serialize};
 use std::{
     collections::{BTreeMap, HashMap},
@@ -112,7 +112,12 @@ impl LocalEventStorage {
     }
 
     /// Insert a items into the data set.
-    pub fn insert(&mut self, kind: EventType, index: u64, events: Vec<(String, TaskInfo)>) -> Result<(), Report> {
+    pub fn insert(
+        &mut self,
+        kind: EventType,
+        index: u64,
+        events: Vec<(String, TaskInfo)>,
+    ) -> Result<(), Report> {
         // Expires after 1 hour, updates any time we get new data
         let dt = Utc::now();
         let expires = dt.timestamp().saturating_add(10);
@@ -128,9 +133,9 @@ impl LocalEventStorage {
                     for (k, v) in events {
                         event_range.insert(k, v);
                     }
-                    println!("evented index added height: {:?}", index);
+                    println!("evented index added height: {index:?}");
                     data.height_based.insert(index, event_range);
-                },
+                }
                 EventType::Time => {
                     let mut event_range = data
                         .time_based
@@ -140,7 +145,7 @@ impl LocalEventStorage {
                     for (k, v) in events {
                         event_range.insert(k, v);
                     }
-                    println!("evented index added time: {:?}", index);
+                    println!("evented index added time: {index:?}");
                     data.time_based.insert(index, event_range);
                 }
             }
@@ -156,7 +161,7 @@ impl LocalEventStorage {
             match kind {
                 EventType::Block => {
                     height_based.insert(index, items);
-                },
+                }
                 EventType::Time => {
                     time_based.insert(index, items);
                 }
@@ -205,9 +210,13 @@ impl LocalEventStorage {
         Ok(())
     }
 
-    /// Remove ended tasks from cache, return the vec of task hashes for agent to 
+    /// Remove ended tasks from cache, return the vec of task hashes for agent to
     /// check if those tasks still exist on chain and need to get removed
-    pub fn clear_ended_tasks(&mut self, block_height: &u64, block_time: &Timestamp) -> Result<Vec<String>, Report> {
+    pub fn clear_ended_tasks(
+        &mut self,
+        block_height: &u64,
+        block_time: &Timestamp,
+    ) -> Result<Vec<String>, Report> {
         let mut cleared = Vec::new();
 
         if let Some(data) = self.data.as_mut() {
@@ -216,7 +225,11 @@ impl LocalEventStorage {
 
                 for (hash, task) in indexed_set.iter() {
                     // Check task end boundary, if any
-                    if let croncat_sdk_tasks::types::Boundary::Height(BoundaryHeight { end: Some(end), .. }) = task.boundary {
+                    if let croncat_sdk_tasks::types::Boundary::Height(BoundaryHeight {
+                        end: Some(end),
+                        ..
+                    }) = task.boundary
+                    {
                         // compare against current height
                         if end < Uint64::from(*block_height) {
                             to_remove.push(hash.clone());
@@ -234,7 +247,11 @@ impl LocalEventStorage {
 
                 for (hash, task) in indexed_set.iter() {
                     // Check task end boundary, if any
-                    if let croncat_sdk_tasks::types::Boundary::Time(BoundaryTime { end: Some(end), .. }) = task.boundary {
+                    if let croncat_sdk_tasks::types::Boundary::Time(BoundaryTime {
+                        end: Some(end),
+                        ..
+                    }) = task.boundary
+                    {
                         // compare against current block time
                         if end < *block_time {
                             to_remove.push(hash.clone());
@@ -283,7 +300,7 @@ impl LocalEventStorage {
             match kind {
                 EventType::Block => {
                     data.height_based.retain(|k, _v| k > index && k != &0);
-                },
+                }
                 EventType::Time => {
                     data.time_based.retain(|k, _v| k > index && k != &0);
                 }
@@ -306,19 +323,29 @@ impl LocalEventStorage {
 
     /// Retrieve ranged events
     /// NOTE: non-ranged tasks store at index 0
-    pub fn get_events_by_index(&self, index: Option<u64>, kind: EventType) -> Option<Vec<&TaskInfo>> {
+    pub fn get_events_by_index(
+        &self,
+        index: Option<u64>,
+        kind: EventType,
+    ) -> Option<Vec<&TaskInfo>> {
         if !self.is_expired() && self.has_events() {
             if let Some(data) = self.data.as_ref() {
                 let idx = index.unwrap_or_default();
-                
+
                 match kind {
                     EventType::Block => {
-                        println!("get_events_by_index height range keys {:?}", data.height_based.keys());
+                        println!(
+                            "get_events_by_index height range keys {:?}",
+                            data.height_based.keys()
+                        );
                         let evts = data.height_based.get(&idx);
                         evts.map(|e| e.values().collect())
-                    },
+                    }
                     EventType::Time => {
-                        println!("get_events_by_index time range keys {:?}", data.time_based.keys());
+                        println!(
+                            "get_events_by_index time range keys {:?}",
+                            data.time_based.keys()
+                        );
                         let evts = data.time_based.get(&idx);
                         evts.map(|e| e.values().collect())
                     }
@@ -332,17 +359,27 @@ impl LocalEventStorage {
     }
 
     /// Retrieve expired ranged events
-    pub fn get_events_lte_index(&self, index: Option<u64>, kind: EventType) -> Option<Vec<&TaskInfo>> {
+    pub fn get_events_lte_index(
+        &self,
+        index: Option<u64>,
+        kind: EventType,
+    ) -> Option<Vec<&TaskInfo>> {
         if !self.is_expired() && self.has_events() {
             if let Some(data) = self.data.as_ref() {
                 let idx = index.unwrap_or(1);
                 let rng = match kind {
                     EventType::Block => {
-                        println!("get_events_lte_index height range keys {:?}", data.height_based.keys());
+                        println!(
+                            "get_events_lte_index height range keys {:?}",
+                            data.height_based.keys()
+                        );
                         data.height_based.range((Excluded(0), Included(idx)))
-                    },
+                    }
                     EventType::Time => {
-                        println!("get_events_lte_index time range keys {:?}", data.time_based.keys());
+                        println!(
+                            "get_events_lte_index time range keys {:?}",
+                            data.time_based.keys()
+                        );
                         data.time_based.range((Excluded(0), Included(idx)))
                     }
                 };
@@ -380,7 +417,12 @@ impl LocalEventStorage {
                 for (_, hm_tasks) in data.time_based.range(1..) {
                     range_time_total = range_time_total.saturating_add(hm_tasks.len() as u64);
                 }
-                (base_height_total, range_height_total, base_time_total, range_time_total)
+                (
+                    base_height_total,
+                    range_height_total,
+                    base_time_total,
+                    range_time_total,
+                )
             } else {
                 (0, 0, 0, 0)
             }

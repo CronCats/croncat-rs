@@ -145,8 +145,12 @@ impl RpcClient {
     }
 
     /// Execute batch via RPC.
-    pub async fn wasm_execute_batch<S>(&self, msgs: Vec<ExecRequest<S>>) -> Result<ChainTxResponse, Report> where
-        S: Serialize
+    pub async fn wasm_execute_batch<S>(
+        &self,
+        msgs: Vec<ExecRequest<S>>,
+    ) -> Result<ChainTxResponse, Report>
+    where
+        S: Serialize,
     {
         if self.key.is_none() {
             return Err(eyre!("No signing key set"));
@@ -164,7 +168,7 @@ impl RpcClient {
             memo: "GMEOW 😻 https://Cron.Cat".to_string(),
             ..default_tx_options
         };
-        println!("tx_options {:?}", tx_options);
+        println!("tx_options {tx_options:?}");
 
         // Execute a message on the chain -- uses default contract_addr if not specified (factory address)
         let response = self

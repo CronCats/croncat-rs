@@ -231,9 +231,7 @@ impl RpcClientService {
                     {
                         Ok(client) => client,
                         Err(e) => {
-                            println!(
-                                "Failed to create RpcCallType::Query for {source_key}: {e}"
-                            );
+                            println!("Failed to create RpcCallType::Query for {source_key}: {e}");
                             debug!("Failed to create RpcClient for {}: {}", source_key, e);
                             let (_, bad) = source_info.get_mut(&source_key).unwrap();
                             *bad = true;

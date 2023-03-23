@@ -152,8 +152,7 @@ impl Tasks {
                     if attr.key == *"task_hash" {
                         task_hash = Some(attr.value.clone());
                     }
-                    if attr.key == *"lifecycle" && attr.value == *"task_ended"
-                    {
+                    if attr.key == *"lifecycle" && attr.value == *"task_ended" {
                         ended = true
                     }
                 }
@@ -560,9 +559,7 @@ pub async fn evented_tasks_loop(
                         EventType::Time,
                     )
                     .await?;
-                println!(
-                    "Range Height {ranged_height:?} Time {ranged_timestamp:?}"
-                );
+                println!("Range Height {ranged_height:?} Time {ranged_timestamp:?}");
 
                 // Accumulate: get all the tasks ready to be queried
                 // Priority order: block height, block timestamp, unbounded

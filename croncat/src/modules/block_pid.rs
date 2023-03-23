@@ -21,7 +21,6 @@ pub type BlockPidDiff = (Duration, u64);
 
 // Default! but not on your loans
 
-
 impl BlockPid {
     /// compute and return avg_duration
     /// Response: (avg duration, avg variance)

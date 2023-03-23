@@ -145,8 +145,12 @@ impl RpcClient {
     }
 
     /// Execute batch via RPC.
-    pub async fn wasm_execute_batch<S>(&self, msgs: Vec<ExecRequest<S>>) -> Result<ChainTxResponse, Report> where
-        S: Serialize
+    pub async fn wasm_execute_batch<S>(
+        &self,
+        msgs: Vec<ExecRequest<S>>,
+    ) -> Result<ChainTxResponse, Report>
+    where
+        S: Serialize,
     {
         if self.key.is_none() {
             return Err(eyre!("No signing key set"));

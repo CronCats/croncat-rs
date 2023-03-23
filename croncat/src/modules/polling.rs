@@ -1,19 +1,20 @@
 //!
 //! Subscribe and stream blocks from the tendermint WS RPC client.
 //!
+use super::block_pid::BlockPid;
 use crate::utils::Block;
+use crate::utils::Status;
 use async_stream::try_stream;
 use color_eyre::{eyre::eyre, Report};
 use futures_util::TryStream;
-use tendermint::{Time};
-use std::{pin::Pin, time::{Duration, SystemTime, UNIX_EPOCH}};
-use tendermint_rpc::{Client, HttpClient};
-use tokio::{
-    time::{sleep, timeout},
+use std::{
+    pin::Pin,
+    time::{Duration, SystemTime, UNIX_EPOCH},
 };
-use tracing::{debug};
-use super::block_pid::BlockPid;
-use crate::utils::Status;
+use tendermint::Time;
+use tendermint_rpc::{Client, HttpClient};
+use tokio::time::{sleep, timeout};
+use tracing::debug;
 
 // The Full block details
 type BlockStream =

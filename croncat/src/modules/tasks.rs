@@ -5,7 +5,7 @@ use cosm_orc::orchestrator::{Address, ChainTxResponse};
 use cosmwasm_std::Timestamp;
 use croncat_sdk_agents::types::AgentStatus;
 use croncat_sdk_tasks::msg::TasksQueryMsg;
-use croncat_sdk_tasks::types::{CroncatQuery, TaskInfo, Boundary};
+use croncat_sdk_tasks::types::{Boundary, CroncatQuery, TaskInfo};
 use mod_sdk::types::QueryResponse;
 use serde_json::Value;
 use std::{
@@ -108,7 +108,11 @@ impl Tasks {
 
     // gets ranged tasks, occurring for specified range
     // TODO: for upcoming future block prep
-    pub async fn ranged(&self, index: u64, kind: EventType) -> Result<Option<Vec<&TaskInfo>>, Report> {
+    pub async fn ranged(
+        &self,
+        index: u64,
+        kind: EventType,
+    ) -> Result<Option<Vec<&TaskInfo>>, Report> {
         // TODO: Filter within boundary
         // let in_boundary = match task.boundary {
         //     Some(Boundary::Height { start, end }) => {
@@ -126,12 +130,19 @@ impl Tasks {
     }
 
     // gets ranged tasks, occurring for specified range
-    pub async fn get_ended_tasks_hashes(&mut self, index: &u64, time: &Timestamp) -> Result<Vec<String>, Report> {
+    pub async fn get_ended_tasks_hashes(
+        &mut self,
+        index: &u64,
+        time: &Timestamp,
+    ) -> Result<Vec<String>, Report> {
         self.store.clear_ended_tasks(index, time)
     }
 
     // Find any task hash's that have events with ended attributes and clean from cache
-    pub async fn clean_ended_tasks_from_chain_tx(&mut self, tx: ChainTxResponse) -> Result<(), Report> {
+    pub async fn clean_ended_tasks_from_chain_tx(
+        &mut self,
+        tx: ChainTxResponse,
+    ) -> Result<(), Report> {
         let mut task_hashes: Vec<String> = vec![];
         for event in tx.events {
             if event.type_str == "wasm".to_string() {
@@ -141,7 +152,8 @@ impl Tasks {
                     if attr.key == "task_hash".to_string() {
                         task_hash = Some(attr.value.clone());
                     }
-                    if attr.key == "lifecycle".to_string() && attr.value == "task_ended".to_string() {
+                    if attr.key == "lifecycle".to_string() && attr.value == "task_ended".to_string()
+                    {
                         ended = true
                     }
                 }
@@ -277,11 +289,11 @@ impl Tasks {
                         Boundary::Height(_) => {
                             let task_hash = task.task_hash.clone();
                             height_tasks.push((task_hash, task));
-                        },
+                        }
                         Boundary::Time(_) => {
                             let task_hash = task.task_hash.clone();
                             time_tasks.push((task_hash, task));
-                        },
+                        }
                     }
                 }
 
@@ -344,7 +356,9 @@ impl Tasks {
                 match res {
                     // likely this was because the response payload didnt match
                     Err(err) if err.to_string().contains("No valid data sources available") => {
-                        println!("TODO: No valid data sources available -- needs coverage to refresh?");
+                        println!(
+                            "TODO: No valid data sources available -- needs coverage to refresh?"
+                        );
                         break;
                     }
                     Err(_) => {
@@ -355,7 +369,11 @@ impl Tasks {
                         if !data.result {
                             break;
                         } else {
-                            println!("task_hash data {:?} {:?}", task_hash, serde_json::from_slice::<Value>(&data.data));
+                            println!(
+                                "task_hash data {:?} {:?}",
+                                task_hash,
+                                serde_json::from_slice::<Value>(&data.data)
+                            );
                             ready_hashes.push(task_hash.clone());
                         }
                     }
@@ -539,7 +557,7 @@ pub async fn evented_tasks_loop(
                             .duration_since(Time::from_unix_timestamp(0, 0).unwrap())
                             .unwrap()
                             .as_secs(),
-                            EventType::Time,
+                        EventType::Time,
                     )
                     .await?;
                 println!(
@@ -589,10 +607,12 @@ pub async fn evented_tasks_loop(
                         .get_ended_tasks_hashes(
                             &header.latest_block_height.into(),
                             &Timestamp::from_seconds(
-                                header.latest_block_time.duration_since(Time::from_unix_timestamp(0, 0).unwrap())
-                            .unwrap()
-                            .as_secs()
-                            )
+                                header
+                                    .latest_block_time
+                                    .duration_since(Time::from_unix_timestamp(0, 0).unwrap())
+                                    .unwrap()
+                                    .as_secs(),
+                            ),
                         )
                         .await?;
                 }
@@ -616,7 +636,10 @@ pub async fn evented_tasks_loop(
                     // Batch proxy_call's for task_hashes
                     // TODO: Limit batches to max gas 3_000_000-6_000_000 (also could be set per-chain since stargaze has higher limits for example)
                     let tasks_failed = tasks_failed.clone();
-                    match manager_client.proxy_call_evented_batch(task_hashes.clone()).await {
+                    match manager_client
+                        .proxy_call_evented_batch(task_hashes.clone())
+                        .await
+                    {
                         Ok(pc_res) => {
                             debug!("Result: {:?}", pc_res.res.log);
                             info!(

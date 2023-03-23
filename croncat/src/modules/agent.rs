@@ -7,7 +7,7 @@ use tracing::{error, info};
 
 use crate::config::ChainConfig;
 use crate::{
-    channels::{StatusStreamRx, ShutdownRx},
+    channels::{ShutdownRx, StatusStreamRx},
     rpc::RpcClientService,
     utils::AtomicIntervalCounter,
 };

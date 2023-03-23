@@ -22,6 +22,12 @@ use tracing::debug;
 use super::Querier;
 use super::Signer;
 
+type RpcSources = Arc<Mutex<HashMap<String, (ChainDataSource, bool)>>>;
+
+lazy_static::lazy_static! {
+    pub(crate) static ref RPC_SOURCES: RpcSources = Arc::new(Mutex::new(HashMap::new()));
+}
+
 #[derive(Debug)]
 pub enum ServiceFailure {
     Timeout(Report),
@@ -46,7 +52,7 @@ pub struct RpcClientService {
     chain_config: ChainConfig,
     contract_addr: Address,
     key: bip32::XPrv,
-    source_info: Arc<Mutex<HashMap<String, (ChainDataSource, bool)>>>,
+    source_info: RpcSources,
 }
 
 impl RpcClientService {
@@ -57,8 +63,19 @@ impl RpcClientService {
     ) -> Self {
         let contract_addr = contract_addr
             .unwrap_or_else(|| Address::from_str(chain_config.clone().factory.as_str()).unwrap());
-        let data_sources =
-            Self::pick_best_sources(&chain_config, &chain_config.data_sources()).await;
+
+        let mut sources = RPC_SOURCES.lock().await;
+
+        let data_sources = if sources.is_empty() {
+            let data_sources =
+                Self::pick_best_sources(&chain_config, &chain_config.data_sources()).await;
+            for (provider, data_source) in data_sources.iter() {
+                sources.insert(provider.clone(), data_source.clone());
+            }
+            data_sources
+        } else {
+            sources.clone()
+        };
 
         Self {
             key,
@@ -214,7 +231,10 @@ impl RpcClientService {
                     {
                         Ok(client) => client,
                         Err(e) => {
-                            println!("Failed to create RpcCallType::Query for {}: {}", source_key, e);
+                            println!(
+                                "Failed to create RpcCallType::Query for {}: {}",
+                                source_key, e
+                            );
                             debug!("Failed to create RpcClient for {}: {}", source_key, e);
                             let (_, bad) = source_info.get_mut(&source_key).unwrap();
                             *bad = true;

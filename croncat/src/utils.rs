@@ -130,7 +130,10 @@ impl From<tendermint_rpc::endpoint::status::Response> for Status {
 
 impl Ord for Status {
     fn cmp(&self, other: &Self) -> std::cmp::Ordering {
-        self.inner.sync_info.latest_block_height.cmp(&other.inner.sync_info.latest_block_height)
+        self.inner
+            .sync_info
+            .latest_block_height
+            .cmp(&other.inner.sync_info.latest_block_height)
     }
 }
 

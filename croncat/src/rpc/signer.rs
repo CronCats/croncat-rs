@@ -79,7 +79,10 @@ impl Signer {
         Ok(res)
     }
 
-    pub async fn execute_batch<S>(&self, msgs: Vec<ExecRequest<S>>) -> Result<ChainTxResponse, Report>
+    pub async fn execute_batch<S>(
+        &self,
+        msgs: Vec<ExecRequest<S>>,
+    ) -> Result<ChainTxResponse, Report>
     where
         S: Serialize,
     {

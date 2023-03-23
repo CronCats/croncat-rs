@@ -1,14 +1,13 @@
-
 use std::collections::BTreeMap;
 use std::time::Duration;
 
-/// 
+///
 /// Inline Polling Cache
 /// We need to poll as close to the block height as possible to be able to make actions during the next block
 /// This will only be possible establishing a simple "PID" loop on block height & block timestamps
-/// The following is the simple block cache to handle variance in block height/timestamps 
+/// The following is the simple block cache to handle variance in block height/timestamps
 /// So our polling stream can validate as soon as possible to the next block finalized
-/// 
+///
 pub struct BlockPid {
     /// k: Block Height, v: Block Timestamp (Nanos)
     pub height: BTreeMap<u64, u128>,
@@ -36,26 +35,29 @@ impl BlockPid {
         // Remove over threshold, so data doesnt get out of hand
         // TODO: Change!!!!!
         if self.height.len() > 5usize {
-          self.height.pop_first();
+            self.height.pop_first();
         }
 
         // avgs timestamp distances together
         let mut previous: (&u64, &u128) = (&0u64, &0u128);
         let mut diffs: Vec<u128> = vec![];
         for (h, t) in self.height.iter() {
-          if previous.0 == &0u64 {
-            // simply assign previous
-            previous = (&h, &t);
-          } else {
-            // find the diff
-            if h.saturating_sub(previous.0.to_owned()) != 1 {
-              // Check if missed block height, to make an average of that as well
-              let block_height_sum = h.saturating_sub(previous.0.to_owned());
-              diffs.push(t.saturating_sub(previous.1.to_owned()).saturating_div(block_height_sum.into()));
+            if previous.0 == &0u64 {
+                // simply assign previous
+                previous = (&h, &t);
             } else {
-              diffs.push(t.saturating_sub(previous.1.to_owned()));
+                // find the diff
+                if h.saturating_sub(previous.0.to_owned()) != 1 {
+                    // Check if missed block height, to make an average of that as well
+                    let block_height_sum = h.saturating_sub(previous.0.to_owned());
+                    diffs.push(
+                        t.saturating_sub(previous.1.to_owned())
+                            .saturating_div(block_height_sum.into()),
+                    );
+                } else {
+                    diffs.push(t.saturating_sub(previous.1.to_owned()));
+                }
             }
-          }
         }
 
         // The variance of offset from duration
@@ -64,14 +66,14 @@ impl BlockPid {
         let mut prev: i32 = 0i32;
         let mut vars: Vec<i32> = vec![];
         for v in diffs.iter() {
-          let va = i32::try_from(*v).ok().unwrap();
-          if prev == 0i32 {
-            // simply assign previous
-            prev = va
-          } else {
-            // find the diff
-            vars.push(va - prev);
-          }
+            let va = i32::try_from(*v).ok().unwrap();
+            if prev == 0i32 {
+                // simply assign previous
+                prev = va
+            } else {
+                // find the diff
+                vars.push(va - prev);
+            }
         }
 
         let total_dur = diffs.len() as u128;
@@ -81,14 +83,22 @@ impl BlockPid {
         let total_var = vars.len() as i32;
         let sum_var: i32 = Iterator::sum(vars.into_iter());
         let avg_var = sum_var.checked_div(total_var).unwrap_or(0);
-        (Duration::from_millis(avg_dur.try_into().unwrap()), avg_var.abs().try_into().unwrap())
+        (
+            Duration::from_millis(avg_dur.try_into().unwrap()),
+            avg_var.abs().try_into().unwrap(),
+        )
     }
 
     /// compute and return duration that lands on or after next block height.
     /// Will do math about: (Block Time + duration + variance) - Current Time
     /// NOTE: timestamp should be in nanos?
     /// TODO: Add optional latency offset
-    pub fn get_next(&mut self, now_timestamp: u128, block_height: u64, block_timestamp: u128) -> BlockPidDiff {
+    pub fn get_next(
+        &mut self,
+        now_timestamp: u128,
+        block_height: u64,
+        block_timestamp: u128,
+    ) -> BlockPidDiff {
         // push into known heights
         self.height.insert(block_height, block_timestamp);
         self.current = (block_height, block_timestamp);
@@ -100,16 +110,15 @@ impl BlockPid {
         // return duration from maths
         // (block_timestamp + avg_duration + avg_variance) - Duration(epoch time now)
         let now = Duration::from_millis(now_timestamp.try_into().unwrap());
-        let block_len = Duration::from_millis(block_timestamp.try_into().unwrap()).checked_add(avg_duration).unwrap();
+        let block_len = Duration::from_millis(block_timestamp.try_into().unwrap())
+            .checked_add(avg_duration)
+            .unwrap();
         let block_diff = block_len.checked_add(variance_millis).unwrap();
         let block_offset = if let Some(offset) = block_diff.checked_sub(now) {
-          offset
+            offset
         } else {
-          // TODO: take into account latency inside the non-duration
-          std::cmp::min(
-            avg_duration,
-            now.checked_sub(block_diff).unwrap()
-          )
+            // TODO: take into account latency inside the non-duration
+            std::cmp::min(avg_duration, now.checked_sub(block_diff).unwrap())
         };
         (block_offset, avg_variance)
     }
@@ -117,8 +126,8 @@ impl BlockPid {
 
 #[cfg(test)]
 mod tests {
-    use std::time::{Duration};
     use crate::modules::block_pid::BlockPid;
+    use std::time::Duration;
 
     #[test]
     fn can_compute_duration() {
@@ -164,9 +173,6 @@ mod tests {
         let (next_duration, next_variance) = blockpid.get_next(now_millis, 10, now_millis);
 
         assert_eq!(next_variance, 14u64);
-        assert_eq!(
-          next_duration,
-          Duration::from_millis(1011),
-        );
+        assert_eq!(next_duration, Duration::from_millis(1011),);
     }
 }

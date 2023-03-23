@@ -1,7 +1,4 @@
-use crate::{
-    errors::Report,
-    rpc::RpcClientService,
-};
+use crate::{errors::Report, rpc::RpcClientService};
 use cosm_orc::orchestrator::{Address, ChainTxResponse};
 use cosm_tome::modules::cosmwasm::model::ExecRequest;
 use croncat_sdk_manager::msg::ManagerExecuteMsg;
@@ -61,7 +58,8 @@ impl Manager {
     ) -> Result<ChainTxResponse, Report> {
         self.client
             .execute(|signer| {
-                let mut reqs: Vec<ExecRequest<ManagerExecuteMsg>> = Vec::with_capacity(tash_hashes.len());
+                let mut reqs: Vec<ExecRequest<ManagerExecuteMsg>> =
+                    Vec::with_capacity(tash_hashes.len());
                 let contract_addr = self.contract_addr.clone();
                 for task_hash in tash_hashes.iter() {
                     reqs.push(ExecRequest {

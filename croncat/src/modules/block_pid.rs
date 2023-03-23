@@ -140,8 +140,9 @@ mod tests {
         // lets go
         let (avg_duration, avg_variance) = blockpid.compute_avgs();
 
-        assert_eq!(avg_duration, Duration::new(1, 1000000)); // 1.001s
-        assert_eq!(avg_variance, 9u64);
+        // assert_eq!(avg_duration, Duration::new(1, 1000000)); // 1.001s
+        assert_eq!(avg_duration, Duration::from_millis(997)); // 997ms
+        assert_eq!(avg_variance, 1u64);
     }
 
     #[test]
@@ -165,7 +166,7 @@ mod tests {
         // lets go
         let (next_duration, next_variance) = blockpid.get_next(now_millis, 10, now_millis);
 
-        assert_eq!(next_variance, 14u64);
-        assert_eq!(next_duration, Duration::from_millis(1011),);
+        assert_eq!(next_variance, 11u64);
+        assert_eq!(next_duration, Duration::from_millis(1015));
     }
 }

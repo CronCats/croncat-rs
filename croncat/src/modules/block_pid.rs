@@ -8,6 +8,7 @@ use std::time::Duration;
 /// The following is the simple block cache to handle variance in block height/timestamps
 /// So our polling stream can validate as soon as possible to the next block finalized
 ///
+#[derive(Default)]
 pub struct BlockPid {
     /// k: Block Height, v: Block Timestamp (Nanos)
     pub height: BTreeMap<u64, u128>,
@@ -19,14 +20,7 @@ pub struct BlockPid {
 pub type BlockPidDiff = (Duration, u64);
 
 // Default! but not on your loans
-impl Default for BlockPid {
-    fn default() -> BlockPid {
-        BlockPid {
-            height: BTreeMap::new(),
-            current: (0u64, 0u128),
-        }
-    }
-}
+
 
 impl BlockPid {
     /// compute and return avg_duration
@@ -44,7 +38,7 @@ impl BlockPid {
         for (h, t) in self.height.iter() {
             if previous.0 == &0u64 {
                 // simply assign previous
-                previous = (&h, &t);
+                previous = (h, t);
             } else {
                 // find the diff
                 if h.saturating_sub(previous.0.to_owned()) != 1 {
@@ -105,7 +99,7 @@ impl BlockPid {
 
         // compute the avgs
         let (avg_duration, avg_variance) = self.compute_avgs();
-        let variance_millis = Duration::from_millis(avg_variance.into());
+        let variance_millis = Duration::from_millis(avg_variance);
 
         // return duration from maths
         // (block_timestamp + avg_duration + avg_variance) - Duration(epoch time now)

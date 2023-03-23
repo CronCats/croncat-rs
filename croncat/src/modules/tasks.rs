@@ -145,14 +145,14 @@ impl Tasks {
     ) -> Result<(), Report> {
         let mut task_hashes: Vec<String> = vec![];
         for event in tx.events {
-            if event.type_str == "wasm".to_string() {
+            if event.type_str == *"wasm" {
                 let mut task_hash: Option<String> = None;
                 let mut ended = false;
                 for attr in &event.attributes {
-                    if attr.key == "task_hash".to_string() {
+                    if attr.key == *"task_hash" {
                         task_hash = Some(attr.value.clone());
                     }
-                    if attr.key == "lifecycle".to_string() && attr.value == "task_ended".to_string()
+                    if attr.key == *"lifecycle" && attr.value == *"task_ended"
                     {
                         ended = true
                     }
@@ -328,7 +328,7 @@ impl Tasks {
         for (task_hash, query_set) in query_sets {
             let mut filtered_q = query_set.clone();
             filtered_q.retain(|q| q.check_result);
-            println!("validate task_hash {:?}", task_hash);
+            println!("validate task_hash {task_hash:?}");
 
             // TODO: This needs to change to be BATCH query! Too much latency here...
             for q in filtered_q.iter() {
@@ -347,7 +347,7 @@ impl Tasks {
                         }
                     })
                     .await;
-                println!("Validate QUERY res {:?}", res);
+                println!("Validate QUERY res {res:?}");
 
                 // TODO: For errors with a query - potentially return the task hash so the task can get cleaned up.
                 // - This would have to check `stop_on_fail` as well as other boundary/interval things.
@@ -365,7 +365,7 @@ impl Tasks {
                         break;
                     }
                     Ok(data) => {
-                        println!("validate task_hash data {:?} {:?}", task_hash, data);
+                        println!("validate task_hash data {task_hash:?} {data:?}");
                         if !data.result {
                             break;
                         } else {
@@ -481,7 +481,7 @@ pub async fn scheduled_tasks_loop(
                                     pc_res.events.len()
                                 );
 
-                                println!("FULL SCHEDULED TX RESULT {:?}", pc_res);
+                                println!("FULL SCHEDULED TX RESULT {pc_res:?}");
                                 tasks_client.clean_ended_tasks_from_chain_tx(pc_res).await?;
                             }
                             Err(err) => {
@@ -542,7 +542,7 @@ pub async fn evented_tasks_loop(
                 // - These will get queried every block
                 // - NOTE: These will be lower priority than ranged
                 let unbounded = tasks_client.unbounded(EventType::Block).await?;
-                println!("BASE 0 {:?}", unbounded);
+                println!("BASE 0 {unbounded:?}");
 
                 // Stack 1: Ranged evented tasks
                 // - These will get queried every block, as long as the index is lt block height/timestamp
@@ -561,8 +561,7 @@ pub async fn evented_tasks_loop(
                     )
                     .await?;
                 println!(
-                    "Range Height {:?} Time {:?}",
-                    ranged_height, ranged_timestamp
+                    "Range Height {ranged_height:?} Time {ranged_timestamp:?}"
                 );
 
                 // Accumulate: get all the tasks ready to be queried
@@ -616,7 +615,7 @@ pub async fn evented_tasks_loop(
                         )
                         .await?;
                 }
-                println!("task_hashes {:?}", task_hashes);
+                println!("task_hashes {task_hashes:?}");
 
                 if !task_hashes.is_empty() {
                     // also get info about evented stats
@@ -649,7 +648,7 @@ pub async fn evented_tasks_loop(
                                 pc_res.events.len()
                             );
 
-                            println!("FULL TX RESULT {:?}", pc_res);
+                            println!("FULL TX RESULT {pc_res:?}");
                             tasks_client.clean_ended_tasks_from_chain_tx(pc_res).await?;
                         }
                         Err(err) => {

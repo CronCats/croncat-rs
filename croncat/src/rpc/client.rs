@@ -168,7 +168,7 @@ impl RpcClient {
             memo: "GMEOW 😻 https://Cron.Cat".to_string(),
             ..default_tx_options
         };
-        println!("tx_options {:?}", tx_options);
+        println!("tx_options {tx_options:?}");
 
         // Execute a message on the chain -- uses default contract_addr if not specified (factory address)
         let response = self

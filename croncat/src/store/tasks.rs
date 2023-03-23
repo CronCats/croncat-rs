@@ -133,7 +133,7 @@ impl LocalEventStorage {
                     for (k, v) in events {
                         event_range.insert(k, v);
                     }
-                    println!("evented index added height: {:?}", index);
+                    println!("evented index added height: {index:?}");
                     data.height_based.insert(index, event_range);
                 }
                 EventType::Time => {
@@ -145,7 +145,7 @@ impl LocalEventStorage {
                     for (k, v) in events {
                         event_range.insert(k, v);
                     }
-                    println!("evented index added time: {:?}", index);
+                    println!("evented index added time: {index:?}");
                     data.time_based.insert(index, event_range);
                 }
             }

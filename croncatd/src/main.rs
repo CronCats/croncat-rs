@@ -268,7 +268,11 @@ async fn run_command(opts: Opts, mut storage: LocalAgentStorage) -> Result<(), R
                         "Agent doesnt exist, must first register and do tasks."
                     ))?;
                 }
-                Err(err) if err.to_string().contains("No rewards available for withdraw") => {
+                Err(err)
+                    if err
+                        .to_string()
+                        .contains("No rewards available for withdraw") =>
+                {
                     info!(
                         "No rewards available for withdraw, please wait until your agent is active and has processed tasks before next withdraw."
                     );

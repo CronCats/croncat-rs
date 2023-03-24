@@ -8,7 +8,7 @@ use tokio::{
     sync::{broadcast, mpsc, Mutex},
     task::JoinHandle,
 };
-use tracing::{debug, log::error};
+use tracing::{debug, error};
 
 use crate::{
     channels::ShutdownTx,

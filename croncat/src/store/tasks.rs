@@ -358,12 +358,8 @@ impl LocalEventStorage {
             if let Some(data) = self.data.as_ref() {
                 let idx = index.unwrap_or(1);
                 let rng = match kind {
-                    EventType::Block => {
-                        data.height_based.range((Excluded(0), Included(idx)))
-                    }
-                    EventType::Time => {
-                        data.time_based.range((Excluded(0), Included(idx)))
-                    }
+                    EventType::Block => data.height_based.range((Excluded(0), Included(idx))),
+                    EventType::Time => data.time_based.range((Excluded(0), Included(idx))),
                 };
                 Some(
                     rng.flat_map(|(_, e)| e.values())

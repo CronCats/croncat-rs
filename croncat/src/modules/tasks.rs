@@ -6,7 +6,7 @@ use cosmwasm_schema::cw_serde;
 use cosmwasm_std::Timestamp;
 use croncat_sdk_agents::types::AgentStatus;
 use croncat_sdk_tasks::msg::TasksQueryMsg;
-use croncat_sdk_tasks::types::{Boundary, TaskInfo, CosmosQuery};
+use croncat_sdk_tasks::types::{Boundary, CosmosQuery, TaskInfo};
 use mod_sdk::types::QueryResponse;
 use serde_json::Value;
 use std::collections::HashSet;
@@ -353,7 +353,11 @@ impl Tasks {
             let res: Result<QueryResponse, Report> = self
                 .client
                 .query(move |querier| {
-                    let batch_query = BatchQueryMsg { batch_query: BatchQuery { queries: queries.to_owned() }};
+                    let batch_query = BatchQueryMsg {
+                        batch_query: BatchQuery {
+                            queries: queries.to_owned(),
+                        },
+                    };
                     println!("batch_querybatch_querybatch_querybatch_query {batch_query:?}");
                     async move {
                         querier
@@ -395,7 +399,7 @@ impl Tasks {
             }
         }
 
-        Ok(ready_hashes.into_iter().map(|r| r).collect::<Vec<String>>())
+        Ok(ready_hashes.into_iter().collect::<Vec<String>>())
     }
 }
 

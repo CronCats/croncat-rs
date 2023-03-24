@@ -6,7 +6,7 @@ use std::{
 
 use color_eyre::{eyre::eyre, Report};
 use indoc::indoc;
-use tracing::log::info;
+use tracing::info;
 
 use crate::store::get_storage_path;
 

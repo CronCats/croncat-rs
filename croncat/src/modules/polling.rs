@@ -51,7 +51,7 @@ pub fn poll_stream_blocks(http_rpc_host: String, poll_duration_secs: f64) -> Sta
                     // Set the default if this is first known block
                     if block_pid_cache.current.0 == 0 {
                         let previous_block_ht = block_height.clone().value().saturating_sub(1);
-                        block_pid_cache.current = (previous_block_ht, block_millis.clone());
+                        block_pid_cache.current = (previous_block_ht, block_millis);
                         // Add "previous" block based on our default duration to kick off with a semi-reasonable duration
                         let previous_block_ts = block_millis.saturating_sub(poll_timeout_duration.as_millis());
                         block_pid_cache.height.insert(previous_block_ht, previous_block_ts);
@@ -77,7 +77,7 @@ pub fn poll_stream_blocks(http_rpc_host: String, poll_duration_secs: f64) -> Sta
                     let stat = Status {
                         inner: status.clone(),
                     };
-                    yield stat.into();
+                    yield stat;
 
                     next_duration
                 }
@@ -125,7 +125,7 @@ pub fn poll_stream_blocks_detailed(http_rpc_host: String, poll_duration_secs: f6
                     // Set the default if this is first known block
                     if block_pid_cache.current.0 == 0 {
                         let previous_block_ht = block_height.clone().value().saturating_sub(1);
-                        block_pid_cache.current = (previous_block_ht, block_millis.clone());
+                        block_pid_cache.current = (previous_block_ht, block_millis);
                         // Add "previous" block based on our default duration to kick off with a semi-reasonable duration
                         let previous_block_ts = block_millis.saturating_sub(poll_timeout_duration.as_millis());
                         block_pid_cache.height.insert(previous_block_ht, previous_block_ts);

@@ -36,7 +36,7 @@ pub async fn run(
     chain_id: &String,
     shutdown_tx: &ShutdownTx,
     config: &ChainConfig,
-    factory: Factory,
+    factory: Arc<Mutex<Factory>>,
     agent: Arc<Agent>,
     manager: Arc<Manager>,
     tasks: Arc<Mutex<Tasks>>,
@@ -120,7 +120,7 @@ pub async fn run(
         factory_cache_check_block_stream_rx,
         factory_cache_check_shutdown_rx,
         Arc::new(chain_id.clone()),
-        factory,
+        factory.clone(),
     ));
 
     // Account status checks
@@ -165,6 +165,7 @@ pub async fn run(
                 Arc::new(chain_id.clone()),
                 manager.clone(),
                 tasks.clone(),
+                factory,
             ))
         } else {
             tokio::task::spawn(async { Ok(()) })
@@ -205,7 +206,6 @@ pub async fn run(
                 err
             )
         })?;
-        println!();
         info!("[{}] Shutting down...", ctrl_c_chain_id);
 
         Ok(())
@@ -238,7 +238,7 @@ pub async fn run_retry(
     chain_id: &String,
     shutdown_tx: &ShutdownTx,
     config: &ChainConfig,
-    factory: Factory,
+    factory: Arc<Mutex<Factory>>,
     agent: Arc<Agent>,
     manager: Arc<Manager>,
     tasks: Arc<Mutex<Tasks>>,

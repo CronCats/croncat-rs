@@ -133,7 +133,6 @@ impl LocalEventStorage {
                     for (k, v) in events {
                         event_range.insert(k, v);
                     }
-                    println!("evented index added height: {index:?}");
                     data.height_based.insert(index, event_range);
                 }
                 EventType::Time => {
@@ -145,7 +144,6 @@ impl LocalEventStorage {
                     for (k, v) in events {
                         event_range.insert(k, v);
                     }
-                    println!("evented index added time: {index:?}");
                     data.time_based.insert(index, event_range);
                 }
             }
@@ -334,18 +332,10 @@ impl LocalEventStorage {
 
                 match kind {
                     EventType::Block => {
-                        println!(
-                            "get_events_by_index height range keys {:?}",
-                            data.height_based.keys()
-                        );
                         let evts = data.height_based.get(&idx);
                         evts.map(|e| e.values().collect())
                     }
                     EventType::Time => {
-                        println!(
-                            "get_events_by_index time range keys {:?}",
-                            data.time_based.keys()
-                        );
                         let evts = data.time_based.get(&idx);
                         evts.map(|e| e.values().collect())
                     }
@@ -369,17 +359,9 @@ impl LocalEventStorage {
                 let idx = index.unwrap_or(1);
                 let rng = match kind {
                     EventType::Block => {
-                        println!(
-                            "get_events_lte_index height range keys {:?}",
-                            data.height_based.keys()
-                        );
                         data.height_based.range((Excluded(0), Included(idx)))
                     }
                     EventType::Time => {
-                        println!(
-                            "get_events_lte_index time range keys {:?}",
-                            data.time_based.keys()
-                        );
                         data.time_based.range((Excluded(0), Included(idx)))
                     }
                 };

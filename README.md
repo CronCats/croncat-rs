@@ -27,7 +27,7 @@
 ```
 $ cargo run help
 ...
-croncatd 0.2.0
+croncatd 0.3.0
 The croncat agent daemon.
 
 USAGE:
@@ -41,17 +41,18 @@ FLAGS:
 
 OPTIONS:
         --agent <agent>          ID of the agent config to use [env: CRONCAT_AGENT=]  [default: agent]
-        --chain-id <chain-id>    Chain ID of the chain to connect to [env: CRONCAT_CHAIN_ID=]
+        --chain-id <chain-id>    Chain ID of the chain to connect to [env: CRONCAT_CHAIN_ID=uni-6]
 
 SUBCOMMANDS:
-    all-tasks            Show all task(s) information
+    all-tasks            Get contract's state Show all task(s) information
     generate-mnemonic    Generates a new keypair and agent account (good first step)
-    get-agent            [SENSITIVE!] Shows all details about agents on this machine
+    get-agent-keys       [SENSITIVE!] Shows all details about agents on this machine
     get-tasks            Get the agent's tasks they're assigned to fulfill
     go                   Starts the Croncat agent, allowing it to fulfill tasks
     help                 Prints this message or the help of the given subcommand(s)
     list-accounts        Get the agent's supported bech32 accounts
     register             Registers an agent, placing them in the pending queue unless it's the first agent
+    send                 Send funds from the agent account to another account
     setup-service        Setup an agent as a system service (systemd)
     status               Get the agent's status (pending/active)
     unregister           Unregisters the agent from being in the queue with other agents
@@ -87,13 +88,36 @@ cargo run generate-mnemonic mainnet --mnemonic "olive soup parade family educate
 ### Register an agent
 
 ```bash
-cargo run register --agent mainnet --chain-id uni-5
+export CRONCAT_CHAIN_ID=uni-6
+export CRONCAT_AGENT=mainnet
+cargo run register
 ```
 
 ### Go for executing tasks
 
 ```bash
-cargo run go --agent mainnet --chain-id uni-5
+cargo run go
+```
+
+### Claim Rewards
+
+After a while, time to claim some rewards if you've been actively processing tasks!
+
+```bash
+# Check if you have any rewards, see "Earned Rewards"
+# NOTE: Also shows how much balance your agent has for processing txns
+cargo run status
+
+# Claim rewards
+cargo run withdraw
+```
+
+### Send Funds
+
+Maybe you wanna send claimed rewards elsewhere, simple command for this! Just make sure you leave funds for the agent to sign txn fees...
+
+```bash
+cargo run send juno1x4uaf...8q8jdraaqj 10 ujunox
 ```
 
 ### Configuring Custom RPCs
@@ -101,10 +125,9 @@ cargo run go --agent mainnet --chain-id uni-5
 ```
     uni-6:
         factory: juno1x4uaf50flf6af8jpean8ruu8q8jdraaqj7e3gg3wemqm5cdw040qk982ec
-        gas_prices: 0.1
-        gas_adjustment: 1.5
-        rpc_timeout: 4.0
-        denom: "ujunox"
+        gas_prices: 0.04
+        gas_adjustment: 1.3
+        rpc_timeout: 9.0
         include_evented_tasks: false
         custom_sources:
             "Cats R US 🙀":

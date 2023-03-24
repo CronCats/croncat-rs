@@ -10,6 +10,7 @@ use croncat_sdk_factory::msg::{
 use std::collections::HashMap;
 use std::str::FromStr;
 use std::sync::Arc;
+use tokio::sync::Mutex;
 use tracing::info;
 
 pub fn to_version_key(name: String, version: [u8; 2]) -> String {
@@ -238,13 +239,14 @@ pub async fn refresh_factory_loop(
     mut block_stream_rx: StatusStreamRx,
     mut shutdown_rx: ShutdownRx,
     chain_id: Arc<String>,
-    mut factory_client: Factory,
+    factory_client: Arc<Mutex<Factory>>,
 ) -> Result<(), Report> {
+    // TODO: Figure out best interval here!
     let block_counter = AtomicIntervalCounter::new(200);
     let task_handle: tokio::task::JoinHandle<Result<(), Report>> = tokio::task::spawn(async move {
         while let Ok(_block) = block_stream_rx.recv().await {
             block_counter.tick();
-            if block_counter.is_at_interval() && factory_client.load().await? {
+            if block_counter.is_at_interval() && factory_client.lock().await.load().await? {
                 info!("[{}] Factory Cache Reloaded", chain_id);
             }
         }

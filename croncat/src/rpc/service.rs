@@ -223,7 +223,6 @@ impl RpcClientService {
                     {
                         Ok(client) => client,
                         Err(e) => {
-                            println!("Failed to create RpcClient for {source_key}: {e}");
                             debug!("Failed to create RpcClient for {}: {}", source_key, e);
                             let (_, bad) = source_info.get_mut(&source_key).unwrap();
                             *bad = true;
@@ -242,7 +241,6 @@ impl RpcClientService {
                     {
                         Ok(client) => client,
                         Err(e) => {
-                            println!("Failed to create RpcCallType::Query for {source_key}: {e}");
                             debug!("Failed to create RpcClient for {}: {}", source_key, e);
                             let (_, bad) = source_info.get_mut(&source_key).unwrap();
                             *bad = true;
@@ -264,7 +262,6 @@ impl RpcClientService {
                 }
                 Err(e) => {
                     // TODO: Assess ChainResponse { code: Err(18) ???
-                    println!("Error calling chain for {source_key}: {e}");
                     debug!("Error calling chain for {}: {}", source_key, e);
                     // let (_, bad) = source_info.get_mut(&source_key).unwrap();
                     // *bad = true;

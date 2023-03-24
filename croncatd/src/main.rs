@@ -85,15 +85,21 @@ async fn run_command(opts: Opts, mut storage: LocalAgentStorage) -> Result<(), R
     let factory_client = RpcClientService::new(chain_config.clone(), key.clone(), None).await;
 
     // Bootstrap all the factory stuffz
-    let mut factory = Factory::new(chain_config.clone(), factory_client).await?;
+    let factory = Arc::new(Mutex::new(
+        Factory::new(chain_config.clone(), factory_client).await?,
+    ));
 
     // Get that factory info before moving on
-    if factory.load().await? {
+    if factory.lock().await.load().await? {
         info!("[{}] Factory Cache Reloaded", chain_id);
     }
 
     // Init that agent client lyfe
-    let agent_contract_addr = factory.get_contract_addr("agents".to_string()).await?;
+    let agent_contract_addr = factory
+        .lock()
+        .await
+        .get_contract_addr("agents".to_string())
+        .await?;
     let agent_client = RpcClientService::new(
         chain_config.clone(),
         key.clone(),
@@ -113,7 +119,11 @@ async fn run_command(opts: Opts, mut storage: LocalAgentStorage) -> Result<(), R
     );
 
     // Init that manager client lyfe
-    let manager_contract_addr = factory.get_contract_addr("manager".to_string()).await?;
+    let manager_contract_addr = factory
+        .lock()
+        .await
+        .get_contract_addr("manager".to_string())
+        .await?;
     let manager_client = RpcClientService::new(
         chain_config.clone(),
         key.clone(),
@@ -124,8 +134,16 @@ async fn run_command(opts: Opts, mut storage: LocalAgentStorage) -> Result<(), R
         Arc::new(Manager::new(manager_contract_addr.clone(), manager_client.clone()).await?);
 
     // Init that tasks client lyfe
-    let tasks_contract_addr = factory.get_contract_addr("tasks".to_string()).await?;
-    let generic_querier_addr = factory.get_contract_addr("mod_generic".to_string()).await?;
+    let tasks_contract_addr = factory
+        .lock()
+        .await
+        .get_contract_addr("tasks".to_string())
+        .await?;
+    let generic_querier_addr = factory
+        .lock()
+        .await
+        .get_contract_addr("mod_generic".to_string())
+        .await?;
     let tasks_client = RpcClientService::new(
         chain_config.clone(),
         key.clone(),
@@ -249,6 +267,11 @@ async fn run_command(opts: Opts, mut storage: LocalAgentStorage) -> Result<(), R
                     Err(eyre!(
                         "Agent doesnt exist, must first register and do tasks."
                     ))?;
+                }
+                Err(err) if err.to_string().contains("No rewards available for withdraw") => {
+                    info!(
+                        "No rewards available for withdraw, please wait until your agent is active and has processed tasks before next withdraw."
+                    );
                 }
                 Err(err) => Err(eyre!("Failed to withdraw reward: {}", err))?,
             }

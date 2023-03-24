@@ -2,18 +2,18 @@ use crate::config::ChainConfig;
 use crate::store::tasks::EventType;
 use crate::utils::AtomicIntervalCounter;
 use cosm_orc::orchestrator::{Address, ChainTxResponse};
+use cosmwasm_schema::cw_serde;
 use cosmwasm_std::Timestamp;
 use croncat_sdk_agents::types::AgentStatus;
 use croncat_sdk_tasks::msg::TasksQueryMsg;
-use croncat_sdk_tasks::types::{Boundary, CroncatQuery, TaskInfo};
+use croncat_sdk_tasks::types::{Boundary, TaskInfo, CosmosQuery};
 use mod_sdk::types::QueryResponse;
 use serde_json::Value;
-use std::{
-    str::FromStr,
-    sync::{
-        atomic::{AtomicBool, Ordering::SeqCst},
-        Arc,
-    },
+use std::collections::HashSet;
+use std::str::FromStr;
+use std::sync::{
+    atomic::{AtomicBool, Ordering::SeqCst},
+    Arc,
 };
 use tendermint::Time;
 // use croncat_sdk_tasks::types::Boundary;
@@ -28,6 +28,7 @@ use crate::{
 use tokio::{sync::Mutex, task::JoinHandle};
 use tracing::error;
 
+use super::factory::Factory;
 use super::{agent::Agent, manager::Manager};
 
 pub struct Tasks {
@@ -37,6 +38,16 @@ pub struct Tasks {
     pub store: LocalEventStorage,
     // for helping with batch query validation
     pub generic_querier_addr: Address,
+}
+
+#[cw_serde]
+pub struct BatchQuery {
+    pub queries: Vec<CosmosQuery>,
+}
+
+#[cw_serde]
+pub struct BatchQueryMsg {
+    pub batch_query: BatchQuery,
 }
 
 // FLOW:
@@ -152,7 +163,9 @@ impl Tasks {
                     if attr.key == *"task_hash" {
                         task_hash = Some(attr.value.clone());
                     }
-                    if attr.key == *"lifecycle" && attr.value == *"task_ended" {
+                    if attr.key == *"lifecycle"
+                        && (attr.value == *"task_ended" || attr.value == *"task_invalidated")
+                    {
                         ended = true
                     }
                 }
@@ -230,7 +243,7 @@ impl Tasks {
         from_index: Option<u64>,
         limit: Option<u64>,
     ) -> Result<Vec<TaskInfo>, Report> {
-        let res: Vec<TaskInfo> = self
+        let results = self
             .client
             .query(move |querier| {
                 let contract_addr = self.contract_addr.clone();
@@ -250,7 +263,10 @@ impl Tasks {
                         .await
                 }
             })
-            .await?;
+            .await;
+
+        let res: Vec<TaskInfo> = results.unwrap();
+
         Ok(res)
     }
 
@@ -319,69 +335,67 @@ impl Tasks {
     // Return task hash of validated task
     pub async fn validate_queries(
         &self,
-        query_sets: Vec<(String, Vec<CroncatQuery>)>,
+        tasks_with_queries: Vec<&TaskInfo>,
+        mod_generic_addr: &str,
     ) -> Result<Vec<String>, Report> {
-        let mut ready_hashes: Vec<String> = Vec::new();
+        let mut ready_hashes: HashSet<String> = HashSet::new();
 
         // Process all the queries
-        for (task_hash, query_set) in query_sets {
-            let mut filtered_q = query_set.clone();
-            filtered_q.retain(|q| q.check_result);
-            println!("validate task_hash {task_hash:?}");
+        // TODO: This needs to change to be BATCH RPC query! Too much latency here...
+        for task in tasks_with_queries {
+            println!("validate task {:?}", task.task_hash);
+            let queries = if let Some(q) = task.queries.to_owned() {
+                q
+            } else {
+                continue;
+            };
 
-            // TODO: This needs to change to be BATCH query! Too much latency here...
-            for q in filtered_q.iter() {
-                let res: Result<QueryResponse, Report> = self
-                    .client
-                    .query(move |querier| {
-                        let deser_msg: Value =
-                            serde_json::from_slice(&q.msg).expect("Deser query msg failed");
-                        async move {
-                            querier
-                                .query_croncat(
-                                    deser_msg,
-                                    Some(Address::from_str(q.contract_addr.as_str())?),
-                                )
-                                .await
-                        }
-                    })
-                    .await;
-                println!("Validate QUERY res {res:?}");
+            let res: Result<QueryResponse, Report> = self
+                .client
+                .query(move |querier| {
+                    let batch_query = BatchQueryMsg { batch_query: BatchQuery { queries: queries.to_owned() }};
+                    println!("batch_querybatch_querybatch_querybatch_query {batch_query:?}");
+                    async move {
+                        querier
+                            .rpc_client
+                            .wasm_query::<BatchQueryMsg, QueryResponse>(
+                                batch_query,
+                                Some(Address::from_str(mod_generic_addr)?),
+                            )
+                            .await
+                    }
+                })
+                .await;
+            println!("Validate QUERY res {res:?}");
 
-                // TODO: For errors with a query - potentially return the task hash so the task can get cleaned up.
-                // - This would have to check `stop_on_fail` as well as other boundary/interval things.
-
-                // Eval if result false, if so break!
-                match res {
-                    // likely this was because the response payload didnt match
-                    Err(err) if err.to_string().contains("No valid data sources available") => {
+            // Eval if result false, if so break!
+            match res {
+                // likely this was because the response payload didnt match
+                Err(err) if err.to_string().contains("No valid data sources available") => {
+                    break;
+                }
+                Err(_) => (),
+                Ok(data) => {
+                    println!("validate task_hash data {:?} {data:?}", task.task_hash);
+                    if !data.result {
+                        break;
+                    } else {
                         println!(
-                            "TODO: No valid data sources available -- needs coverage to refresh?"
+                            "task_hash data {:?} {:?}",
+                            task.task_hash,
+                            serde_json::from_slice::<Value>(&data.data)
                         );
-                        break;
-                    }
-                    Err(_) => {
-                        break;
-                    }
-                    Ok(data) => {
-                        println!("validate task_hash data {task_hash:?} {data:?}");
-                        if !data.result {
-                            break;
-                        } else {
-                            println!(
-                                "task_hash data {:?} {:?}",
-                                task_hash,
-                                serde_json::from_slice::<Value>(&data.data)
-                            );
-                            ready_hashes.push(task_hash.clone());
+                        let h = task.task_hash.clone();
+                        // Dedupe, if theres any remote chance it could  happen
+                        if !ready_hashes.contains(&h) {
+                            ready_hashes.insert(h);
                         }
                     }
                 }
             }
         }
 
-        // TODO: Dedupe, if theres any remote chance it could  happen
-        Ok(ready_hashes)
+        Ok(ready_hashes.into_iter().map(|r| r).collect::<Vec<String>>())
     }
 }
 
@@ -449,7 +463,7 @@ pub async fn scheduled_tasks_loop(
                     let stats = tasks_client.get_stats().await?;
 
                     info!(
-                        "[{}] Block {} :: Block: {}, Cron: {}, H0: {}, RH: {}, T0: {}, RT: {}",
+                        "[{}] Block {} :: Block: {}, Cron: {}, H0: {}, HR: {}, T0: {}, TR: {}",
                         chain_id,
                         block.inner.sync_info.latest_block_height,
                         tasks.stats.num_block_tasks,
@@ -480,7 +494,6 @@ pub async fn scheduled_tasks_loop(
                                     pc_res.events.len()
                                 );
 
-                                println!("FULL SCHEDULED TX RESULT {pc_res:?}");
                                 tasks_client.clean_ended_tasks_from_chain_tx(pc_res).await?;
                             }
                             Err(err) => {
@@ -525,6 +538,7 @@ pub async fn evented_tasks_loop(
     chain_id: Arc<String>,
     manager_client: Arc<Manager>,
     tasks_client_mut: Arc<Mutex<Tasks>>,
+    factory_client: Arc<Mutex<Factory>>,
 ) -> Result<(), Report> {
     // TODO: Question for Seedyrom: can this while loop invalidate once block passed?
     let block_consumer_stream: JoinHandle<Result<(), Report>> = tokio::task::spawn(async move {
@@ -541,7 +555,6 @@ pub async fn evented_tasks_loop(
                 // - These will get queried every block
                 // - NOTE: These will be lower priority than ranged
                 let unbounded = tasks_client.unbounded(EventType::Block).await?;
-                println!("BASE 0 {unbounded:?}");
 
                 // Stack 1: Ranged evented tasks
                 // - These will get queried every block, as long as the index is lt block height/timestamp
@@ -559,42 +572,44 @@ pub async fn evented_tasks_loop(
                         EventType::Time,
                     )
                     .await?;
-                println!("Range Height {ranged_height:?} Time {ranged_timestamp:?}");
 
                 // Accumulate: get all the tasks ready to be queried
                 // Priority order: block height, block timestamp, unbounded
-                let mut query_sets: Vec<(String, Vec<CroncatQuery>)> = Vec::new();
-                let rhqs = ranged_height.map(|mut rh| -> Vec<(String, Vec<CroncatQuery>)> {
+                // let mut query_sets: Vec<(String, Vec<CroncatQuery>)> = Vec::new();
+                let mut tasks_with_queries: Vec<&TaskInfo> = Vec::new();
+                let rhqs = ranged_height.map(|mut rh| -> Vec<&TaskInfo> {
                     rh.retain(|r| r.queries.is_some());
-                    rh.iter()
-                        .map(|r| (r.task_hash.clone(), r.queries.clone().unwrap()))
-                        .collect()
+                    rh.to_vec()
                 });
-                let rtqs = ranged_timestamp.map(|mut rt| -> Vec<(String, Vec<CroncatQuery>)> {
+                let rtqs = ranged_timestamp.map(|mut rt| -> Vec<&TaskInfo> {
                     rt.retain(|r| r.queries.is_some());
-                    rt.iter()
-                        .map(|r| (r.task_hash.clone(), r.queries.clone().unwrap()))
-                        .collect()
+                    rt.to_vec()
                 });
-                let ubqs = unbounded.map(|mut ub| -> Vec<(String, Vec<CroncatQuery>)> {
+                let ubqs = unbounded.map(|mut ub| -> Vec<&TaskInfo> {
                     ub.retain(|r| r.queries.is_some());
-                    ub.iter()
-                        .map(|r| (r.task_hash.clone(), r.queries.clone().unwrap()))
-                        .collect()
+                    ub.to_vec()
                 });
                 if let Some(rh) = rhqs {
-                    query_sets.extend(rh);
+                    tasks_with_queries.extend(rh);
                 }
                 if let Some(rt) = rtqs {
-                    query_sets.extend(rt);
+                    tasks_with_queries.extend(rt);
                 }
                 if let Some(ub) = ubqs {
-                    query_sets.extend(ub);
+                    tasks_with_queries.extend(ub);
                 }
 
+                // Get the batch query generic contract, so we can have reproducible query test
+                let mod_generic_addr = factory_client
+                    .lock()
+                    .await
+                    .get_contract_addr("mod_generic".to_string())
+                    .await?;
+
                 // Validate: get all
-                let mut task_hashes: Vec<String> =
-                    tasks_client.validate_queries(query_sets).await?;
+                let mut task_hashes: Vec<String> = tasks_client
+                    .validate_queries(tasks_with_queries, mod_generic_addr.as_ref())
+                    .await?;
 
                 // Based on end-boundary, skip validation of queries so we can cleanup tasks state, if any exist
                 // if we are bored, have our agent thumbs twiddling, attempt to do some cleanup for missed/passed evented taasks
@@ -612,14 +627,13 @@ pub async fn evented_tasks_loop(
                         )
                         .await?;
                 }
-                println!("task_hashes {task_hashes:?}");
 
                 if !task_hashes.is_empty() {
                     // also get info about evented stats
                     let stats = tasks_client.get_stats().await?;
 
                     info!(
-                        "[{}] Evented Tasks {}, Block {}, H0: {}, RH: {}, T0: {}, RT: {}",
+                        "[{}] Evented Tasks {}, Block {}, H0: {}, HR: {}, T0: {}, TR: {}",
                         chain_id,
                         task_hashes.len(),
                         header.latest_block_height,
@@ -645,7 +659,6 @@ pub async fn evented_tasks_loop(
                                 pc_res.events.len()
                             );
 
-                            println!("FULL TX RESULT {pc_res:?}");
                             tasks_client.clean_ended_tasks_from_chain_tx(pc_res).await?;
                         }
                         Err(err) => {

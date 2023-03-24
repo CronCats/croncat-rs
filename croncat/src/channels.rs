@@ -18,6 +18,12 @@ pub type BlockStreamTx = broadcast::Sender<utils::Block>;
 /// Block stream channel Receiver.
 pub type BlockStreamRx = broadcast::Receiver<utils::Block>;
 
+/// Block sync stream channel Sender.
+pub type StatusStreamTx = broadcast::Sender<utils::Status>;
+
+/// Block sync stream channel Receiver.
+pub type StatusStreamRx = broadcast::Receiver<utils::Status>;
+
 ///
 /// Create a shutdown channel.
 ///

@@ -2,56 +2,55 @@
 //! This module contains the code for querying the croncat contract via HTTP RPC.
 //!
 
-use std::time::Duration;
-
-use cw_croncat_core::msg::{
-    AgentResponse, AgentTaskResponse, GetConfigResponse, QueryMsg, TaskResponse,
-};
-use cw_croncat_core::types::AgentStatus;
-
-use serde::de::DeserializeOwned;
-use serde::Serialize;
-use tokio::time::timeout;
-
 use crate::config::ChainConfig;
 use crate::errors::{eyre, Report};
 use crate::utils::normalize_rpc_url;
+use cosm_orc::orchestrator::Address;
+use serde::de::DeserializeOwned;
+use serde::Serialize;
+use std::time::Duration;
+use tokio::time::timeout;
 
 use super::RpcClient;
 
 pub struct Querier {
-    rpc_client: RpcClient,
-    croncat_addr: String,
+    pub rpc_client: RpcClient,
+    pub contract_addr: Address,
 }
 
 impl std::fmt::Debug for Querier {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.debug_struct("Querier")
-            .field("croncat_addr", &self.croncat_addr)
+            .field("contract_addr", &self.contract_addr)
             .finish()
     }
 }
 
 impl Querier {
-    pub async fn new(cfg: ChainConfig, rpc_url: String) -> Result<Self, Report> {
+    pub async fn new(
+        rpc_url: String,
+        cfg: ChainConfig,
+        contract_addr: Address,
+    ) -> Result<Self, Report> {
         let rpc_url = normalize_rpc_url(&rpc_url);
 
         let rpc_client = RpcClient::new(&cfg, &rpc_url)?;
 
         Ok(Self {
             rpc_client,
-            croncat_addr: cfg.manager,
+            contract_addr,
         })
     }
 
-    pub async fn query_croncat<S, T>(&self, msg: S) -> Result<T, Report>
+    pub async fn query_croncat<S, T>(&self, msg: S, address: Option<Address>) -> Result<T, Report>
     where
         S: Serialize,
         T: DeserializeOwned,
     {
+        let a = address.unwrap_or_else(|| self.contract_addr.clone());
         timeout(
             Duration::from_secs_f64(self.rpc_client.timeout_secs),
-            self.rpc_client.wasm_query(msg),
+            self.rpc_client.wasm_query(msg, Some(a)),
         )
         .await
         .map_err(|err| {
@@ -61,44 +60,6 @@ impl Querier {
                 err
             )
         })?
-    }
-
-    pub async fn query_config(&self) -> Result<String, Report> {
-        let config: GetConfigResponse = self.query_croncat(QueryMsg::GetConfig {}).await?;
-        let json = serde_json::to_string_pretty(&config)?;
-        Ok(json)
-    }
-
-    pub async fn get_agent_status(&self, account_id: String) -> Result<AgentStatus, Report> {
-        let agent_info: Option<AgentResponse> = self
-            .query_croncat(QueryMsg::GetAgent { account_id })
-            .await?;
-
-        if agent_info.is_none() {
-            Err(eyre!("Agent not registered"))
-        } else {
-            Ok(agent_info.unwrap().status)
-        }
-    }
-
-    pub async fn get_tasks(
-        &self,
-        from_index: Option<u64>,
-        limit: Option<u64>,
-    ) -> Result<String, Report> {
-        let response: Vec<TaskResponse> = self
-            .query_croncat(QueryMsg::GetTasks { from_index, limit })
-            .await?;
-        let json = serde_json::to_string_pretty(&response)?;
-        Ok(json)
-    }
-
-    pub async fn get_agent_tasks(&self, account_id: String) -> Result<String, Report> {
-        let response: Option<AgentTaskResponse> = self
-            .query_croncat(QueryMsg::GetAgentTasks { account_id })
-            .await?;
-        let json = serde_json::to_string_pretty(&response)?;
-        Ok(json)
     }
 }
 

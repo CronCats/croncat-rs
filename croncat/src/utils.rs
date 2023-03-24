@@ -11,7 +11,7 @@ use color_eyre::Report;
 use delegate::delegate;
 use tokio::task::JoinHandle;
 
-use cw_croncat_core::msg::AgentTaskResponse;
+use croncat_sdk_agents::msg::AgentTaskResponse;
 
 pub const DEFAULT_AGENT_ID: &str = "agent";
 pub const DERIVATION_PATH: &str = "m/44'/118'/0'/0/0";
@@ -47,11 +47,7 @@ impl AtomicIntervalCounter {
 }
 
 pub fn sum_num_tasks(tasks: &AgentTaskResponse) -> u64 {
-    (tasks.num_block_tasks
-        + tasks.num_block_tasks_extra
-        + tasks.num_cron_tasks
-        + tasks.num_cron_tasks_extra)
-        .into()
+    (tasks.stats.num_block_tasks + tasks.stats.num_cron_tasks).into()
 }
 
 ///
@@ -108,6 +104,52 @@ impl PartialEq for Block {
 }
 
 impl Eq for Block {}
+
+///
+/// Block wrapper
+///
+#[derive(Debug, Clone)]
+pub struct Status {
+    pub inner: tendermint_rpc::endpoint::status::Response,
+}
+
+#[allow(dead_code)]
+impl Status {
+    delegate! {
+        to self.inner {
+            // find your inner self
+        }
+    }
+}
+
+impl From<tendermint_rpc::endpoint::status::Response> for Status {
+    fn from(status: tendermint_rpc::endpoint::status::Response) -> Self {
+        Self { inner: status }
+    }
+}
+
+impl Ord for Status {
+    fn cmp(&self, other: &Self) -> std::cmp::Ordering {
+        self.inner
+            .sync_info
+            .latest_block_height
+            .cmp(&other.inner.sync_info.latest_block_height)
+    }
+}
+
+impl PartialOrd for Status {
+    fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
+        Some(self.cmp(other))
+    }
+}
+
+impl PartialEq for Status {
+    fn eq(&self, other: &Self) -> bool {
+        self.inner.sync_info.latest_block_height == other.inner.sync_info.latest_block_height
+    }
+}
+
+impl Eq for Status {}
 
 /// Normalize an rpc url that might not have a protocol.
 pub fn normalize_rpc_url(rpc_url: &str) -> String {

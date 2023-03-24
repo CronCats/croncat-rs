@@ -1,18 +1,17 @@
-use std::collections::HashMap;
-use std::str::FromStr;
-
 use color_eyre::{eyre::eyre, Report};
 use cosm_orc::config::cfg::Config as CosmOrcConfig;
 use cosm_orc::config::ChainConfig as CosmOrcChainConfig;
 use cosm_orc::orchestrator::{
     cosm_orc::CosmOrc, deploy::DeployInfo, Address, Denom, SigningKey, TendermintRPC,
 };
-use cosm_orc::orchestrator::{ChainResponse, ChainTxResponse, Coin, Key};
+use cosm_orc::orchestrator::{ChainTxResponse, Coin, Key};
 use cosm_tome::chain::request::TxOptions;
 use cosm_tome::modules::bank::model::SendRequest;
 use cosm_tome::modules::cosmwasm::model::ExecRequest;
 use serde::de::DeserializeOwned;
 use serde::Serialize;
+use std::collections::HashMap;
+use std::str::FromStr;
 
 use crate::config::ChainConfig;
 use crate::utils::DERIVATION_PATH;
@@ -36,17 +35,18 @@ impl RpcClient {
         // Build the contract info map.
         let mut contract_deploy_info = HashMap::new();
         contract_deploy_info.insert(
-            "croncat-manager".to_string(),
+            "croncat-factory".to_string(),
             DeployInfo {
                 code_id: None,
-                address: Some(cfg.manager.clone()),
+                address: Some(cfg.factory.clone()),
             },
         );
 
         // Convert our config into a CosmOrc config with the specified rpc url.
+        let denom = cfg.info.fees.fee_tokens[0].denom.clone();
         let config = CosmOrcConfig {
             chain_cfg: CosmOrcChainConfig {
-                denom: cfg.info.fees.fee_tokens[0].denom.clone(),
+                denom: denom.clone(),
                 prefix: cfg.info.bech32_prefix.clone(),
                 chain_id: cfg.info.chain_id.clone(),
                 rpc_endpoint: Some(rpc_url.to_string()),
@@ -57,13 +57,13 @@ impl RpcClient {
             },
             contract_deploy_info,
         };
-        let contract_addr = cfg.manager.parse::<Address>()?;
+        let contract_addr = cfg.factory.parse::<Address>()?;
 
         Ok(Self {
             client: CosmOrc::new_tendermint_rpc(config, true)?,
             contract_addr,
             key: None,
-            denom: None,
+            denom: Some(Denom::from_str(denom.as_str())?),
             timeout_secs: cfg.rpc_timeout_seconds.unwrap_or(DEFAULT_TIMEOUT),
         })
     }
@@ -83,13 +83,15 @@ impl RpcClient {
     }
 
     /// Query the contract via RPC at a specific address.
-    pub async fn call_wasm_query<S, R>(&self, address: Address, msg: S) -> Result<R, Report>
+    pub async fn wasm_query<S, R>(&self, msg: S, address: Option<Address>) -> Result<R, Report>
     where
         S: Serialize,
         R: DeserializeOwned,
     {
-        // Query the chain
-        let response = self.client.client.wasm_query(address, &msg).await?;
+        // Query the chain -- uses default contract_addr if not specified (factory address)
+        // TODO: Assess support for batch settings
+        let a = address.unwrap_or_else(|| self.contract_addr.clone());
+        let response = self.client.client.wasm_query(a, &msg).await?;
 
         // Deserialize the response
         let data = response
@@ -99,17 +101,21 @@ impl RpcClient {
         Ok(data)
     }
 
-    /// Query the contract at the manager address.
-    pub async fn wasm_query<S, R>(&self, msg: S) -> Result<R, Report>
-    where
-        S: Serialize,
-        R: DeserializeOwned,
-    {
-        self.call_wasm_query(self.contract_addr.clone(), msg).await
-    }
+    // /// Query the contract at the factory address.
+    // pub async fn wasm_query<S, R>(&self, msg: S) -> Result<R, Report>
+    // where
+    //     S: Serialize,
+    //     R: DeserializeOwned,
+    // {
+    //     self.call_wasm_query(self.contract_addr.clone(), msg).await
+    // }
 
     /// Execute a contract via RPC.
-    pub async fn wasm_execute<S>(&self, msg: S) -> Result<ChainResponse, Report>
+    pub async fn wasm_execute<S>(
+        &self,
+        msg: S,
+        address: Option<Address>,
+    ) -> Result<ChainTxResponse, Report>
     where
         S: Serialize,
     {
@@ -117,13 +123,15 @@ impl RpcClient {
             return Err(eyre!("No signing key set"));
         }
 
-        // Query the chain
+        // Execute a message on the chain -- uses default contract_addr if not specified (factory address)
+        // TODO: Assess support for batch settings
+        let a = address.unwrap_or_else(|| self.contract_addr.clone());
         let response = self
             .client
             .client
             .wasm_execute(
                 ExecRequest {
-                    address: self.contract_addr.clone(),
+                    address: a,
                     msg: &msg,
                     funds: vec![],
                 },
@@ -132,10 +140,44 @@ impl RpcClient {
             )
             .await?;
 
-        // Get the response data
-        let data = response.res;
+        // return the response data
+        Ok(response.res)
+    }
 
-        Ok(data.res)
+    /// Execute batch via RPC.
+    pub async fn wasm_execute_batch<S>(
+        &self,
+        msgs: Vec<ExecRequest<S>>,
+    ) -> Result<ChainTxResponse, Report>
+    where
+        S: Serialize,
+    {
+        if self.key.is_none() {
+            return Err(eyre!("No signing key set"));
+        }
+
+        let mut reqs = Vec::with_capacity(msgs.len());
+
+        // format for reqs
+        for m in msgs {
+            reqs.push(m)
+        }
+
+        let default_tx_options = TxOptions::default();
+        let tx_options = TxOptions {
+            memo: "GMEOW 😻 https://Cron.Cat".to_string(),
+            ..default_tx_options
+        };
+
+        // Execute a message on the chain -- uses default contract_addr if not specified (factory address)
+        let response = self
+            .client
+            .client
+            .wasm_execute_batch(reqs, self.key.as_ref().unwrap(), &tx_options)
+            .await?;
+
+        // return the response data
+        Ok(response.res)
     }
 
     /// Query the balance of an address.

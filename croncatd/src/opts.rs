@@ -48,7 +48,7 @@ pub enum Command {
     Unregister,
 
     /// Update the agent's configuration
-    Update,
+    Update { payable_account_id: String },
 
     /// Withdraw the agent's funds to the payable account ID
     Withdraw,
@@ -67,11 +67,7 @@ pub enum Command {
     },
 
     /// Starts the Croncat agent, allowing it to fulfill tasks
-    Go {
-        /// Allow agent to do tasks with queries, uses more computer resources
-        #[structopt(long, short = "q")]
-        with_queries: bool,
-    },
+    Go {},
 
     /// Generates a new keypair and agent account (good first step)
     GenerateMnemonic {
@@ -84,7 +80,7 @@ pub enum Command {
     },
 
     /// [SENSITIVE!] Shows all details about agents on this machine
-    GetAgent {
+    GetAgentKeys {
         #[structopt(long, default_value = "agent", env = "CRONCAT_AGENT")]
         name: String,
     },
@@ -105,6 +101,6 @@ pub enum Command {
         amount: String,
 
         /// The denom of the funds to send
-        denom: String,
+        denom: Option<String>,
     },
 }

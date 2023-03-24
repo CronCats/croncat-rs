@@ -2,25 +2,26 @@
 //! The croncat system daemon.
 //!
 
+use croncat_pipeline::{try_flat_join, Dispatcher, ProviderSystem, Sequencer};
 use std::sync::Arc;
-
-use cosmrs::bip32::{secp256k1::ecdsa::SigningKey, ExtendedPrivateKey};
-use croncat_pipeline::{
-    try_flat_join, Dispatcher, ProviderSystem, ProviderSystemMonitor, Sequencer,
-};
 use tokio::{
     sync::{broadcast, mpsc, Mutex},
     task::JoinHandle,
 };
-use tracing::{debug, log::error};
+use tracing::{debug, error};
 
 use crate::{
     channels::ShutdownTx,
     config::ChainConfig,
     errors::{eyre, Report},
     logging::info,
-    rpc::RpcClientService,
-    streams::{agent, polling::poll_stream_blocks, tasks},
+    modules::{
+        agent::{check_status_loop, Agent},
+        factory::{refresh_factory_loop, Factory},
+        manager::Manager,
+        polling::poll_stream_blocks,
+        tasks::{evented_tasks_loop, refresh_tasks_cache_loop, scheduled_tasks_loop, Tasks},
+    },
     tokio,
 };
 
@@ -35,24 +36,17 @@ pub async fn run(
     chain_id: &String,
     shutdown_tx: &ShutdownTx,
     config: &ChainConfig,
-    key: &ExtendedPrivateKey<SigningKey>,
-    with_queries: bool,
+    factory: Arc<Mutex<Factory>>,
+    agent: Arc<Agent>,
+    manager: Arc<Manager>,
+    tasks: Arc<Mutex<Tasks>>,
 ) -> Result<(), Report> {
-    // Setup the chain client.
-    let client = RpcClientService::new(config.clone(), key.clone()).await;
-
     // Get the status of the agent
-    let account_id = client.account_id();
-    let status = client
-        .query(move |querier| {
-            let account_id = account_id.clone();
-            async move { querier.get_agent_status(account_id).await }
-        })
-        .await?;
-
-    let account_id = client.account_id();
-    info!("[{}] Agent account id: {}", chain_id, account_id);
-    info!("[{}] Initial agent status: {:?}", chain_id, status);
+    let account_id = agent.account_id();
+    let account_addr = account_id.clone();
+    let status = agent.get_status(account_addr).await?;
+    info!("[{}] Agent: {}", chain_id, account_id);
+    info!("[{}] Current Status: {:?}", chain_id, status);
     let status = Arc::new(Mutex::new(status));
 
     // Create a channel for block sources
@@ -75,26 +69,26 @@ pub async fn run(
     }
 
     // Provider system monitor updates.
-    let (provider_system_monitor_tx, _provider_system_monitor_rx) = mpsc::channel(100);
-    let provider_system_monitor = ProviderSystemMonitor::new(
-        provider_system.get_provider_states(),
-        provider_system_monitor_tx,
-    );
+    // let (provider_system_monitor_tx, _provider_system_monitor_rx) = mpsc::channel(100);
+    // let provider_system_monitor = ProviderSystemMonitor::new(
+    //     provider_system.get_provider_states(),
+    //     provider_system_monitor_tx,
+    // );
 
     // Monitor the provider system for updates.
     let provider_system_handle = tokio::spawn(async move { provider_system.produce().await });
-    let _provider_system_monitor_handle =
-        tokio::spawn(async move { provider_system_monitor.monitor(6000).await });
-    let provider_system_monitor_display_chain_id = chain_id.clone();
-    let _provider_system_monitor_display_handle = tokio::spawn(async move {
-        let mut provider_system_monitor_rx = _provider_system_monitor_rx;
-        while let Some(provider_states) = provider_system_monitor_rx.recv().await {
-            debug!(
-                "[{}] Provider states: {:#?}",
-                provider_system_monitor_display_chain_id, provider_states
-            );
-        }
-    });
+    // let _provider_system_monitor_handle =
+    //     tokio::spawn(async move { provider_system_monitor.monitor(1000).await });
+    // let provider_system_monitor_display_chain_id = chain_id.clone();
+    // let _provider_system_monitor_display_handle = tokio::spawn(async move {
+    //     let mut provider_system_monitor_rx = _provider_system_monitor_rx;
+    //     while let Some(provider_states) = provider_system_monitor_rx.recv().await {
+    //         debug!(
+    //             "[{}] Provider states: {:#?}",
+    //             provider_system_monitor_display_chain_id, provider_states
+    //         );
+    //     }
+    // });
 
     // Sequence the blocks we receive from the block stream. This is necessary because we may receive
     // blocks from multiple sources, and we need to ensure that we process them in order.
@@ -111,49 +105,89 @@ pub async fn run(
     let mut block_stream_info_rx = dispatcher_tx.subscribe();
     let block_stream_chain_id = chain_id.clone();
     let _block_stream_info_handle = tokio::task::spawn(async move {
-        while let Ok(block) = block_stream_info_rx.recv().await {
-            info!(
+        while let Ok(status) = block_stream_info_rx.recv().await {
+            debug!(
                 "[{}] Processing block (height: {})",
-                block_stream_chain_id,
-                block.header().height,
+                block_stream_chain_id, status.inner.sync_info.latest_block_height,
             );
         }
     });
+
+    // Factory Cache checks
+    let factory_cache_check_shutdown_rx = shutdown_tx.subscribe();
+    let factory_cache_check_block_stream_rx = dispatcher_tx.subscribe();
+    let factory_cache_check_handle = tokio::task::spawn(refresh_factory_loop(
+        factory_cache_check_block_stream_rx,
+        factory_cache_check_shutdown_rx,
+        Arc::new(chain_id.clone()),
+        factory.clone(),
+    ));
 
     // Account status checks
     let account_status_check_shutdown_rx = shutdown_tx.subscribe();
     let account_status_check_block_stream_rx = dispatcher_tx.subscribe();
     let block_status = status.clone();
     let block_status_accounts_loop = block_status.clone();
-    let block_status_client = client.clone();
-    let account_status_check_handle = tokio::task::spawn(agent::check_account_status_loop(
+    let account_status_check_handle = tokio::task::spawn(check_status_loop(
         account_status_check_block_stream_rx,
         account_status_check_shutdown_rx,
         block_status_accounts_loop,
-        block_status_client,
+        Arc::new(chain_id.clone()),
         config.clone(),
+        agent.clone(),
+        manager.clone(),
     ));
 
-    // Process blocks coming in from the blockchain
+    // Process scheduled tasks based on block stream
     let task_runner_shutdown_rx = shutdown_tx.subscribe();
     let task_runner_block_stream_rx = dispatcher_tx.subscribe();
-    let tasks_client = client.clone();
     let block_status_tasks = block_status.clone();
-    let task_runner_handle = tokio::task::spawn(tasks::tasks_loop(
+    let task_runner_handle = tokio::task::spawn(scheduled_tasks_loop(
         task_runner_block_stream_rx,
         task_runner_shutdown_rx,
-        tasks_client,
         block_status_tasks,
+        Arc::new(chain_id.clone()),
+        agent.clone(),
+        manager.clone(),
+        tasks.clone(),
     ));
 
-    // Check queries if enabled
-    let queries_runner_handle = if with_queries {
-        tokio::task::spawn(tasks::queries_loop(
-            dispatcher_tx.subscribe(),
-            shutdown_tx.subscribe(),
-            client,
-            block_status,
-        ))
+    // Process evented tasks, if they're ready
+    let evented_task_runner_shutdown_rx = shutdown_tx.subscribe();
+    let evented_task_runner_block_stream_rx = dispatcher_tx.subscribe();
+    let block_status_evented_tasks = block_status.clone();
+    let evented_task_runner_handle = if let Some(b) = config.include_evented_tasks {
+        if b {
+            tokio::task::spawn(evented_tasks_loop(
+                evented_task_runner_block_stream_rx,
+                evented_task_runner_shutdown_rx,
+                block_status_evented_tasks,
+                Arc::new(chain_id.clone()),
+                manager.clone(),
+                tasks.clone(),
+                factory,
+            ))
+        } else {
+            tokio::task::spawn(async { Ok(()) })
+        }
+    } else {
+        tokio::task::spawn(async { Ok(()) })
+    };
+
+    // Tasks Cache checks
+    let tasks_cache_check_shutdown_rx = shutdown_tx.subscribe();
+    let tasks_cache_check_block_stream_rx = dispatcher_tx.subscribe();
+    let tasks_cache_check_handle = if let Some(b) = config.include_evented_tasks {
+        if b {
+            tokio::task::spawn(refresh_tasks_cache_loop(
+                tasks_cache_check_block_stream_rx,
+                tasks_cache_check_shutdown_rx,
+                Arc::new(chain_id.clone()),
+                tasks,
+            ))
+        } else {
+            tokio::task::spawn(async { Ok(()) })
+        }
     } else {
         tokio::task::spawn(async { Ok(()) })
     };
@@ -172,7 +206,6 @@ pub async fn run(
                 err
             )
         })?;
-        println!();
         info!("[{}] Shutting down...", ctrl_c_chain_id);
 
         Ok(())
@@ -184,9 +217,11 @@ pub async fn run(
         sequencer_handle,
         dispatcher_handle,
         provider_system_handle,
+        factory_cache_check_handle,
         account_status_check_handle,
         task_runner_handle,
-        queries_runner_handle,
+        evented_task_runner_handle,
+        tasks_cache_check_handle,
     );
 
     // If any of the tasks failed, we need to propagate the error.
@@ -203,14 +238,25 @@ pub async fn run_retry(
     chain_id: &String,
     shutdown_tx: &ShutdownTx,
     config: &ChainConfig,
-    key: &ExtendedPrivateKey<SigningKey>,
-    with_queries: bool,
+    factory: Arc<Mutex<Factory>>,
+    agent: Arc<Agent>,
+    manager: Arc<Manager>,
+    tasks: Arc<Mutex<Tasks>>,
 ) -> Result<(), Report> {
     // TODO: Rethink this retry logic
     // let retry_strategy = FixedInterval::from_millis(5000).take(1200);
 
     // Retry::spawn(retry_strategy, || async {
-    run(chain_id, shutdown_tx, config, key, with_queries).await?;
+    run(
+        chain_id,
+        shutdown_tx,
+        config,
+        factory,
+        agent,
+        manager,
+        tasks,
+    )
+    .await?;
     // .map_err(|err| {
     //     error!("[{}] System crashed: {}", &chain_id, err);
     //     error!("[{}] Retrying...", &chain_id);

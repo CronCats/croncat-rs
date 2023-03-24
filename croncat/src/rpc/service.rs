@@ -3,24 +3,30 @@
 //! This uses multiple approaches to ensure that the service is always available.
 //!
 
-use std::collections::HashMap;
-use std::sync::Arc;
-use std::time::Duration;
-
+use crate::config::{ChainConfig, ChainDataSource};
+use crate::errors::{eyre, Report};
+use crate::logging::info;
+use cosm_orc::orchestrator::{Address, ChainTxResponse};
+use cosm_tome::chain::coin::Coin;
 use cosmrs::bip32;
 use cosmrs::crypto::secp256k1::SigningKey;
 use futures_util::Future;
 use rand::seq::SliceRandom;
+use std::collections::{HashMap, HashSet};
+use std::str::FromStr;
+use std::sync::Arc;
+use std::time::Duration;
 use tokio::sync::Mutex;
 use tracing::debug;
 
-use crate::config::ChainConfig;
-use crate::config::ChainDataSource;
-use crate::errors::{eyre, Report};
-use crate::logging::info;
-
 use super::Querier;
 use super::Signer;
+
+type RpcSources = Arc<Mutex<HashMap<String, (ChainDataSource, bool)>>>;
+
+lazy_static::lazy_static! {
+    pub(crate) static ref RPC_SOURCES: RpcSources = Arc::new(Mutex::new(HashMap::new()));
+}
 
 #[derive(Debug)]
 pub enum ServiceFailure {
@@ -44,18 +50,37 @@ pub enum RpcClientType {
 #[derive(Clone, Debug)]
 pub struct RpcClientService {
     chain_config: ChainConfig,
+    contract_addr: Address,
     key: bip32::XPrv,
-    source_info: Arc<Mutex<HashMap<String, (ChainDataSource, bool)>>>,
+    source_info: RpcSources,
 }
 
 impl RpcClientService {
-    pub async fn new(chain_config: ChainConfig, key: bip32::XPrv) -> Self {
-        let data_sources =
-            Self::pick_best_sources(&chain_config, &chain_config.data_sources()).await;
+    pub async fn new(
+        chain_config: ChainConfig,
+        key: bip32::XPrv,
+        contract_addr: Option<Address>,
+    ) -> Self {
+        let contract_addr = contract_addr
+            .unwrap_or_else(|| Address::from_str(chain_config.clone().factory.as_str()).unwrap());
+
+        let mut global_sources = RPC_SOURCES.lock().await;
+
+        let data_sources = if global_sources.is_empty() {
+            let data_sources =
+                Self::pick_best_sources(&chain_config, &chain_config.data_sources()).await;
+            for (provider, data_source) in data_sources.iter() {
+                global_sources.insert(provider.clone(), data_source.clone());
+            }
+            data_sources
+        } else {
+            global_sources.clone()
+        };
 
         Self {
             key,
             chain_config,
+            contract_addr,
             source_info: Arc::new(Mutex::new(data_sources)),
         }
     }
@@ -74,13 +99,36 @@ impl RpcClientService {
         // Create a racetrack for testing sources.
         let mut race_track = RaceTrack::disqualify_after(Duration::from_secs(5));
 
+        // Seen sources
+        let mut seen_sources = HashSet::new();
+
         // Race all the sources and check that they connect to RPC.
         for (name, source) in sources {
             let source = source.clone();
+
+            // If we've seen the before then skip it.
+            if source.rpc.is_empty() || seen_sources.contains(&source.rpc) {
+                continue;
+            }
+            // Add the source to the seen sources.
+            seen_sources.insert(source.rpc.clone());
+
             let chain_config = chain_config.clone();
+            let factory_addr = chain_config.clone().factory;
             race_track.add_racer(name, async move {
-                let rpc_client = Querier::new(chain_config, source.rpc.clone()).await?;
-                let _ = rpc_client.query_config().await?;
+                let rpc_client = Querier::new(
+                    source.rpc.clone(),
+                    chain_config,
+                    Address::from_str(&factory_addr)?,
+                )
+                .await?;
+                // get block height from the nodes directly
+                let _ = rpc_client
+                    .rpc_client
+                    .client
+                    .client
+                    .tendermint_query_latest_block()
+                    .await?;
 
                 Ok(source)
             });
@@ -104,13 +152,18 @@ impl RpcClientService {
             .collect();
 
         // Log how many available sources we have
+        let list: Vec<String> = data_sources
+            .iter()
+            .filter(|(_, (_, disqualified))| !disqualified)
+            .map(|(i, _)| i.to_owned())
+            .collect();
+        let plural = if list.len() == 1 { "source" } else { "sources" };
         info!(
-            "[{}] {} source(s) available!",
+            "[{}] {} {} available! {:?}",
             chain_config.info.chain_id,
-            data_sources
-                .iter()
-                .filter(|(_, (_, disqualified))| !disqualified)
-                .count()
+            list.len(),
+            plural,
+            list,
         );
 
         data_sources
@@ -148,8 +201,7 @@ impl RpcClientService {
                     return Err(last_error.unwrap());
                 }
 
-                // TODO: This should be a more specific error
-                return Err(eyre!("No valid data sources available"));
+                return Err(eyre!("No valid rpc sources available"));
             }
 
             let source_key = source_keys
@@ -158,12 +210,13 @@ impl RpcClientService {
                 .to_string();
             let (source, _) = source_info.get_mut(&source_key).unwrap().clone();
 
+            // TODO: Change to contract_addr
             let rpc_client = match kind {
                 RpcCallType::Execute => RpcClientType::Execute(Box::new(
                     match Signer::new(
                         source.rpc.to_string(),
                         self.chain_config.clone(),
-                        self.chain_config.manager.clone(),
+                        self.contract_addr.clone(),
                         self.key.clone(),
                     )
                     .await
@@ -179,7 +232,13 @@ impl RpcClientService {
                     },
                 )),
                 RpcCallType::Query => RpcClientType::Query(Box::new(
-                    match Querier::new(self.chain_config.clone(), source.rpc.to_string()).await {
+                    match Querier::new(
+                        source.clone().rpc.to_string(),
+                        self.chain_config.clone(),
+                        self.contract_addr.clone(),
+                    )
+                    .await
+                    {
                         Ok(client) => client,
                         Err(e) => {
                             debug!("Failed to create RpcClient for {}: {}", source_key, e);
@@ -192,6 +251,7 @@ impl RpcClientService {
                 )),
             };
 
+            // TODO: ONLY mark as bad IF the /status endpoint doesnt return, otherwise provider is not considered bad.
             match f(rpc_client).await {
                 Ok(result) => {
                     return Ok(result);
@@ -201,11 +261,13 @@ impl RpcClientService {
                     break Err(e);
                 }
                 Err(e) => {
+                    // TODO: Assess ChainResponse { code: Err(18) ???
                     debug!("Error calling chain for {}: {}", source_key, e);
-                    let (_, bad) = source_info.get_mut(&source_key).unwrap();
-                    *bad = true;
-                    last_error = Some(e);
-                    continue;
+                    // let (_, bad) = source_info.get_mut(&source_key).unwrap();
+                    // *bad = true;
+                    // last_error = Some(e);
+                    // continue;
+                    break Err(e);
                 }
             }
         }
@@ -239,6 +301,45 @@ impl RpcClientService {
             }
         })
         .await
+    }
+
+    /// Query the balance of an address.
+    /// Returns the balance in the denom set for this client.
+    pub async fn query_balance(&self, address: &str) -> Result<Coin, Report> {
+        let balance = self
+            .query(move |querier| {
+                let address = address.parse::<Address>().unwrap();
+                async move {
+                    querier
+                        .rpc_client
+                        .query_balance(address.to_string().as_str())
+                        .await
+                }
+            })
+            .await?;
+
+        Ok(balance)
+    }
+
+    /// Send funds to an address.
+    pub async fn send_funds(
+        &self,
+        to: &str,
+        from: &str,
+        denom: &str,
+        amount: u128,
+    ) -> Result<ChainTxResponse, Report> {
+        let response = self
+            .execute(|signer| {
+                let to = to;
+                let from = from;
+                let denom = denom;
+                let amount = amount;
+                async move { signer.rpc_client.send_funds(to, from, denom, amount).await }
+            })
+            .await?;
+
+        Ok(response)
     }
 }
 

@@ -57,7 +57,7 @@ impl<'de> Deserialize<'de> for Config {
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 struct RawChainConfigEntry {
-    pub manager: String,
+    pub factory: String,
     pub registry: Option<String>,
     pub block_polling_seconds: Option<f64>,
     pub block_polling_timeout_seconds: Option<f64>,
@@ -66,6 +66,7 @@ struct RawChainConfigEntry {
     pub gas_prices: Option<f32>,
     pub gas_adjustment: Option<f32>,
     pub threshold: Option<u64>,
+    pub include_evented_tasks: Option<bool>,
     pub custom_sources: Option<HashMap<String, ChainDataSource>>,
     pub rpc_timeout_seconds: Option<f64>,
     pub denom: Option<String>,
@@ -79,7 +80,7 @@ pub struct ChainDataSource {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ChainConfig {
     pub info: ChainInfo,
-    pub manager: String,
+    pub factory: String,
     pub registry: Option<String>,
     pub block_polling_seconds: f64,
     pub block_polling_timeout_seconds: f64,
@@ -88,6 +89,7 @@ pub struct ChainConfig {
     pub gas_prices: f32,
     pub gas_adjustment: f32,
     pub threshold: Option<u64>,
+    pub include_evented_tasks: Option<bool>,
     pub rpc_timeout_seconds: Option<f64>,
     pub denom: Option<String>,
 }
@@ -115,7 +117,7 @@ impl ChainConfig {
 
         Self {
             info,
-            manager: entry.manager,
+            factory: entry.factory,
             registry: entry.registry,
             block_polling_seconds,
             block_polling_timeout_seconds,
@@ -124,6 +126,7 @@ impl ChainConfig {
             gas_prices,
             gas_adjustment,
             threshold: entry.threshold,
+            include_evented_tasks: entry.include_evented_tasks,
             rpc_timeout_seconds: entry.rpc_timeout_seconds,
             denom: entry.denom,
         }

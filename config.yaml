@@ -1,12 +1,12 @@
 chains:
     juno-1:
-        factory: juno1yaxs8l9xa4xg7lk0aqxatxqkk5f3mcwetwg7vvlqu7uxc74dlf6qhkx3xj
+        factory: juno1fg83ymlxj9lfdv6cx9hwdm5jt6nf3uzmgkfed4uh7efz4ffs0psslm25zm
         gas_prices: 0.04
         gas_adjustment: 1.3
         threshold: 1000000
         include_evented_tasks: true
     uni-6:
-        factory: juno1m0602c9a85jrtcyn5frfhkenvtyy8nvqm299syqsswn4zmj09pgq9adzj5
+        factory: juno1qzkcegjce9ezy5afs043r8kdf50lkugcgdxqgp4a902mayefssws5n5ydu
         gas_prices: 0.04
         gas_adjustment: 1.3
         threshold: 1000000
@@ -39,8 +39,7 @@ chains:
         gas_adjustment: 1.3
         threshold: 1000000
         include_evented_tasks: true
-        rpc_timeout: 4.0
-        denom: "ustars"
+        rpc_timeout: 9.0
         # custom_sources:
         #     "stars":
         #         rpc: https://rpc.elgafar-1.stargaze-apis.com

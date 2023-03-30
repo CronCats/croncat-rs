@@ -251,7 +251,7 @@ impl RpcClientService {
                 )),
             };
 
-            // TODO: ONLY mark as bad IF the /status endpoint doesnt return, otherwise provider is not considered bad.
+            // ONLY mark as bad IF the /status endpoint doesnt return, otherwise provider is not considered bad.
             match f(rpc_client).await {
                 Ok(result) => {
                     return Ok(result);
@@ -261,13 +261,14 @@ impl RpcClientService {
                     break Err(e);
                 }
                 Err(e) => {
-                    // TODO: Assess ChainResponse { code: Err(18) ???
                     debug!("Error calling chain for {}: {}", source_key, e);
-                    // let (_, bad) = source_info.get_mut(&source_key).unwrap();
-                    // *bad = true;
-                    // last_error = Some(e);
-                    // continue;
-                    break Err(e);
+                    // Handle cases for when query against a non-existant contract could stop this node
+                    if e.to_string().to_lowercase().contains("contract: not found") { continue; }
+                    // This will remove invalid providers if they have errors we dont know how to handle.
+                    let (_, bad) = source_info.get_mut(&source_key).unwrap();
+                    *bad = true;
+                    last_error = Some(e);
+                    continue;
                 }
             }
         }

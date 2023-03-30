@@ -263,7 +263,9 @@ impl RpcClientService {
                 Err(e) => {
                     debug!("Error calling chain for {}: {}", source_key, e);
                     // Handle cases for when query against a non-existant contract could stop this node
-                    if e.to_string().to_lowercase().contains("contract: not found") { continue; }
+                    if e.to_string().to_lowercase().contains("contract: not found") {
+                        continue;
+                    }
                     // This will remove invalid providers if they have errors we dont know how to handle.
                     let (_, bad) = source_info.get_mut(&source_key).unwrap();
                     *bad = true;

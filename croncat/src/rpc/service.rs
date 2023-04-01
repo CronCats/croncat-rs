@@ -56,6 +56,18 @@ pub struct RpcClientService {
 }
 
 impl RpcClientService {
+    pub async fn cache_sources(chain_config: &ChainConfig) {
+        let mut global_sources = RPC_SOURCES.lock().await;
+
+        if global_sources.is_empty() {
+            let data_sources =
+                Self::pick_best_sources(chain_config, &chain_config.data_sources()).await;
+            for (provider, data_source) in data_sources.iter() {
+                global_sources.insert(provider.clone(), data_source.clone());
+            }
+        }
+    }
+
     pub async fn new(
         chain_config: ChainConfig,
         key: bip32::XPrv,
@@ -64,24 +76,13 @@ impl RpcClientService {
         let contract_addr = contract_addr
             .unwrap_or_else(|| Address::from_str(chain_config.clone().factory.as_str()).unwrap());
 
-        let mut global_sources = RPC_SOURCES.lock().await;
-
-        let data_sources = if global_sources.is_empty() {
-            let data_sources =
-                Self::pick_best_sources(&chain_config, &chain_config.data_sources()).await;
-            for (provider, data_source) in data_sources.iter() {
-                global_sources.insert(provider.clone(), data_source.clone());
-            }
-            data_sources
-        } else {
-            global_sources.clone()
-        };
+        Self::cache_sources(&chain_config).await;
 
         Self {
             key,
             chain_config,
             contract_addr,
-            source_info: Arc::new(Mutex::new(data_sources)),
+            source_info: RPC_SOURCES.clone(),
         }
     }
 

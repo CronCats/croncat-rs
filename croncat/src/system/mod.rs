@@ -23,7 +23,7 @@ use crate::{
         polling::poll_stream_blocks,
         tasks::{evented_tasks_loop, refresh_tasks_cache_loop, scheduled_tasks_loop, Tasks},
     },
-    rpc::service::RPC_SOURCES,
+    rpc::{service::RPC_SOURCES, RpcClientService},
     tokio,
 };
 
@@ -266,6 +266,8 @@ pub async fn run_retry(
                 // Clear the RPC source cache
                 let mut sources = RPC_SOURCES.lock().await;
                 sources.clear();
+                // Cache them again
+                RpcClientService::cache_sources(config).await;
 
                 // Tell the user we died.
                 error!("[{}] System crashed: {}", &chain_id, err);

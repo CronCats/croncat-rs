@@ -190,11 +190,15 @@ impl RpcClientService {
         let mut last_error = None;
 
         loop {
-            let mut source_info = self.source_info.lock().await;
-            let source_keys = source_info
-                .keys()
-                .filter(|k| !source_info.get(*k).unwrap().1)
-                .collect::<Vec<_>>();
+            let source_keys = {
+                let source_info = self.source_info.lock().await;
+
+                source_info
+                    .keys()
+                    .cloned()
+                    .filter(|k| !source_info.get(k).unwrap().1)
+                    .collect::<Vec<_>>()
+            };
 
             if source_keys.is_empty() {
                 if last_error.is_some() {
@@ -208,7 +212,14 @@ impl RpcClientService {
                 .choose(&mut rand::thread_rng())
                 .unwrap()
                 .to_string();
-            let (source, _) = source_info.get_mut(&source_key).unwrap().clone();
+            let (source, _) = {
+                self.source_info
+                    .lock()
+                    .await
+                    .get_mut(&source_key)
+                    .unwrap()
+                    .clone()
+            };
 
             // TODO: Change to contract_addr
             let rpc_client = match kind {
@@ -224,8 +235,11 @@ impl RpcClientService {
                         Ok(client) => client,
                         Err(e) => {
                             debug!("Failed to create RpcClient for {}: {}", source_key, e);
-                            let (_, bad) = source_info.get_mut(&source_key).unwrap();
-                            *bad = true;
+                            {
+                                let mut source_info = self.source_info.lock().await;
+                                let (_, bad) = source_info.get_mut(&source_key).unwrap();
+                                *bad = true;
+                            }
                             last_error = Some(e);
                             continue;
                         }
@@ -242,8 +256,11 @@ impl RpcClientService {
                         Ok(client) => client,
                         Err(e) => {
                             debug!("Failed to create RpcClient for {}: {}", source_key, e);
-                            let (_, bad) = source_info.get_mut(&source_key).unwrap();
-                            *bad = true;
+                            {
+                                let mut source_info = self.source_info.lock().await;
+                                let (_, bad) = source_info.get_mut(&source_key).unwrap();
+                                *bad = true;
+                            }
                             last_error = Some(e);
                             continue;
                         }
@@ -267,8 +284,11 @@ impl RpcClientService {
                         continue;
                     }
                     // This will remove invalid providers if they have errors we dont know how to handle.
-                    let (_, bad) = source_info.get_mut(&source_key).unwrap();
-                    *bad = true;
+                    {
+                        let mut source_info = self.source_info.lock().await;
+                        let (_, bad) = source_info.get_mut(&source_key).unwrap();
+                        *bad = true;
+                    }
                     last_error = Some(e);
                     continue;
                 }

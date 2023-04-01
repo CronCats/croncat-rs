@@ -8,6 +8,7 @@ use tokio::{
     sync::{broadcast, mpsc, Mutex},
     task::JoinHandle,
 };
+use tokio_retry::{strategy::FixedInterval, Retry};
 use tracing::{debug, error};
 
 use crate::{
@@ -22,6 +23,7 @@ use crate::{
         polling::poll_stream_blocks,
         tasks::{evented_tasks_loop, refresh_tasks_cache_loop, scheduled_tasks_loop, Tasks},
     },
+    rpc::service::RPC_SOURCES,
     tokio,
 };
 
@@ -244,26 +246,35 @@ pub async fn run_retry(
     tasks: Arc<Mutex<Tasks>>,
 ) -> Result<(), Report> {
     // TODO: Rethink this retry logic
-    // let retry_strategy = FixedInterval::from_millis(5000).take(1200);
+    let retry_strategy = FixedInterval::from_millis(5000).take(1200);
 
-    // Retry::spawn(retry_strategy, || async {
-    run(
-        chain_id,
-        shutdown_tx,
-        config,
-        factory,
-        agent,
-        manager,
-        tasks,
-    )
+    Retry::spawn(retry_strategy, || async {
+        let result = run(
+            chain_id,
+            shutdown_tx,
+            config,
+            factory.clone(),
+            agent.clone(),
+            manager.clone(),
+            tasks.clone(),
+        )
+        .await;
+
+        match result {
+            Ok(_) => Ok(()),
+            Err(err) => {
+                // Clear the RPC source cache
+                let mut sources = RPC_SOURCES.lock().await;
+                sources.clear();
+
+                // Tell the user we died.
+                error!("[{}] System crashed: {}", &chain_id, err);
+                error!("[{}] Retrying...", &chain_id);
+                Err(err)
+            }
+        }
+    })
     .await?;
-    // .map_err(|err| {
-    //     error!("[{}] System crashed: {}", &chain_id, err);
-    //     error!("[{}] Retrying...", &chain_id);
-    //     err
-    // })?;
-    // })
-    // .await?;
 
     Ok(())
 }

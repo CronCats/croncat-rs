@@ -158,8 +158,8 @@ pub async fn run(
     let evented_task_runner_shutdown_rx = shutdown_tx.subscribe();
     let evented_task_runner_block_stream_rx = dispatcher_tx.subscribe();
     let block_status_evented_tasks = block_status.clone();
-    let evented_task_runner_handle = if let Some(b) = config.include_evented_tasks {
-        if b {
+    let evented_task_runner_handle = if let Some(evented_tasks) = config.include_evented_tasks {
+        if evented_tasks {
             tokio::task::spawn(evented_tasks_loop(
                 evented_task_runner_block_stream_rx,
                 evented_task_runner_shutdown_rx,
@@ -170,17 +170,17 @@ pub async fn run(
                 factory,
             ))
         } else {
-            tokio::task::spawn(async { Ok(()) })
+            empty_task()
         }
     } else {
-        tokio::task::spawn(async { Ok(()) })
+        empty_task()
     };
 
     // Tasks Cache checks
     let tasks_cache_check_shutdown_rx = shutdown_tx.subscribe();
     let tasks_cache_check_block_stream_rx = dispatcher_tx.subscribe();
-    let tasks_cache_check_handle = if let Some(b) = config.include_evented_tasks {
-        if b {
+    let tasks_cache_check_handle = if let Some(evented_tasks) = config.include_evented_tasks {
+        if evented_tasks {
             tokio::task::spawn(refresh_tasks_cache_loop(
                 tasks_cache_check_block_stream_rx,
                 tasks_cache_check_shutdown_rx,
@@ -188,10 +188,10 @@ pub async fn run(
                 tasks,
             ))
         } else {
-            tokio::task::spawn(async { Ok(()) })
+            empty_task()
         }
     } else {
-        tokio::task::spawn(async { Ok(()) })
+        empty_task()
     };
 
     // Ctrl-C handler
@@ -277,4 +277,9 @@ pub async fn run_retry(
     .await?;
 
     Ok(())
+}
+
+#[inline(always)]
+fn empty_task() -> JoinHandle<Result<(), Report>> {
+    tokio::task::spawn(async { Ok(()) })
 }

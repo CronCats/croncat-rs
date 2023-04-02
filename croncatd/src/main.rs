@@ -54,6 +54,11 @@ async fn main() -> Result<(), Report> {
         exit(1);
     }
 
+    // Say goodbye if no no-frills
+    if !opts.no_frills {
+        println!("\n🐱 Cron Cat says: Goodbye / さようなら\n");
+    }
+
     Ok(())
 }
 

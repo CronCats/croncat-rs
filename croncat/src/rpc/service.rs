@@ -56,6 +56,11 @@ pub struct RpcClientService {
 }
 
 impl RpcClientService {
+    pub async fn clear_sources() {
+        let mut sources = RPC_SOURCES.lock().await;
+        sources.clear();
+    }
+
     pub async fn cache_sources(chain_config: &ChainConfig) {
         let mut global_sources = RPC_SOURCES.lock().await;
 

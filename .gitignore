@@ -7,3 +7,5 @@ Cargo.lock
 .DS_Store
 .config.local.yaml
 .cosmos-chain-registry/
+flamegraph.svg
+cargo-flamegraph.stacks

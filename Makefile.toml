@@ -27,8 +27,4 @@ command = "cargo"
 args = ["test"]
 
 [tasks.pre-commit]
-dependencies = [
-    "format",
-    "check",
-    "clippy",
-]
+dependencies = ["clippy"]

@@ -449,10 +449,8 @@ pub async fn scheduled_tasks_loop(
 ) -> Result<(), Report> {
     let block_consumer_stream: JoinHandle<Result<(), Report>> = tokio::task::spawn(async move {
         while let Ok(block) = block_stream_rx.recv().await {
-            let locked_status = block_status.lock().await;
-            let is_active = *locked_status == AgentStatus::Active;
-            // unlocking it ASAP
-            std::mem::drop(locked_status);
+            let is_active = *block_status.lock().await == AgentStatus::Active;
+
             if is_active {
                 let tasks_failed = Arc::new(AtomicBool::new(false));
                 let account_addr = agent_client.account_id();
@@ -547,10 +545,8 @@ pub async fn evented_tasks_loop(
     // TODO: Question for Seedyrom: can this while loop invalidate once block passed?
     let block_consumer_stream: JoinHandle<Result<(), Report>> = tokio::task::spawn(async move {
         while let Ok(block) = block_stream_rx.recv().await {
-            let locked_status = block_status.lock().await;
-            let is_active = *locked_status == AgentStatus::Active;
-            // unlocking it ASAP
-            std::mem::drop(locked_status);
+            let is_active = *block_status.lock().await == AgentStatus::Active;
+
             if is_active {
                 let tasks_failed = Arc::new(AtomicBool::new(false));
                 let mut tasks_client = tasks_client_mut.lock().await;

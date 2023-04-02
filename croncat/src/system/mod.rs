@@ -38,10 +38,10 @@ pub async fn run(
     chain_id: &String,
     shutdown_tx: &ShutdownTx,
     config: &ChainConfig,
-    factory: Arc<Mutex<Factory>>,
-    agent: Arc<Agent>,
-    manager: Arc<Manager>,
-    tasks: Arc<Mutex<Tasks>>,
+    factory: &Arc<Mutex<Factory>>,
+    agent: &Arc<Agent>,
+    manager: &Arc<Manager>,
+    tasks: &Arc<Mutex<Tasks>>,
 ) -> Result<(), Report> {
     // Get the status of the agent
     let account_id = agent.account_id();
@@ -179,6 +179,7 @@ pub async fn run(
                 let shutdown_rx = shutdown_tx.subscribe();
                 let block_stream_rx = dispatcher_tx.subscribe();
                 let block_status = block_status.clone();
+
                 evented_tasks_loop(
                     block_stream_rx,
                     shutdown_rx,
@@ -186,7 +187,7 @@ pub async fn run(
                     Arc::new(chain_id.clone()),
                     manager.clone(),
                     tasks.clone(),
-                    factory,
+                    factory.clone(),
                 )
             })
         } else {
@@ -207,7 +208,7 @@ pub async fn run(
                     block_stream_rx,
                     shutdown_rx,
                     Arc::new(chain_id.clone()),
-                    tasks,
+                    tasks.clone(),
                 )
             })
         } else {
@@ -265,10 +266,10 @@ pub async fn run_retry(
     chain_id: &String,
     shutdown_tx: &ShutdownTx,
     config: &ChainConfig,
-    factory: Arc<Mutex<Factory>>,
-    agent: Arc<Agent>,
-    manager: Arc<Manager>,
-    tasks: Arc<Mutex<Tasks>>,
+    factory: &Arc<Mutex<Factory>>,
+    agent: &Arc<Agent>,
+    manager: &Arc<Manager>,
+    tasks: &Arc<Mutex<Tasks>>,
 ) -> Result<(), Report> {
     // TODO: What's the strategy for retrying?
     let retry_strategy = FixedInterval::from_millis(5000).take(1200);
@@ -278,10 +279,10 @@ pub async fn run_retry(
             chain_id,
             shutdown_tx,
             config,
-            factory.clone(),
-            agent.clone(),
-            manager.clone(),
-            tasks.clone(),
+            factory,
+            agent,
+            manager,
+            tasks,
         )
         .await;
 

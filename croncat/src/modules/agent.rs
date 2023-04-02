@@ -273,9 +273,7 @@ pub async fn check_status_loop(
                     info!("Agent status: {:?}", locked_status);
                 }
 
-                {
-                    *block_status.lock().await = locked_status;
-                }
+                *block_status.lock().await = locked_status;
 
                 if let Some(threshold) = chain_config.threshold {
                     // Check the agent's balance to make sure it's not falling below a threshold

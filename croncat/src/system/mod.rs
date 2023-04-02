@@ -245,7 +245,7 @@ pub async fn run_retry(
     manager: Arc<Manager>,
     tasks: Arc<Mutex<Tasks>>,
 ) -> Result<(), Report> {
-    // TODO: Rethink this retry logic
+    // TODO: What's the strategy for retrying?
     let retry_strategy = FixedInterval::from_millis(5000).take(1200);
 
     Retry::spawn(retry_strategy, || async {
@@ -263,10 +263,11 @@ pub async fn run_retry(
         match result {
             Ok(_) => Ok(()),
             Err(err) => {
+                // Clear the cache and recache RPC sources
                 RpcClientService::clear_sources().await;
                 RpcClientService::cache_sources(config).await;
 
-                // Tell the user we died.
+                // Tell the user we died
                 error!("[{}] System crashed: {}", &chain_id, err);
                 error!("[{}] Retrying...", &chain_id);
                 Err(err)

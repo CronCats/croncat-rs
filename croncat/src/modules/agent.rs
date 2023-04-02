@@ -251,7 +251,7 @@ pub async fn check_status_loop(
                 let mut locked_status = agent
                     .ok_or(eyre!("Agent unregistered during the loop"))?
                     .agent
-                    .unwrap()
+                    .ok_or(eyre!("Agent unregistered during the loop"))?
                     .status;
 
                 info!("[{}] Agent status: {:?}", chain_id, locked_status);
@@ -267,7 +267,7 @@ pub async fn check_status_loop(
                     locked_status = agent
                         .ok_or(eyre!("Agent unregistered during the loop"))?
                         .agent
-                        .unwrap()
+                        .ok_or(eyre!("Agent unregistered during the loop"))?
                         .status;
 
                     info!("Agent status: {:?}", locked_status);

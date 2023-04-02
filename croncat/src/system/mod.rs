@@ -8,7 +8,7 @@ use tokio::{
     sync::{broadcast, mpsc, Mutex},
     task::JoinHandle,
 };
-use tokio_retry::{strategy::FixedInterval, Retry};
+use tokio_retry::{strategy::FixedInterval, RetryIf};
 use tracing::{debug, error};
 
 use crate::{
@@ -25,6 +25,7 @@ use crate::{
     },
     rpc::RpcClientService,
     tokio,
+    utils::is_error_fallible,
 };
 
 pub mod service;
@@ -274,32 +275,44 @@ pub async fn run_retry(
     // TODO: What's the strategy for retrying?
     let retry_strategy = FixedInterval::from_millis(5000).take(1200);
 
-    Retry::spawn(retry_strategy, || async {
-        let result = run(
-            chain_id,
-            shutdown_tx,
-            config,
-            factory,
-            agent,
-            manager,
-            tasks,
-        )
-        .await;
+    // TODO: Retry needs to jsut be a loop, not a retry strategy.
+    RetryIf::spawn(
+        retry_strategy,
+        || async {
+            let result = run(
+                chain_id,
+                shutdown_tx,
+                config,
+                factory,
+                agent,
+                manager,
+                tasks,
+            )
+            .await;
 
-        match result {
-            Ok(_) => Ok(()),
-            Err(err) => {
-                // Clear the cache and recache RPC sources
-                RpcClientService::clear_sources().await;
-                RpcClientService::cache_sources(config).await;
+            match result {
+                Ok(_) => Ok(()),
+                Err(err) => {
+                    // Clear the cache and recache RPC sources
+                    RpcClientService::clear_sources().await;
+                    RpcClientService::cache_sources(config).await;
 
+                    Err(err)
+                }
+            }
+        },
+        |err: &Report| {
+            let retry = !is_error_fallible(err);
+
+            if retry {
                 // Tell the user we died
                 error!("[{}] System crashed: {}", &chain_id, err);
                 error!("[{}] Retrying...", &chain_id);
-                Err(err)
             }
-        }
-    })
+
+            retry
+        },
+    )
     .await?;
 
     Ok(())

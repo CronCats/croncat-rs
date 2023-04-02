@@ -159,3 +159,11 @@ pub fn normalize_rpc_url(rpc_url: &str) -> String {
         format!("https://{rpc_url}")
     }
 }
+
+pub fn is_error_fallible(e: &Report) -> bool {
+    let msg = e.to_string().to_lowercase();
+    msg.contains("agent not registered")
+        || msg.contains("agent already registered")
+        || msg.contains("agent not found")
+        || msg.contains("account not found")
+}

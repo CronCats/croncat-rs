@@ -6,6 +6,7 @@
 use crate::config::{ChainConfig, ChainDataSource};
 use crate::errors::{eyre, Report};
 use crate::logging::info;
+use crate::utils::is_error_fallible;
 use cosm_orc::orchestrator::{Address, ChainTxResponse};
 use cosm_tome::chain::coin::Coin;
 use cosmrs::bip32;
@@ -279,7 +280,7 @@ impl RpcClientService {
                 Ok(result) => {
                     return Ok(result);
                 }
-                Err(e) if break_loop_errors(&e) => {
+                Err(e) if is_error_fallible(&e) => {
                     debug!("Error calling chain for {}: {}", source_key, e);
                     break Err(e);
                 }
@@ -370,12 +371,4 @@ impl RpcClientService {
 
         Ok(response)
     }
-}
-
-fn break_loop_errors(e: &Report) -> bool {
-    let msg = e.to_string().to_lowercase();
-    msg.contains("agent not registered")
-        || msg.contains("agent already registered")
-        || msg.contains("agent not found")
-        || msg.contains("account not found")
 }

@@ -244,27 +244,37 @@ pub async fn check_status_loop(
                     "Checking agents statuses for block (height: {})",
                     block.inner.sync_info.latest_block_height
                 );
+
                 let account_id = agent_client.account_id();
                 let agent = agent_client.get(account_id.as_str()).await?;
-                let mut locked_status = block_status.lock().await;
-                *locked_status = agent
+
+                let mut locked_status = agent
                     .ok_or(eyre!("Agent unregistered during the loop"))?
                     .agent
                     .unwrap()
                     .status;
-                info!("[{}] Agent status: {:?}", chain_id, *locked_status);
-                if *locked_status == AgentStatus::Nominated {
+
+                info!("[{}] Agent status: {:?}", chain_id, locked_status);
+
+                if locked_status == AgentStatus::Nominated {
                     info!(
                         "Checking in agent: {}",
                         agent_client.check_in().await.map(|result| result.res.log)?
                     );
+
                     let agent = agent_client.get(account_id.as_str()).await?;
-                    *locked_status = agent
+
+                    locked_status = agent
                         .ok_or(eyre!("Agent unregistered during the loop"))?
                         .agent
                         .unwrap()
                         .status;
-                    info!("Agent status: {:?}", *locked_status);
+
+                    info!("Agent status: {:?}", locked_status);
+                }
+
+                {
+                    *block_status.lock().await = locked_status;
                 }
 
                 if let Some(threshold) = chain_config.threshold {

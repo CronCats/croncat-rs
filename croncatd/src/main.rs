@@ -377,10 +377,10 @@ async fn run_command(opts: Opts, mut storage: LocalAgentStorage) -> Result<(), R
                 &chain_id,
                 &shutdown_tx,
                 chain_config,
-                factory,
-                agent,
-                manager,
-                tasks,
+                &factory,
+                &agent,
+                &manager,
+                &tasks,
             )
             .await?
         }

@@ -8,6 +8,7 @@ use tokio::{
     sync::{broadcast, mpsc, Mutex},
     task::JoinHandle,
 };
+use tokio_retry::{strategy::FixedInterval, RetryIf};
 use tracing::{debug, error};
 
 use crate::{
@@ -22,7 +23,9 @@ use crate::{
         polling::poll_stream_blocks,
         tasks::{evented_tasks_loop, refresh_tasks_cache_loop, scheduled_tasks_loop, Tasks},
     },
+    rpc::RpcClientService,
     tokio,
+    utils::is_error_fallible,
 };
 
 pub mod service;
@@ -36,17 +39,19 @@ pub async fn run(
     chain_id: &String,
     shutdown_tx: &ShutdownTx,
     config: &ChainConfig,
-    factory: Arc<Mutex<Factory>>,
-    agent: Arc<Agent>,
-    manager: Arc<Manager>,
-    tasks: Arc<Mutex<Tasks>>,
+    factory: &Arc<Mutex<Factory>>,
+    agent: &Arc<Agent>,
+    manager: &Arc<Manager>,
+    tasks: &Arc<Mutex<Tasks>>,
 ) -> Result<(), Report> {
     // Get the status of the agent
     let account_id = agent.account_id();
     let account_addr = account_id.clone();
     let status = agent.get_status(account_addr).await?;
+
     info!("[{}] Agent: {}", chain_id, account_id);
     info!("[{}] Current Status: {:?}", chain_id, status);
+
     let status = Arc::new(Mutex::new(status));
 
     // Create a channel for block sources
@@ -68,6 +73,7 @@ pub async fn run(
         );
     }
 
+    // TODO: FIXME
     // Provider system monitor updates.
     // let (provider_system_monitor_tx, _provider_system_monitor_rx) = mpsc::channel(100);
     // let provider_system_monitor = ProviderSystemMonitor::new(
@@ -77,6 +83,8 @@ pub async fn run(
 
     // Monitor the provider system for updates.
     let provider_system_handle = tokio::spawn(async move { provider_system.produce().await });
+
+    // TODO: FIXME
     // let _provider_system_monitor_handle =
     //     tokio::spawn(async move { provider_system_monitor.monitor(1000).await });
     // let provider_system_monitor_display_chain_id = chain_id.clone();
@@ -102,113 +110,131 @@ pub async fn run(
     let dispatcher_handle = tokio::task::spawn(async move { dispatcher.fanout().await });
 
     // Task to show blocks from the block stream
-    let mut block_stream_info_rx = dispatcher_tx.subscribe();
-    let block_stream_chain_id = chain_id.clone();
-    let _block_stream_info_handle = tokio::task::spawn(async move {
-        while let Ok(status) = block_stream_info_rx.recv().await {
-            debug!(
-                "[{}] Processing block (height: {})",
-                block_stream_chain_id, status.inner.sync_info.latest_block_height,
-            );
+    let block_stream_info_handle = tokio::task::spawn({
+        let mut block_stream = dispatcher_tx.subscribe();
+        let chain_id = chain_id.clone();
+
+        async move {
+            while let Ok(status) = block_stream.recv().await {
+                debug!(
+                    "[{}] Processing block (height: {})",
+                    chain_id, status.inner.sync_info.latest_block_height,
+                );
+            }
         }
     });
 
     // Factory Cache checks
-    let factory_cache_check_shutdown_rx = shutdown_tx.subscribe();
-    let factory_cache_check_block_stream_rx = dispatcher_tx.subscribe();
-    let factory_cache_check_handle = tokio::task::spawn(refresh_factory_loop(
-        factory_cache_check_block_stream_rx,
-        factory_cache_check_shutdown_rx,
-        Arc::new(chain_id.clone()),
-        factory.clone(),
-    ));
+    let factory_cache_check_handle = tokio::task::spawn({
+        let shutdown_rx = shutdown_tx.subscribe();
+        let block_stream_rx = dispatcher_tx.subscribe();
+
+        refresh_factory_loop(
+            block_stream_rx,
+            shutdown_rx,
+            Arc::new(chain_id.clone()),
+            factory.clone(),
+        )
+    });
 
     // Account status checks
-    let account_status_check_shutdown_rx = shutdown_tx.subscribe();
-    let account_status_check_block_stream_rx = dispatcher_tx.subscribe();
     let block_status = status.clone();
-    let block_status_accounts_loop = block_status.clone();
-    let account_status_check_handle = tokio::task::spawn(check_status_loop(
-        account_status_check_block_stream_rx,
-        account_status_check_shutdown_rx,
-        block_status_accounts_loop,
-        Arc::new(chain_id.clone()),
-        config.clone(),
-        agent.clone(),
-        manager.clone(),
-    ));
+
+    let account_status_check_handle = tokio::task::spawn({
+        let shutdown_rx = shutdown_tx.subscribe();
+        let block_stream_rx = dispatcher_tx.subscribe();
+        let block_status = block_status.clone();
+
+        check_status_loop(
+            block_stream_rx,
+            shutdown_rx,
+            block_status,
+            Arc::new(chain_id.clone()),
+            config.clone(),
+            agent.clone(),
+            manager.clone(),
+        )
+    });
 
     // Process scheduled tasks based on block stream
-    let task_runner_shutdown_rx = shutdown_tx.subscribe();
-    let task_runner_block_stream_rx = dispatcher_tx.subscribe();
-    let block_status_tasks = block_status.clone();
-    let task_runner_handle = tokio::task::spawn(scheduled_tasks_loop(
-        task_runner_block_stream_rx,
-        task_runner_shutdown_rx,
-        block_status_tasks,
-        Arc::new(chain_id.clone()),
-        agent.clone(),
-        manager.clone(),
-        tasks.clone(),
-    ));
+    let task_runner_handle = tokio::task::spawn({
+        let shutdown_rx = shutdown_tx.subscribe();
+        let block_stream_rx = dispatcher_tx.subscribe();
+        let block_status = block_status.clone();
+
+        scheduled_tasks_loop(
+            block_stream_rx,
+            shutdown_rx,
+            block_status,
+            Arc::new(chain_id.clone()),
+            agent.clone(),
+            manager.clone(),
+            tasks.clone(),
+        )
+    });
 
     // Process evented tasks, if they're ready
-    let evented_task_runner_shutdown_rx = shutdown_tx.subscribe();
-    let evented_task_runner_block_stream_rx = dispatcher_tx.subscribe();
-    let block_status_evented_tasks = block_status.clone();
-    let evented_task_runner_handle = if let Some(b) = config.include_evented_tasks {
-        if b {
-            tokio::task::spawn(evented_tasks_loop(
-                evented_task_runner_block_stream_rx,
-                evented_task_runner_shutdown_rx,
-                block_status_evented_tasks,
-                Arc::new(chain_id.clone()),
-                manager.clone(),
-                tasks.clone(),
-                factory,
-            ))
+    let evented_task_runner_handle = if let Some(evented_tasks) = config.include_evented_tasks {
+        if evented_tasks {
+            tokio::task::spawn({
+                let shutdown_rx = shutdown_tx.subscribe();
+                let block_stream_rx = dispatcher_tx.subscribe();
+                let block_status = block_status.clone();
+
+                evented_tasks_loop(
+                    block_stream_rx,
+                    shutdown_rx,
+                    block_status,
+                    Arc::new(chain_id.clone()),
+                    manager.clone(),
+                    tasks.clone(),
+                    factory.clone(),
+                )
+            })
         } else {
-            tokio::task::spawn(async { Ok(()) })
+            empty_task()
         }
     } else {
-        tokio::task::spawn(async { Ok(()) })
+        empty_task()
     };
 
     // Tasks Cache checks
-    let tasks_cache_check_shutdown_rx = shutdown_tx.subscribe();
-    let tasks_cache_check_block_stream_rx = dispatcher_tx.subscribe();
-    let tasks_cache_check_handle = if let Some(b) = config.include_evented_tasks {
-        if b {
-            tokio::task::spawn(refresh_tasks_cache_loop(
-                tasks_cache_check_block_stream_rx,
-                tasks_cache_check_shutdown_rx,
-                Arc::new(chain_id.clone()),
-                tasks,
-            ))
+    let tasks_cache_check_handle = if let Some(evented_tasks) = config.include_evented_tasks {
+        if evented_tasks {
+            tokio::task::spawn({
+                let shutdown_rx = shutdown_tx.subscribe();
+                let block_stream_rx = dispatcher_tx.subscribe();
+
+                refresh_tasks_cache_loop(
+                    block_stream_rx,
+                    shutdown_rx,
+                    Arc::new(chain_id.clone()),
+                    tasks.clone(),
+                )
+            })
         } else {
-            tokio::task::spawn(async { Ok(()) })
+            empty_task()
         }
     } else {
-        tokio::task::spawn(async { Ok(()) })
+        empty_task()
     };
 
     // Ctrl-C handler
-    let ctrl_c_shutdown_tx = shutdown_tx.clone();
-    let ctrl_c_chain_id = chain_id.clone();
-    let ctrl_c_handle: JoinHandle<Result<(), Report>> = tokio::task::spawn(async move {
-        tokio::signal::ctrl_c()
-            .await
-            .map_err(|err| eyre!("[{}] Failed to wait for Ctrl-C: {}", ctrl_c_chain_id, err))?;
-        ctrl_c_shutdown_tx.send(()).map_err(|err| {
-            eyre!(
-                "[{}] Failed to send shutdown signal: {}",
-                ctrl_c_chain_id,
-                err
-            )
-        })?;
-        info!("[{}] Shutting down...", ctrl_c_chain_id);
+    let ctrl_c_handle: JoinHandle<Result<(), Report>> = tokio::task::spawn({
+        let shutdown_tx = shutdown_tx.clone();
+        let chain_id = chain_id.clone();
 
-        Ok(())
+        async move {
+            tokio::signal::ctrl_c()
+                .await
+                .map_err(|err| eyre!("[{}] Failed to wait for Ctrl-C: {}", chain_id, err))?;
+            shutdown_tx
+                .send(())
+                .map_err(|err| eyre!("[{}] Failed to send shutdown signal: {}", chain_id, err))?;
+            info!("[{}] Shutting down...", chain_id);
+
+            Ok(())
+        }
     });
 
     // Try to join all the system tasks.
@@ -224,6 +250,9 @@ pub async fn run(
         tasks_cache_check_handle,
     );
 
+    // Kill the info stream.
+    block_stream_info_handle.abort();
+
     // If any of the tasks failed, we need to propagate the error.
     match system_status {
         Ok(_) => Ok(()),
@@ -238,32 +267,58 @@ pub async fn run_retry(
     chain_id: &String,
     shutdown_tx: &ShutdownTx,
     config: &ChainConfig,
-    factory: Arc<Mutex<Factory>>,
-    agent: Arc<Agent>,
-    manager: Arc<Manager>,
-    tasks: Arc<Mutex<Tasks>>,
+    factory: &Arc<Mutex<Factory>>,
+    agent: &Arc<Agent>,
+    manager: &Arc<Manager>,
+    tasks: &Arc<Mutex<Tasks>>,
 ) -> Result<(), Report> {
-    // TODO: Rethink this retry logic
-    // let retry_strategy = FixedInterval::from_millis(5000).take(1200);
+    // TODO: What's the strategy for retrying?
+    let retry_strategy = FixedInterval::from_millis(5000).take(1200);
 
-    // Retry::spawn(retry_strategy, || async {
-    run(
-        chain_id,
-        shutdown_tx,
-        config,
-        factory,
-        agent,
-        manager,
-        tasks,
+    // TODO: Retry needs to jsut be a loop, not a retry strategy.
+    RetryIf::spawn(
+        retry_strategy,
+        || async {
+            let result = run(
+                chain_id,
+                shutdown_tx,
+                config,
+                factory,
+                agent,
+                manager,
+                tasks,
+            )
+            .await;
+
+            match result {
+                Ok(_) => Ok(()),
+                Err(err) => {
+                    // Clear the cache and recache RPC sources
+                    RpcClientService::clear_sources().await;
+                    RpcClientService::cache_sources(config).await;
+
+                    Err(err)
+                }
+            }
+        },
+        |err: &Report| {
+            let retry = !is_error_fallible(err);
+
+            if retry {
+                // Tell the user we died
+                error!("[{}] System crashed: {}", &chain_id, err);
+                error!("[{}] Retrying...", &chain_id);
+            }
+
+            retry
+        },
     )
     .await?;
-    // .map_err(|err| {
-    //     error!("[{}] System crashed: {}", &chain_id, err);
-    //     error!("[{}] Retrying...", &chain_id);
-    //     err
-    // })?;
-    // })
-    // .await?;
 
     Ok(())
+}
+
+#[inline(always)]
+fn empty_task() -> JoinHandle<Result<(), Report>> {
+    tokio::task::spawn(async { Ok(()) })
 }

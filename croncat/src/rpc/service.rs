@@ -6,6 +6,7 @@
 use crate::config::{ChainConfig, ChainDataSource};
 use crate::errors::{eyre, Report};
 use crate::logging::info;
+use crate::utils::is_error_fallible;
 use cosm_orc::orchestrator::{Address, ChainTxResponse};
 use cosm_tome::chain::coin::Coin;
 use cosmrs::bip32;
@@ -56,6 +57,23 @@ pub struct RpcClientService {
 }
 
 impl RpcClientService {
+    pub async fn clear_sources() {
+        let mut sources = RPC_SOURCES.lock().await;
+        sources.clear();
+    }
+
+    pub async fn cache_sources(chain_config: &ChainConfig) {
+        let mut global_sources = RPC_SOURCES.lock().await;
+
+        if global_sources.is_empty() {
+            let data_sources =
+                Self::pick_best_sources(chain_config, &chain_config.data_sources()).await;
+            for (provider, data_source) in data_sources.iter() {
+                global_sources.insert(provider.clone(), data_source.clone());
+            }
+        }
+    }
+
     pub async fn new(
         chain_config: ChainConfig,
         key: bip32::XPrv,
@@ -64,24 +82,13 @@ impl RpcClientService {
         let contract_addr = contract_addr
             .unwrap_or_else(|| Address::from_str(chain_config.clone().factory.as_str()).unwrap());
 
-        let mut global_sources = RPC_SOURCES.lock().await;
-
-        let data_sources = if global_sources.is_empty() {
-            let data_sources =
-                Self::pick_best_sources(&chain_config, &chain_config.data_sources()).await;
-            for (provider, data_source) in data_sources.iter() {
-                global_sources.insert(provider.clone(), data_source.clone());
-            }
-            data_sources
-        } else {
-            global_sources.clone()
-        };
+        Self::cache_sources(&chain_config).await;
 
         Self {
             key,
             chain_config,
             contract_addr,
-            source_info: Arc::new(Mutex::new(data_sources)),
+            source_info: RPC_SOURCES.clone(),
         }
     }
 
@@ -190,11 +197,15 @@ impl RpcClientService {
         let mut last_error = None;
 
         loop {
-            let mut source_info = self.source_info.lock().await;
-            let source_keys = source_info
-                .keys()
-                .filter(|k| !source_info.get(*k).unwrap().1)
-                .collect::<Vec<_>>();
+            let source_keys = {
+                let source_info = self.source_info.lock().await;
+
+                source_info
+                    .keys()
+                    .cloned()
+                    .filter(|k| !source_info.get(k).unwrap().1)
+                    .collect::<Vec<_>>()
+            };
 
             if source_keys.is_empty() {
                 if last_error.is_some() {
@@ -208,7 +219,14 @@ impl RpcClientService {
                 .choose(&mut rand::thread_rng())
                 .unwrap()
                 .to_string();
-            let (source, _) = source_info.get_mut(&source_key).unwrap().clone();
+            let (source, _) = {
+                self.source_info
+                    .lock()
+                    .await
+                    .get_mut(&source_key)
+                    .unwrap()
+                    .clone()
+            };
 
             // TODO: Change to contract_addr
             let rpc_client = match kind {
@@ -224,8 +242,11 @@ impl RpcClientService {
                         Ok(client) => client,
                         Err(e) => {
                             debug!("Failed to create RpcClient for {}: {}", source_key, e);
-                            let (_, bad) = source_info.get_mut(&source_key).unwrap();
-                            *bad = true;
+                            {
+                                let mut source_info = self.source_info.lock().await;
+                                let (_, bad) = source_info.get_mut(&source_key).unwrap();
+                                *bad = true;
+                            }
                             last_error = Some(e);
                             continue;
                         }
@@ -242,8 +263,11 @@ impl RpcClientService {
                         Ok(client) => client,
                         Err(e) => {
                             debug!("Failed to create RpcClient for {}: {}", source_key, e);
-                            let (_, bad) = source_info.get_mut(&source_key).unwrap();
-                            *bad = true;
+                            {
+                                let mut source_info = self.source_info.lock().await;
+                                let (_, bad) = source_info.get_mut(&source_key).unwrap();
+                                *bad = true;
+                            }
                             last_error = Some(e);
                             continue;
                         }
@@ -256,7 +280,7 @@ impl RpcClientService {
                 Ok(result) => {
                     return Ok(result);
                 }
-                Err(e) if break_loop_errors(&e) => {
+                Err(e) if is_error_fallible(&e) => {
                     debug!("Error calling chain for {}: {}", source_key, e);
                     break Err(e);
                 }
@@ -267,8 +291,11 @@ impl RpcClientService {
                         continue;
                     }
                     // This will remove invalid providers if they have errors we dont know how to handle.
-                    let (_, bad) = source_info.get_mut(&source_key).unwrap();
-                    *bad = true;
+                    {
+                        let mut source_info = self.source_info.lock().await;
+                        let (_, bad) = source_info.get_mut(&source_key).unwrap();
+                        *bad = true;
+                    }
                     last_error = Some(e);
                     continue;
                 }
@@ -344,12 +371,4 @@ impl RpcClientService {
 
         Ok(response)
     }
-}
-
-fn break_loop_errors(e: &Report) -> bool {
-    let msg = e.to_string().to_lowercase();
-    msg.contains("agent not registered")
-        || msg.contains("agent already registered")
-        || msg.contains("agent not found")
-        || msg.contains("account not found")
 }

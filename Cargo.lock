@@ -651,7 +651,7 @@ dependencies = [
 
 [[package]]
 name = "croncat"
-version = "0.3.4"
+version = "0.3.5"
 dependencies = [
  "async-stream",
  "async-trait",
@@ -791,7 +791,7 @@ dependencies = [
 
 [[package]]
 name = "croncatd"
-version = "0.3.4"
+version = "0.3.5"
 dependencies = [
  "croncat",
  "croncat-sdk-agents",

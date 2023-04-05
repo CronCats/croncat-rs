@@ -12,6 +12,7 @@ use croncat::{
     store::agent::LocalAgentStorage,
     system,
     tokio::{self, sync::Mutex},
+    utils::is_error_fallible,
 };
 use opts::Opts;
 use std::{process::exit, sync::Arc};
@@ -21,11 +22,7 @@ mod opts;
 ///
 /// Start the `croncatd` agent.
 ///
-#[tokio::main]
-async fn main() -> Result<(), Report> {
-    // Get environment variables
-    let storage = LocalAgentStorage::new();
-
+fn main() -> Result<(), Report> {
     // Get the CLI options, handle argument errors nicely
     let opts = cli::get_opts()
         .map_err(|err| {
@@ -42,16 +39,46 @@ async fn main() -> Result<(), Report> {
         cli::print_banner();
     }
 
-    // Run a command and handle errors
-    if let Err(err) = run_command(opts.clone(), storage).await {
-        error!("{}", err);
+    // Retry the agent creation if it fails.
+    loop {
+        // Creata tokio runtime
+        let rt = tokio::runtime::Runtime::new()?;
 
-        if opts.debug {
-            error!("Command failed: {}", opts.cmd);
-            return Err(err);
+        let result = rt.block_on({
+            let opts = opts.clone();
+
+            async move {
+                // Load up the local storage
+                let storage = LocalAgentStorage::new();
+
+                // Run the command
+                if let Err(err) = run_command(opts.clone(), storage).await {
+                    error!("{}", err);
+
+                    if opts.debug {
+                        error!("Command failed: {}", opts.cmd);
+                    }
+
+                    return Err(err);
+                }
+
+                Ok(())
+            }
+        });
+
+        match result {
+            Ok(_) => break,
+            Err(err) => {
+                if !is_error_fallible(&err) {
+                    error!("Agent failed: {}", err);
+                    error!("Retrying in 5 seconds...");
+                    std::thread::sleep(std::time::Duration::from_secs(5));
+                    continue;
+                }
+
+                break;
+            }
         }
-
-        exit(1);
     }
 
     Ok(())

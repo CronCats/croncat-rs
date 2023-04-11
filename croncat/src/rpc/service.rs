@@ -6,7 +6,7 @@
 use crate::config::{ChainConfig, ChainDataSource};
 use crate::errors::{eyre, Report};
 use crate::logging::info;
-use crate::utils::is_error_fallible;
+use crate::utils::{is_error_fallible, is_contract_error};
 use cosm_orc::orchestrator::{Address, ChainTxResponse};
 use cosm_tome::chain::coin::Coin;
 use cosmrs::bip32;
@@ -283,6 +283,13 @@ impl RpcClientService {
                 Err(e) if is_error_fallible(&e) => {
                     debug!("Error calling chain for {}: {}", source_key, e);
                     break Err(e);
+                }
+                Err(e) if is_contract_error(&e) => {
+                    println!("Error calling contract for {}: {} -------- {:?}", source_key, e, kind);
+                    debug!("Error calling contract for {}: {}", source_key, e);
+                    // last_error = Some(e);
+                    break Err(e);
+                    // continue;
                 }
                 Err(e) => {
                     debug!("Error calling chain for {}: {}", source_key, e);

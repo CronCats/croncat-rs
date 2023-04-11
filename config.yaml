@@ -6,7 +6,8 @@ chains:
         threshold: 1000000
         include_evented_tasks: true
     uni-6:
-        factory: juno1qzkcegjce9ezy5afs043r8kdf50lkugcgdxqgp4a902mayefssws5n5ydu
+        # factory: juno19szwefl74ez5wuc8uxq55cr0tp7zzks8490d6jgfgrcumcw52mzq2zj94p
+        factory: juno1xyvv0ptxmqr5pxh2494uuwqdpv2lgatamr3f3tq74yy5zpnc7agq7y34mr
         gas_prices: 0.04
         gas_adjustment: 1.3
         threshold: 1000000

@@ -167,3 +167,8 @@ pub fn is_error_fallible(e: &Report) -> bool {
         || msg.contains("agent not found")
         || msg.contains("account not found")
 }
+
+pub fn is_contract_error(e: &Report) -> bool {
+    let msg = e.to_string().to_lowercase();
+    msg.contains("execute wasm contract failed")
+}

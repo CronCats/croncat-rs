@@ -285,6 +285,7 @@ impl Tasks {
             }
             from_index += limit;
         }
+        println!("evented_ids {:?}", evented_ids);
 
         // Step 1: Get all the data from ids
         for id in evented_ids {
@@ -320,9 +321,11 @@ impl Tasks {
 
             // update storage
             if !height_tasks.is_empty() {
+                println!("---------- height_tasks {:?}", height_tasks);
                 self.store.insert(EventType::Block, id, height_tasks)?;
             }
             if !time_tasks.is_empty() {
+                println!("---------- time_tasks {:?}", time_tasks);
                 self.store.insert(EventType::Time, id, time_tasks)?;
             }
         }
@@ -416,6 +419,7 @@ pub async fn refresh_tasks_cache_loop(
     tasks_client.lock().await.load().await?;
 
     // TODO: Figure out best interval here!
+    // TODO: Could actually clear this at THE block when we get expired
     let block_counter = AtomicIntervalCounter::new(10);
     let task_handle: tokio::task::JoinHandle<Result<(), Report>> = tokio::task::spawn(async move {
         while let Ok(_block) = block_stream_rx.recv().await {
@@ -551,6 +555,14 @@ pub async fn evented_tasks_loop(
                 let tasks_failed = Arc::new(AtomicBool::new(false));
                 let mut tasks_client = tasks_client_mut.lock().await;
 
+                // if we expired, quickly refresh the data
+                if tasks_client.store.is_expired() {
+                    println!("FOUND EXPIRED TASKS -- reloading....");
+                    tasks_client.store.clear_all()?;
+                    tasks_client.load_all_evented_tasks().await?;
+                    println!("FOUND EXPIRED TASKS -- RELOAD COMPLETE!!!!");
+                }
+
                 // Stack 0: Unbounded evented tasks
                 // - These will get queried every block
                 // - NOTE: These will be lower priority than ranged
@@ -572,6 +584,7 @@ pub async fn evented_tasks_loop(
                         EventType::Time,
                     )
                     .await?;
+                println!("ranged_height {:?}", ranged_height);
 
                 // Accumulate: get all the tasks ready to be queried
                 // Priority order: block height, block timestamp, unbounded
@@ -605,11 +618,26 @@ pub async fn evented_tasks_loop(
                     .await
                     .get_contract_addr("mod_generic".to_string())
                     .await?;
+                // also get info about evented stats
+                let stats = tasks_client.get_stats().await?;
+
+                info!(
+                    "[{}] Evented Tasks --, Block {}, H0: {}, HR: {}, T0: {}, TR: {}",
+                    chain_id,
+                    // task_hashes.len(),
+                    header.latest_block_height,
+                    stats.0,
+                    stats.1,
+                    stats.2,
+                    stats.3,
+                );
 
                 // Validate: get all
+                println!("--- validate: tasks_with_queries {:?}", tasks_with_queries);
                 let mut task_hashes: Vec<String> = tasks_client
                     .validate_queries(tasks_with_queries, mod_generic_addr.as_ref())
                     .await?;
+                println!("--- validated: task_hashes {:?} {:?}", header.latest_block_height, task_hashes);
 
                 // Based on end-boundary, skip validation of queries so we can cleanup tasks state, if any exist
                 // if we are bored, have our agent thumbs twiddling, attempt to do some cleanup for missed/passed evented taasks
@@ -627,46 +655,68 @@ pub async fn evented_tasks_loop(
                         )
                         .await?;
                 }
+                println!("--- task_hashes {:?} {:?}", header.latest_block_height, task_hashes);
 
                 if !task_hashes.is_empty() {
-                    // also get info about evented stats
-                    let stats = tasks_client.get_stats().await?;
-
-                    info!(
-                        "[{}] Evented Tasks {}, Block {}, H0: {}, HR: {}, T0: {}, TR: {}",
-                        chain_id,
-                        task_hashes.len(),
-                        header.latest_block_height,
-                        stats.0,
-                        stats.1,
-                        stats.2,
-                        stats.3,
-                    );
 
                     // Batch proxy_call's for task_hashes
                     // TODO: Limit batches to max gas 3_000_000-6_000_000 (also could be set per-chain since stargaze has higher limits for example)
                     let tasks_failed = tasks_failed.clone();
-                    match manager_client
-                        .proxy_call_evented_batch(task_hashes.clone())
-                        .await
-                    {
-                        Ok(pc_res) => {
-                            debug!("Result: {:?}", pc_res.res.log);
-                            info!(
-                                "Finished evented task batch - TX: {}, Blk: {}, Evts: {}",
-                                pc_res.tx_hash,
-                                pc_res.height,
-                                pc_res.events.len()
-                            );
 
-                            tasks_client.clean_ended_tasks_from_chain_tx(pc_res).await?;
-                        }
-                        Err(err) => {
-                            tasks_failed.store(true, SeqCst);
-                            error!(
-                                "Something went wrong during proxy_call_evented_batch: {}",
-                                err
-                            );
+                    // NOTE: Disabled since 1 item in batch causes whole batch to fail
+                    // match manager_client
+                    //     .proxy_call_evented_batch(task_hashes.clone())
+                    //     .await
+                    // {
+                    //     Ok(pc_res) => {
+                    //         debug!("Result: {:?}", pc_res.res.log);
+                    //         info!(
+                    //             "Finished evented task batch - TX: {}, Blk: {}, Evts: {}",
+                    //             pc_res.tx_hash,
+                    //             pc_res.height,
+                    //             pc_res.events.len()
+                    //         );
+
+                    //         tasks_client.clean_ended_tasks_from_chain_tx(pc_res).await?;
+                    //     }
+                    //     Err(err) => {
+                    //         tasks_failed.store(true, SeqCst);
+                    //         error!(
+                    //             "Something went wrong during proxy_call_evented_batch: {}",
+                    //             err
+                    //         );
+                    //     }
+                    // }
+
+                    // TODO: Change to parallel!!!!!!!
+                    for th in task_hashes {
+                        match manager_client
+                            .proxy_call_evented_batch(vec![th])
+                            .await
+                        {
+                            Ok(pc_res) => {
+                                debug!("Result: {:?}", pc_res.res.log);
+                                info!(
+                                    "Finished evented task batch - TX: {}, Blk: {}, Evts: {}",
+                                    pc_res.tx_hash,
+                                    pc_res.height,
+                                    pc_res.events.len()
+                                );
+
+                                tasks_client.clean_ended_tasks_from_chain_tx(pc_res).await?;
+                            }
+                            Err(err) => {
+                                // TODO: Handle breaking tasks better!!
+                                // - could flag them to try less times or whatever
+                                // - remove task if we believe its out of funds or execution?
+                                debug!("proxy_call_evented_batch ERROR: {:?}", err);
+                                println!("proxy_call_evented_batch ERROR: {:?}", err);
+                                tasks_failed.store(true, SeqCst);
+                                error!(
+                                    "Something went wrong during proxy_call_evented_batch: {}",
+                                    err
+                                );
+                            }
                         }
                     }
                 }

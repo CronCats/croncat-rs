@@ -112,6 +112,24 @@ impl LocalEventStorage {
     }
 
     /// Insert a items into the data set.
+    pub fn update_expiry(&mut self) -> Result<(), Report> {
+        // Expires after 1 hour, updates any time we get new data
+        let dt = Utc::now();
+        let expires = dt.timestamp().saturating_add(60); // 1 min
+        let prev = self.data.as_ref().unwrap();
+
+        self.data = Some(LocalEventsStorageEntry {
+            expires,
+            height_based: prev.height_based.clone(),
+            time_based: prev.time_based.clone(),
+        });
+
+        self.clear_empty_indexes()?;
+        self.write_to_disk()?;
+        Ok(())
+    }
+
+    /// Insert a items into the data set.
     pub fn insert(
         &mut self,
         kind: EventType,
@@ -120,7 +138,7 @@ impl LocalEventStorage {
     ) -> Result<(), Report> {
         // Expires after 1 hour, updates any time we get new data
         let dt = Utc::now();
-        let expires = dt.timestamp().saturating_add(10);
+        let expires = dt.timestamp().saturating_add(60); // 1 min
 
         if let Some(mut data) = self.data.clone() {
             match kind {
@@ -354,13 +372,16 @@ impl LocalEventStorage {
         index: Option<u64>,
         kind: EventType,
     ) -> Option<Vec<&TaskInfo>> {
+        println!("get_events_lte_index !self.is_expired() && self.has_events() {:?} {:?}", !self.is_expired(), self.has_events());
         if !self.is_expired() && self.has_events() {
             if let Some(data) = self.data.as_ref() {
                 let idx = index.unwrap_or(1);
+                println!("get_events_lte_index idx {:?}", idx);
                 let rng = match kind {
                     EventType::Block => data.height_based.range((Excluded(0), Included(idx))),
                     EventType::Time => data.time_based.range((Excluded(0), Included(idx))),
                 };
+                println!("get_events_lte_index rng {:?}", rng);
                 Some(
                     rng.flat_map(|(_, e)| e.values())
                         .collect::<Vec<&TaskInfo>>(),

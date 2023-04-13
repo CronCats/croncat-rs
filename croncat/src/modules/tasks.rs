@@ -50,6 +50,34 @@ pub struct BatchQueryMsg {
     pub batch_query: BatchQuery,
 }
 
+use std::{error::Error as StdError, fmt};
+
+#[derive(Debug)]
+pub struct CustomError {
+    inner: Box<dyn StdError + Send + Sync>,
+}
+
+impl fmt::Display for CustomError {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(f, "{}", self.inner)
+    }
+}
+
+impl StdError for CustomError {
+    fn source(&self) -> Option<&(dyn StdError + 'static)> {
+        self.inner.source()
+    }
+}
+
+// impl From<ErrReport> for CustomError {
+//     fn from(err: ErrReport) -> CustomError {
+//         // Perform the custom conversion here
+//         CustomError {
+//             inner: Box::new(err),
+//         }
+//     }
+// }
+
 // FLOW:
 // - check if local cache has tasks ready, if at all
 //   - if no tasks, go get from chain - using current chain context
@@ -637,7 +665,10 @@ pub async fn evented_tasks_loop(
                 let mut task_hashes: Vec<String> = tasks_client
                     .validate_queries(tasks_with_queries, mod_generic_addr.as_ref())
                     .await?;
-                println!("--- validated: task_hashes {:?} {:?}", header.latest_block_height, task_hashes);
+                println!(
+                    "--- validated: task_hashes {:?} {:?}",
+                    header.latest_block_height, task_hashes
+                );
 
                 // Based on end-boundary, skip validation of queries so we can cleanup tasks state, if any exist
                 // if we are bored, have our agent thumbs twiddling, attempt to do some cleanup for missed/passed evented taasks
@@ -655,70 +686,125 @@ pub async fn evented_tasks_loop(
                         )
                         .await?;
                 }
-                println!("--- task_hashes {:?} {:?}", header.latest_block_height, task_hashes);
+                println!(
+                    "--- task_hashes {:?} {:?}",
+                    header.latest_block_height, task_hashes
+                );
 
                 if !task_hashes.is_empty() {
-
                     // Batch proxy_call's for task_hashes
                     // TODO: Limit batches to max gas 3_000_000-6_000_000 (also could be set per-chain since stargaze has higher limits for example)
                     let tasks_failed = tasks_failed.clone();
 
-                    // NOTE: Disabled since 1 item in batch causes whole batch to fail
-                    // match manager_client
-                    //     .proxy_call_evented_batch(task_hashes.clone())
-                    //     .await
-                    // {
-                    //     Ok(pc_res) => {
-                    //         debug!("Result: {:?}", pc_res.res.log);
-                    //         info!(
-                    //             "Finished evented task batch - TX: {}, Blk: {}, Evts: {}",
-                    //             pc_res.tx_hash,
-                    //             pc_res.height,
-                    //             pc_res.events.len()
-                    //         );
+                    // // NOTE: Disabled since 1 item in batch causes whole batch to fail
+                    match manager_client
+                        .proxy_call_evented_batch(task_hashes.clone())
+                        .await
+                    {
+                        Ok(pc_res) => {
+                            debug!("Result: {:?}", pc_res.res.log);
+                            info!(
+                                "Finished evented task batch - TX: {}, Blk: {}, Evts: {}",
+                                pc_res.tx_hash,
+                                pc_res.height,
+                                pc_res.events.len()
+                            );
 
-                    //         tasks_client.clean_ended_tasks_from_chain_tx(pc_res).await?;
-                    //     }
-                    //     Err(err) => {
-                    //         tasks_failed.store(true, SeqCst);
-                    //         error!(
-                    //             "Something went wrong during proxy_call_evented_batch: {}",
-                    //             err
-                    //         );
+                            tasks_client.clean_ended_tasks_from_chain_tx(pc_res).await?;
+                        }
+                        Err(err) => {
+                            tasks_failed.store(true, SeqCst);
+                            error!(
+                                "Something went wrong during proxy_call_evented_batch: {}",
+                                err
+                            );
+                        }
+                    }
+
+                    // // NOTE: using this until predictable batch exec can be done
+                    // for th in task_hashes {
+                    //     match manager_client.proxy_call_evented_batch(vec![th]).await {
+                    //         Ok(pc_res) => {
+                    //             debug!("Result: {:?}", pc_res.res.log);
+                    //             info!(
+                    //                 "Finished evented task batch - TX: {}, Blk: {}, Evts: {}",
+                    //                 pc_res.tx_hash,
+                    //                 pc_res.height,
+                    //                 pc_res.events.len()
+                    //             );
+
+                    //             tasks_client.clean_ended_tasks_from_chain_tx(pc_res).await?;
+                    //         }
+                    //         Err(err) => {
+                    //             // TODO: Handle breaking tasks better!!
+                    //             // - could flag them to try less times or whatever
+                    //             // - remove task if we believe its out of funds or execution?
+                    //             debug!("proxy_call_evented_batch ERROR: {:?}", err);
+                    //             println!("proxy_call_evented_batch ERROR: {:?}", err);
+                    //             tasks_failed.store(true, SeqCst);
+                    //             error!(
+                    //                 "Something went wrong during proxy_call_evented_batch: {}",
+                    //                 err
+                    //             );
+                    //         }
                     //     }
                     // }
 
-                    // TODO: Change to parallel!!!!!!!
-                    for th in task_hashes {
-                        match manager_client
-                            .proxy_call_evented_batch(vec![th])
-                            .await
-                        {
-                            Ok(pc_res) => {
-                                debug!("Result: {:?}", pc_res.res.log);
-                                info!(
-                                    "Finished evented task batch - TX: {}, Blk: {}, Evts: {}",
-                                    pc_res.tx_hash,
-                                    pc_res.height,
-                                    pc_res.events.len()
-                                );
+                    // let mut tasks = Vec::new();
+                    // // TODO: REMOVE!
+                    // let base_sequence: u64 = 300;
 
-                                tasks_client.clean_ended_tasks_from_chain_tx(pc_res).await?;
-                            }
-                            Err(err) => {
-                                // TODO: Handle breaking tasks better!!
-                                // - could flag them to try less times or whatever
-                                // - remove task if we believe its out of funds or execution?
-                                debug!("proxy_call_evented_batch ERROR: {:?}", err);
-                                println!("proxy_call_evented_batch ERROR: {:?}", err);
-                                tasks_failed.store(true, SeqCst);
-                                error!(
-                                    "Something went wrong during proxy_call_evented_batch: {}",
-                                    err
-                                );
-                            }
-                        }
-                    }
+                    // // for th in task_hashes {
+                    // for (i, th) in task_hashes.into_iter().enumerate() {
+                    //     let manager_client_clone = manager_client.clone();
+                    //     let sq = base_sequence.saturating_add(i as u64);
+
+                    //     let task = task::spawn(async move {
+                    //         // let tasks_client_clone = tasks_client.lock().unwrap().clone();
+                    //         // NOTE: single batch adjusted by account sequence nums
+                    //         match manager_client_clone
+                    //             .proxy_call_evented_batch(vec![th.to_owned()], Some(sq))
+                    //             .await
+                    //         {
+                    //             Ok(pc_res) => {
+                    //                 debug!("Result: {:?}", pc_res.res.log);
+                    //                 info!(
+                    //                     "Finished evented task batch - TX: {}, Blk: {}, Evts: {}",
+                    //                     pc_res.tx_hash,
+                    //                     pc_res.height,
+                    //                     pc_res.events.len()
+                    //                 );
+
+                    //                 // tasks_client_clone.clean_ended_tasks_from_chain_tx(pc_res).await.map_err(|e| CustomError { inner: Box::new(e) })?;
+                    //             }
+                    //             Err(err) => {
+                    //                 // TODO: Handle breaking tasks better!!
+                    //                 // - could flag them to try less times or whatever
+                    //                 // - remove task if we believe its out of funds or execution?
+                    //                 debug!("proxy_call_evented_batch ERROR: {:?}", err);
+                    //                 println!("proxy_call_evented_batch ERROR: {:?}", err);
+                    //                 // tasks_failed.store(true, SeqCst);
+                    //                 error!(
+                    //                     "Something went wrong during proxy_call_evented_batch: {}",
+                    //                     err
+                    //                 );
+                    //             }
+                    //         }
+                    //         Result::<(), CustomError>::Ok(())
+                    //     });
+
+                    //     tasks.push(task);
+                    // }
+
+                    // // Wait for all tasks to complete
+                    // match try_join_all(tasks).await {
+                    //     Ok(_) => {
+                    //         info!("All tasks finished successfully.");
+                    //     }
+                    //     Err(err) => {
+                    //         error!("An error occurred while executing tasks in parallel: {:?}", err);
+                    //     }
+                    // }
                 }
 
                 if !tasks_failed.load(SeqCst) {

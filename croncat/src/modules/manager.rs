@@ -37,15 +37,15 @@ impl Manager {
     pub async fn proxy_call_batch(&self, count: usize) -> Result<ChainTxResponse, Report> {
         self.client
             .execute(|signer| {
-                let mut reqs: Vec<ExecRequest<ManagerExecuteMsg>> = Vec::with_capacity(count);
-                let contract_addr = self.contract_addr.clone();
+                let mut proxy_calls: Vec<Option<String>> = Vec::with_capacity(count);
                 for _ in 0..count {
-                    reqs.push(ExecRequest {
-                        address: contract_addr.clone(),
-                        msg: ManagerExecuteMsg::ProxyCall { task_hash: None },
-                        funds: vec![],
-                    });
+                    proxy_calls.push(None);
                 }
+                let reqs = vec![ExecRequest {
+                    address: self.contract_addr.clone(),
+                    msg: ManagerExecuteMsg::ProxyBatch(proxy_calls),
+                    funds: vec![],
+                }];
                 async move { signer.execute_batch(reqs).await }
             })
             .await
@@ -58,18 +58,15 @@ impl Manager {
     ) -> Result<ChainTxResponse, Report> {
         self.client
             .execute(|signer| {
-                let mut reqs: Vec<ExecRequest<ManagerExecuteMsg>> =
-                    Vec::with_capacity(tash_hashes.len());
-                let contract_addr = self.contract_addr.clone();
+                let mut proxy_calls: Vec<Option<String>> = Vec::with_capacity(tash_hashes.len());
                 for task_hash in tash_hashes.iter() {
-                    reqs.push(ExecRequest {
-                        address: contract_addr.clone(),
-                        msg: ManagerExecuteMsg::ProxyCall {
-                            task_hash: Some(task_hash.to_string()),
-                        },
-                        funds: vec![],
-                    });
+                    proxy_calls.push(Some(task_hash.to_owned()));
                 }
+                let reqs = vec![ExecRequest {
+                    address: self.contract_addr.clone(),
+                    msg: ManagerExecuteMsg::ProxyBatch(proxy_calls),
+                    funds: vec![],
+                }];
                 async move { signer.execute_batch(reqs).await }
             })
             .await

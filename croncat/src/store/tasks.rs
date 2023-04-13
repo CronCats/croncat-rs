@@ -372,7 +372,11 @@ impl LocalEventStorage {
         index: Option<u64>,
         kind: EventType,
     ) -> Option<Vec<&TaskInfo>> {
-        println!("get_events_lte_index !self.is_expired() && self.has_events() {:?} {:?}", !self.is_expired(), self.has_events());
+        println!(
+            "get_events_lte_index !self.is_expired() && self.has_events() {:?} {:?}",
+            !self.is_expired(),
+            self.has_events()
+        );
         if !self.is_expired() && self.has_events() {
             if let Some(data) = self.data.as_ref() {
                 let idx = index.unwrap_or(1);

@@ -20,7 +20,7 @@ pub const DERIVATION_PATH: &str = "m/44'/118'/0'/0/0";
 /// Count block received from the stream.
 ///
 pub struct AtomicIntervalCounter {
-    count: Arc<AtomicU64>,
+    pub count: Arc<AtomicU64>,
     check_interval: u64,
 }
 

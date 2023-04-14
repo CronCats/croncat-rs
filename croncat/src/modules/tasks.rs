@@ -8,7 +8,6 @@ use croncat_sdk_agents::types::AgentStatus;
 use croncat_sdk_tasks::msg::TasksQueryMsg;
 use croncat_sdk_tasks::types::{Boundary, CosmosQuery, TaskInfo};
 use mod_sdk::types::QueryResponse;
-use serde_json::Value;
 use std::collections::HashSet;
 use std::str::FromStr;
 use std::sync::{
@@ -140,6 +139,26 @@ impl Tasks {
         Ok(self.store.get_stats())
     }
 
+    pub fn set_cooldown_task(&mut self, task_hash: String, index: Option<u8>, expires: Option<i64>) {
+        self.store.set_cooldown_task(task_hash, index, expires);
+    }
+
+    pub fn get_cooldown_task(&mut self) -> Option<String> {
+        self.store.get_cooldown_task()
+    }
+
+    pub fn is_cooldown_task(&self, task_hash: &String) -> bool {
+        self.store.is_cooldown_task(task_hash)
+    }
+    pub fn is_jailed_task(&self, task_hash: &String) -> bool {
+        self.store.is_jailed_task(task_hash)
+    }
+
+    // only gets unbounded tasks
+    pub async fn clear_all(&mut self) -> Result<(), Report> {
+        self.store.clear_all()
+    }
+
     // only gets unbounded tasks
     pub async fn unbounded(&self, kind: EventType) -> Result<Option<Vec<&TaskInfo>>, Report> {
         Ok(self.store.get_events_by_index(None, kind))
@@ -196,10 +215,17 @@ impl Tasks {
                     {
                         ended = true
                     }
-                }
-                if let Some(hash) = task_hash {
-                    if ended {
-                        task_hashes.push(hash);
+
+                    // Since our batch will be within ordered array, seeing this will 
+                    // ALWAYS reset the current known variables after keeping track appropriately
+                    if attr.key == *"_contract_address" {
+                        if let Some(hash) = task_hash {
+                            if ended {
+                                task_hashes.push(hash);
+                            }
+                        }
+                        task_hash = None;
+                        ended = false;
                     }
                 }
             }
@@ -313,7 +339,7 @@ impl Tasks {
             }
             from_index += limit;
         }
-        println!("evented_ids {:?}", evented_ids);
+        println!("--- evented_ids {:?}", evented_ids);
 
         // Step 1: Get all the data from ids
         for id in evented_ids {
@@ -349,11 +375,11 @@ impl Tasks {
 
             // update storage
             if !height_tasks.is_empty() {
-                println!("---------- height_tasks {:?}", height_tasks);
+                println!("---------- height_tasks {:?}", height_tasks.len());
                 self.store.insert(EventType::Block, id, height_tasks)?;
             }
             if !time_tasks.is_empty() {
-                println!("---------- time_tasks {:?}", time_tasks);
+                println!("---------- time_tasks {:?}", time_tasks.len());
                 self.store.insert(EventType::Time, id, time_tasks)?;
             }
         }
@@ -374,7 +400,6 @@ impl Tasks {
         // Process all the queries
         // TODO: This needs to change to be BATCH RPC query! Too much latency here...
         for task in tasks_with_queries {
-            println!("validate task {:?}", task.task_hash);
             let queries = if let Some(q) = task.queries.to_owned() {
                 q
             } else {
@@ -389,7 +414,6 @@ impl Tasks {
                             queries: queries.to_owned(),
                         },
                     };
-                    println!("batch_querybatch_querybatch_querybatch_query {batch_query:?}");
                     async move {
                         querier
                             .rpc_client
@@ -401,7 +425,6 @@ impl Tasks {
                     }
                 })
                 .await;
-            println!("Validate QUERY res {res:?}");
 
             // Eval if result false, if so break!
             match res {
@@ -411,15 +434,9 @@ impl Tasks {
                 }
                 Err(_) => (),
                 Ok(data) => {
-                    println!("validate task_hash data {:?} {data:?}", task.task_hash);
                     if !data.result {
                         break;
                     } else {
-                        println!(
-                            "task_hash data {:?} {:?}",
-                            task.task_hash,
-                            serde_json::from_slice::<Value>(&data.data)
-                        );
                         let h = task.task_hash.clone();
                         // Dedupe, if theres any remote chance it could  happen
                         if !ready_hashes.contains(&h) {
@@ -582,6 +599,7 @@ pub async fn evented_tasks_loop(
             if is_active {
                 let tasks_failed = Arc::new(AtomicBool::new(false));
                 let mut tasks_client = tasks_client_mut.lock().await;
+                println!("tasks_client.store.is_expired() {:?}", tasks_client.store.is_expired());
 
                 // if we expired, quickly refresh the data
                 if tasks_client.store.is_expired() {
@@ -612,7 +630,6 @@ pub async fn evented_tasks_loop(
                         EventType::Time,
                     )
                     .await?;
-                println!("ranged_height {:?}", ranged_height);
 
                 // Accumulate: get all the tasks ready to be queried
                 // Priority order: block height, block timestamp, unbounded
@@ -640,6 +657,12 @@ pub async fn evented_tasks_loop(
                     tasks_with_queries.extend(ub);
                 }
 
+                // Filter out the jailed && cooldown tasks
+                tasks_with_queries.retain(|t| {
+                    !tasks_client.is_jailed_task(&t.task_hash)
+                        && !tasks_client.is_cooldown_task(&t.task_hash)
+                });
+
                 // Get the batch query generic contract, so we can have reproducible query test
                 let mod_generic_addr = factory_client
                     .lock()
@@ -661,7 +684,6 @@ pub async fn evented_tasks_loop(
                 );
 
                 // Validate: get all
-                println!("--- validate: tasks_with_queries {:?}", tasks_with_queries);
                 let mut task_hashes: Vec<String> = tasks_client
                     .validate_queries(tasks_with_queries, mod_generic_addr.as_ref())
                     .await?;
@@ -686,6 +708,15 @@ pub async fn evented_tasks_loop(
                         )
                         .await?;
                 }
+
+                // Lastly, if we really really dont have any other things to do, attempt a cooldown task
+                if task_hashes.is_empty() {
+                    if let Some(task_hash) = tasks_client.get_cooldown_task() {
+                        println!("<<<<<<<<<<<< RETRY COOLDOWN TASK {:?}", task_hash);
+                        task_hashes.push(task_hash);
+                    }
+                }
+
                 println!(
                     "--- task_hashes {:?} {:?}",
                     header.latest_block_height, task_hashes
@@ -709,102 +740,26 @@ pub async fn evented_tasks_loop(
                                 pc_res.height,
                                 pc_res.events.len()
                             );
+                            // TODO: Handle cooldown tasks
+                            println!(">>>>>> SET COOLDOWN TASK");
 
                             tasks_client.clean_ended_tasks_from_chain_tx(pc_res).await?;
                         }
                         Err(err) => {
                             tasks_failed.store(true, SeqCst);
-                            error!(
-                                "Something went wrong during proxy_call_evented_batch: {}",
+                            // Handle: "No tasks to be done in this slot" (just refresh task cache)
+                            if err.to_string().to_lowercase().contains("No tasks to be done in this slot") {
+                                tasks_client.store.clear_all()?;
+                                tasks_client.load_all_evented_tasks().await?;
+                            }
+                            // TODO: Add back!!!!
+                            // error!(
+                            println!(
+                                "ERR---Something went wrong during proxy_call_evented_batch: {}",
                                 err
                             );
                         }
                     }
-
-                    // // NOTE: using this until predictable batch exec can be done
-                    // for th in task_hashes {
-                    //     match manager_client.proxy_call_evented_batch(vec![th]).await {
-                    //         Ok(pc_res) => {
-                    //             debug!("Result: {:?}", pc_res.res.log);
-                    //             info!(
-                    //                 "Finished evented task batch - TX: {}, Blk: {}, Evts: {}",
-                    //                 pc_res.tx_hash,
-                    //                 pc_res.height,
-                    //                 pc_res.events.len()
-                    //             );
-
-                    //             tasks_client.clean_ended_tasks_from_chain_tx(pc_res).await?;
-                    //         }
-                    //         Err(err) => {
-                    //             // TODO: Handle breaking tasks better!!
-                    //             // - could flag them to try less times or whatever
-                    //             // - remove task if we believe its out of funds or execution?
-                    //             debug!("proxy_call_evented_batch ERROR: {:?}", err);
-                    //             println!("proxy_call_evented_batch ERROR: {:?}", err);
-                    //             tasks_failed.store(true, SeqCst);
-                    //             error!(
-                    //                 "Something went wrong during proxy_call_evented_batch: {}",
-                    //                 err
-                    //             );
-                    //         }
-                    //     }
-                    // }
-
-                    // let mut tasks = Vec::new();
-                    // // TODO: REMOVE!
-                    // let base_sequence: u64 = 300;
-
-                    // // for th in task_hashes {
-                    // for (i, th) in task_hashes.into_iter().enumerate() {
-                    //     let manager_client_clone = manager_client.clone();
-                    //     let sq = base_sequence.saturating_add(i as u64);
-
-                    //     let task = task::spawn(async move {
-                    //         // let tasks_client_clone = tasks_client.lock().unwrap().clone();
-                    //         // NOTE: single batch adjusted by account sequence nums
-                    //         match manager_client_clone
-                    //             .proxy_call_evented_batch(vec![th.to_owned()], Some(sq))
-                    //             .await
-                    //         {
-                    //             Ok(pc_res) => {
-                    //                 debug!("Result: {:?}", pc_res.res.log);
-                    //                 info!(
-                    //                     "Finished evented task batch - TX: {}, Blk: {}, Evts: {}",
-                    //                     pc_res.tx_hash,
-                    //                     pc_res.height,
-                    //                     pc_res.events.len()
-                    //                 );
-
-                    //                 // tasks_client_clone.clean_ended_tasks_from_chain_tx(pc_res).await.map_err(|e| CustomError { inner: Box::new(e) })?;
-                    //             }
-                    //             Err(err) => {
-                    //                 // TODO: Handle breaking tasks better!!
-                    //                 // - could flag them to try less times or whatever
-                    //                 // - remove task if we believe its out of funds or execution?
-                    //                 debug!("proxy_call_evented_batch ERROR: {:?}", err);
-                    //                 println!("proxy_call_evented_batch ERROR: {:?}", err);
-                    //                 // tasks_failed.store(true, SeqCst);
-                    //                 error!(
-                    //                     "Something went wrong during proxy_call_evented_batch: {}",
-                    //                     err
-                    //                 );
-                    //             }
-                    //         }
-                    //         Result::<(), CustomError>::Ok(())
-                    //     });
-
-                    //     tasks.push(task);
-                    // }
-
-                    // // Wait for all tasks to complete
-                    // match try_join_all(tasks).await {
-                    //     Ok(_) => {
-                    //         info!("All tasks finished successfully.");
-                    //     }
-                    //     Err(err) => {
-                    //         error!("An error occurred while executing tasks in parallel: {:?}", err);
-                    //     }
-                    // }
                 }
 
                 if !tasks_failed.load(SeqCst) {

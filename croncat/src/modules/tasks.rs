@@ -49,34 +49,6 @@ pub struct BatchQueryMsg {
     pub batch_query: BatchQuery,
 }
 
-use std::{error::Error as StdError, fmt};
-
-#[derive(Debug)]
-pub struct CustomError {
-    inner: Box<dyn StdError + Send + Sync>,
-}
-
-impl fmt::Display for CustomError {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        write!(f, "{}", self.inner)
-    }
-}
-
-impl StdError for CustomError {
-    fn source(&self) -> Option<&(dyn StdError + 'static)> {
-        self.inner.source()
-    }
-}
-
-// impl From<ErrReport> for CustomError {
-//     fn from(err: ErrReport) -> CustomError {
-//         // Perform the custom conversion here
-//         CustomError {
-//             inner: Box::new(err),
-//         }
-//     }
-// }
-
 // FLOW:
 // - check if local cache has tasks ready, if at all
 //   - if no tasks, go get from chain - using current chain context
@@ -139,8 +111,8 @@ impl Tasks {
         Ok(self.store.get_stats())
     }
 
-    pub fn set_cooldown_task(&mut self, task_hash: String, index: Option<u8>, expires: Option<i64>) {
-        self.store.set_cooldown_task(task_hash, index, expires);
+    pub fn set_cooldown_task(&mut self, task_hash: String) {
+        self.store.set_cooldown_task(task_hash);
     }
 
     pub fn get_cooldown_task(&mut self) -> Option<String> {
@@ -216,7 +188,7 @@ impl Tasks {
                         ended = true
                     }
 
-                    // Since our batch will be within ordered array, seeing this will 
+                    // Since our batch will be within ordered array, seeing this will
                     // ALWAYS reset the current known variables after keeping track appropriately
                     if attr.key == *"_contract_address" {
                         if let Some(hash) = task_hash {
@@ -228,12 +200,19 @@ impl Tasks {
                         ended = false;
                     }
                 }
+                // catch the last ones, very edge case
+                if let Some(hash) = task_hash {
+                    if ended {
+                        task_hashes.push(hash);
+                    }
+                }
             }
         }
+        debug!("task_hashes found ending {:?}", task_hashes);
 
         // loop remove the found task_hash's
         for hash in task_hashes {
-            self.store.remove_task_by_hash(hash.as_str())?;
+            self.store.remove_task_by_hash(hash)?;
         }
 
         Ok(())
@@ -339,7 +318,6 @@ impl Tasks {
             }
             from_index += limit;
         }
-        println!("--- evented_ids {:?}", evented_ids);
 
         // Step 1: Get all the data from ids
         for id in evented_ids {
@@ -375,11 +353,9 @@ impl Tasks {
 
             // update storage
             if !height_tasks.is_empty() {
-                println!("---------- height_tasks {:?}", height_tasks.len());
                 self.store.insert(EventType::Block, id, height_tasks)?;
             }
             if !time_tasks.is_empty() {
-                println!("---------- time_tasks {:?}", time_tasks.len());
                 self.store.insert(EventType::Time, id, time_tasks)?;
             }
         }
@@ -599,14 +575,13 @@ pub async fn evented_tasks_loop(
             if is_active {
                 let tasks_failed = Arc::new(AtomicBool::new(false));
                 let mut tasks_client = tasks_client_mut.lock().await;
-                println!("tasks_client.store.is_expired() {:?}", tasks_client.store.is_expired());
 
                 // if we expired, quickly refresh the data
                 if tasks_client.store.is_expired() {
-                    println!("FOUND EXPIRED TASKS -- reloading....");
+                    debug!("FOUND EXPIRED TASKS -- reloading....");
                     tasks_client.store.clear_all()?;
                     tasks_client.load_all_evented_tasks().await?;
-                    println!("FOUND EXPIRED TASKS -- RELOAD COMPLETE!!!!");
+                    debug!("FOUND EXPIRED TASKS -- RELOAD COMPLETE!!!!");
                 }
 
                 // Stack 0: Unbounded evented tasks
@@ -672,7 +647,7 @@ pub async fn evented_tasks_loop(
                 // also get info about evented stats
                 let stats = tasks_client.get_stats().await?;
 
-                info!(
+                debug!(
                     "[{}] Evented Tasks --, Block {}, H0: {}, HR: {}, T0: {}, TR: {}",
                     chain_id,
                     // task_hashes.len(),
@@ -687,7 +662,7 @@ pub async fn evented_tasks_loop(
                 let mut task_hashes: Vec<String> = tasks_client
                     .validate_queries(tasks_with_queries, mod_generic_addr.as_ref())
                     .await?;
-                println!(
+                debug!(
                     "--- validated: task_hashes {:?} {:?}",
                     header.latest_block_height, task_hashes
                 );
@@ -712,12 +687,11 @@ pub async fn evented_tasks_loop(
                 // Lastly, if we really really dont have any other things to do, attempt a cooldown task
                 if task_hashes.is_empty() {
                     if let Some(task_hash) = tasks_client.get_cooldown_task() {
-                        println!("<<<<<<<<<<<< RETRY COOLDOWN TASK {:?}", task_hash);
                         task_hashes.push(task_hash);
                     }
                 }
 
-                println!(
+                debug!(
                     "--- task_hashes {:?} {:?}",
                     header.latest_block_height, task_hashes
                 );
@@ -740,22 +714,27 @@ pub async fn evented_tasks_loop(
                                 pc_res.height,
                                 pc_res.events.len()
                             );
-                            // TODO: Handle cooldown tasks
-                            println!(">>>>>> SET COOLDOWN TASK");
 
                             tasks_client.clean_ended_tasks_from_chain_tx(pc_res).await?;
                         }
                         Err(err) => {
                             tasks_failed.store(true, SeqCst);
+                            let err_msg = err.to_string().to_lowercase();
                             // Handle: "No tasks to be done in this slot" (just refresh task cache)
-                            if err.to_string().to_lowercase().contains("No tasks to be done in this slot") {
+                            if err_msg.contains("no tasks to be done in this slot") {
                                 tasks_client.store.clear_all()?;
                                 tasks_client.load_all_evented_tasks().await?;
                             }
-                            // TODO: Add back!!!!
-                            // error!(
-                            println!(
-                                "ERR---Something went wrong during proxy_call_evented_batch: {}",
+                            if err_msg.contains("underflow") || err_msg.contains("overflow") {
+                                // unfortunately we need to add the WHOLE list to cooldown, so they get individually re-tried.
+                                // Hopefully a diff agent picks them up in another order so we execute it faster!
+                                for task_hash in task_hashes {
+                                    // Sending to cooldown forces a task to only be attempted a few times before being jailed.
+                                    tasks_client.set_cooldown_task(task_hash);
+                                }
+                            }
+                            debug!(
+                                "Something went wrong during proxy_call_evented_batch: {}",
                                 err
                             );
                         }

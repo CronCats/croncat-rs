@@ -188,11 +188,18 @@ impl LocalEventStorage {
             data.expires = expires;
             self.data = Some(data);
         } else {
+            // dont ever clear cooldown or jailed tasks, those need to be longer living
+            let data = &self.data;
+            let (cooldown_tasks, jailed_tasks) = if let Some(data) = data {
+                (data.cooldown_tasks.clone(), data.jailed_tasks.clone())
+            } else {
+                (vec![], vec![])
+            };
+
             let mut height_based: BTreeMap<u64, HashMap<String, TaskInfo>> = BTreeMap::new();
             let mut time_based: BTreeMap<u64, HashMap<String, TaskInfo>> = BTreeMap::new();
             let mut items: HashMap<String, TaskInfo> = HashMap::new();
-            let cooldown_tasks = vec![];
-            let jailed_tasks = vec![];
+
             for (k, v) in events {
                 items.insert(k, v);
             }
@@ -221,13 +228,19 @@ impl LocalEventStorage {
 
     /// Clear all data, helpful for refreshing all data
     pub fn clear_all(&mut self) -> Result<(), Report> {
+        // dont ever clear cooldown or jailed tasks, those need to be longer living
+        let data = &self.data;
+        let (cooldown_tasks, jailed_tasks) = if let Some(data) = data {
+            (data.cooldown_tasks.clone(), data.jailed_tasks.clone())
+        } else {
+            (vec![], vec![])
+        };
+
         // Expires immediately, so we know to grab moar datazzzz
         let dt = Utc::now();
         let expires = dt.timestamp().saturating_add(30);
         let height_based: BTreeMap<u64, HashMap<String, TaskInfo>> = BTreeMap::new();
         let time_based: BTreeMap<u64, HashMap<String, TaskInfo>> = BTreeMap::new();
-        let cooldown_tasks = vec![];
-        let jailed_tasks = vec![];
         self.data = Some(LocalEventsStorageEntry {
             expires,
             height_based,
@@ -236,7 +249,6 @@ impl LocalEventStorage {
             jailed_tasks,
         });
         self.write_to_disk()?;
-        println!("+++++++++ CLEARED ALLLLLLLLLLLLLLLLLL");
         Ok(())
     }
 
@@ -253,7 +265,6 @@ impl LocalEventStorage {
         }
 
         self.write_to_disk()?;
-        println!("+++++++++ CLEARED EMPTY INDEXES");
         Ok(())
     }
 
@@ -321,20 +332,18 @@ impl LocalEventStorage {
     }
 
     /// Remove a task by task hash, dont care if wasn't there
-    pub fn remove_task_by_hash(&mut self, task_hash: &str) -> Result<(), Report> {
-        if let Some(data) = self.data.as_mut() {
-            for (_, indexed_set) in data.height_based.iter_mut() {
-                if indexed_set.contains_key(task_hash) {
-                    indexed_set.remove(task_hash);
-                }
+    pub fn remove_task_by_hash(&mut self, task_hash: String) -> Result<(), Report> {
+        if let Some(data) = &mut self.data {
+            for hb in data.height_based.values_mut() {
+                hb.remove(&task_hash);
             }
-            for (_, indexed_set) in data.time_based.iter_mut() {
-                if indexed_set.contains_key(task_hash) {
-                    indexed_set.remove(task_hash);
-                }
+
+            for tb in data.time_based.values_mut() {
+                tb.remove(&task_hash.to_owned());
             }
         }
 
+        self.write_to_disk()?;
         Ok(())
     }
 
@@ -403,11 +412,6 @@ impl LocalEventStorage {
         index: Option<u64>,
         kind: EventType,
     ) -> Option<Vec<&TaskInfo>> {
-        println!(
-            "get_events_lte_index self.is_expired() && self.has_events() {:?} {:?}",
-            self.is_expired(),
-            self.has_events()
-        );
         if !self.is_expired() && self.has_events() {
             if let Some(data) = self.data.as_ref() {
                 let idx = index.unwrap_or(1);
@@ -428,31 +432,38 @@ impl LocalEventStorage {
     }
 
     /// inserts a new or updated cooldown task
-    pub fn set_cooldown_task(
-        &mut self,
-        task_hash: String,
-        index: Option<u8>,
-        expires: Option<i64>,
-    ) {
+    pub fn set_cooldown_task(&mut self, task_hash: String) {
         let mut data = self.data.clone().expect("No local data found!");
-
-        // if index is too high, jail task!
-        if let Some(i) = index {
-            if i > MAXIMUM_COOLDOWN_INDEX {
-                data.jailed_tasks.push(task_hash);
-                self.data = Some(data);
-                self.write_to_disk().unwrap();
-                return;
-            }
-        }
-
         let dt = Utc::now();
-        let expiry = dt.timestamp().saturating_add(300); // 5 mins
-        data.cooldown_tasks.push(CooldownTask {
-            index: index.unwrap_or_default(),
-            expires: expires.unwrap_or(expiry),
-            task_hash,
-        });
+
+        if let Some(task) = data
+            .cooldown_tasks
+            .iter_mut()
+            .find(|t| t.task_hash == task_hash)
+        {
+            // if index is too high, jail task!
+            if task.index >= MAXIMUM_COOLDOWN_INDEX {
+                data.jailed_tasks.push(task_hash.clone());
+
+                // remove from the cooldown vec
+                data.cooldown_tasks
+                    .retain(|c| c.task_hash != task_hash.clone());
+
+                // Remove task item by task hash from cache in every occurrence
+                self.remove_task_by_hash(task_hash).unwrap();
+            } else {
+                task.index += 1;
+                let idx = i64::from(task.index);
+                task.expires = dt.timestamp().saturating_add(idx * idx * 30); // exponential backoff
+            }
+        } else {
+            let index = 0;
+            data.cooldown_tasks.push(CooldownTask {
+                index,
+                task_hash,
+                expires: dt.timestamp().saturating_add(30), // 30 secs,
+            });
+        }
 
         self.data = Some(data);
         self.write_to_disk().unwrap();
@@ -460,7 +471,7 @@ impl LocalEventStorage {
 
     /// retrieves a ready cooldown task for re-evaluation
     pub fn get_cooldown_task(&mut self) -> Option<String> {
-        let mut data = self.data.clone().expect("No local data found!");
+        let data = self.data.clone().expect("No local data found!");
         let dt = Utc::now();
         let now = dt.timestamp();
         let mut hash: Option<String> = None;
@@ -470,16 +481,16 @@ impl LocalEventStorage {
             if t.expires < now {
                 hash = Some(t.task_hash.clone());
 
-                // remove from the cooldown vec
-                data.cooldown_tasks.retain(|c| c.task_hash != t.task_hash);
+                // // remove from the cooldown vec
+                // data.cooldown_tasks.retain(|c| c.task_hash != t.task_hash);
                 break;
             }
         }
 
-        if hash.is_some() {
-            self.data = Some(data);
-            self.write_to_disk().unwrap();
-        }
+        // if hash.is_some() {
+        //     self.data = Some(data);
+        //     self.write_to_disk().unwrap();
+        // }
 
         hash
     }

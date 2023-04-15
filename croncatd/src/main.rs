@@ -19,6 +19,8 @@ use std::{process::exit, sync::Arc};
 mod cli;
 mod opts;
 
+const MAXIMUM_RETRY_INDEX: u64 = 600; // 600*30/60/60 = 5hrs
+
 ///
 /// Start the `croncatd` agent.
 ///
@@ -40,6 +42,7 @@ fn main() -> Result<(), Report> {
     }
 
     // Retry the agent creation if it fails.
+    let mut idx: u64 = 0;
     loop {
         // Creata tokio runtime
         let rt = tokio::runtime::Runtime::new()?;
@@ -69,10 +72,12 @@ fn main() -> Result<(), Report> {
         match result {
             Ok(_) => break,
             Err(err) => {
-                if !is_error_fallible(&err) {
-                    error!("Agent failed: {}", err);
-                    error!("Retrying in 5 seconds...");
-                    std::thread::sleep(std::time::Duration::from_secs(5));
+                if idx >= MAXIMUM_RETRY_INDEX {
+                    break;
+                } else if !is_error_fallible(&err) {
+                    error!("Retrying in 30 seconds...");
+                    std::thread::sleep(std::time::Duration::from_secs(30));
+                    idx = idx.saturating_add(1);
                     continue;
                 }
 

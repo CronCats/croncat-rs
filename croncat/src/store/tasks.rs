@@ -445,7 +445,7 @@ impl LocalEventStorage {
             if task.index >= MAXIMUM_COOLDOWN_INDEX {
                 data.jailed_tasks.push(task_hash.clone());
 
-                // remove from the cooldown vec
+                // remove from the cooldown set
                 data.cooldown_tasks
                     .retain(|c| c.task_hash != task_hash.clone());
 
@@ -477,20 +477,12 @@ impl LocalEventStorage {
         let mut hash: Option<String> = None;
 
         // Loop the cooldowners, find one thats expired which is ready for a retry
-        for t in data.cooldown_tasks.clone() {
+        for t in data.cooldown_tasks {
             if t.expires < now {
-                hash = Some(t.task_hash.clone());
-
-                // // remove from the cooldown vec
-                // data.cooldown_tasks.retain(|c| c.task_hash != t.task_hash);
+                hash = Some(t.task_hash);
                 break;
             }
         }
-
-        // if hash.is_some() {
-        //     self.data = Some(data);
-        //     self.write_to_disk().unwrap();
-        // }
 
         hash
     }

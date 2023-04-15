@@ -8,7 +8,6 @@ use croncat_sdk_agents::types::AgentStatus;
 use croncat_sdk_tasks::msg::TasksQueryMsg;
 use croncat_sdk_tasks::types::{Boundary, CosmosQuery, TaskInfo};
 use mod_sdk::types::QueryResponse;
-use serde_json::Value;
 use std::collections::HashSet;
 use std::str::FromStr;
 use std::sync::{
@@ -112,6 +111,26 @@ impl Tasks {
         Ok(self.store.get_stats())
     }
 
+    pub fn set_cooldown_task(&mut self, task_hash: String) {
+        self.store.set_cooldown_task(task_hash);
+    }
+
+    pub fn get_cooldown_task(&mut self) -> Option<String> {
+        self.store.get_cooldown_task()
+    }
+
+    pub fn is_cooldown_task(&self, task_hash: &String) -> bool {
+        self.store.is_cooldown_task(task_hash)
+    }
+    pub fn is_jailed_task(&self, task_hash: &String) -> bool {
+        self.store.is_jailed_task(task_hash)
+    }
+
+    // only gets unbounded tasks
+    pub async fn clear_all(&mut self) -> Result<(), Report> {
+        self.store.clear_all()
+    }
+
     // only gets unbounded tasks
     pub async fn unbounded(&self, kind: EventType) -> Result<Option<Vec<&TaskInfo>>, Report> {
         Ok(self.store.get_events_by_index(None, kind))
@@ -168,7 +187,20 @@ impl Tasks {
                     {
                         ended = true
                     }
+
+                    // Since our batch will be within ordered array, seeing this will
+                    // ALWAYS reset the current known variables after keeping track appropriately
+                    if attr.key == *"_contract_address" {
+                        if let Some(hash) = task_hash {
+                            if ended {
+                                task_hashes.push(hash);
+                            }
+                        }
+                        task_hash = None;
+                        ended = false;
+                    }
                 }
+                // catch the last ones, very edge case
                 if let Some(hash) = task_hash {
                     if ended {
                         task_hashes.push(hash);
@@ -176,10 +208,11 @@ impl Tasks {
                 }
             }
         }
+        debug!("task_hashes found ending {:?}", task_hashes);
 
         // loop remove the found task_hash's
         for hash in task_hashes {
-            self.store.remove_task_by_hash(hash.as_str())?;
+            self.store.remove_task_by_hash(hash)?;
         }
 
         Ok(())
@@ -343,7 +376,6 @@ impl Tasks {
         // Process all the queries
         // TODO: This needs to change to be BATCH RPC query! Too much latency here...
         for task in tasks_with_queries {
-            println!("validate task {:?}", task.task_hash);
             let queries = if let Some(q) = task.queries.to_owned() {
                 q
             } else {
@@ -358,7 +390,6 @@ impl Tasks {
                             queries: queries.to_owned(),
                         },
                     };
-                    println!("batch_querybatch_querybatch_querybatch_query {batch_query:?}");
                     async move {
                         querier
                             .rpc_client
@@ -370,7 +401,6 @@ impl Tasks {
                     }
                 })
                 .await;
-            println!("Validate QUERY res {res:?}");
 
             // Eval if result false, if so break!
             match res {
@@ -380,15 +410,9 @@ impl Tasks {
                 }
                 Err(_) => (),
                 Ok(data) => {
-                    println!("validate task_hash data {:?} {data:?}", task.task_hash);
                     if !data.result {
                         break;
                     } else {
-                        println!(
-                            "task_hash data {:?} {:?}",
-                            task.task_hash,
-                            serde_json::from_slice::<Value>(&data.data)
-                        );
                         let h = task.task_hash.clone();
                         // Dedupe, if theres any remote chance it could  happen
                         if !ready_hashes.contains(&h) {
@@ -416,6 +440,7 @@ pub async fn refresh_tasks_cache_loop(
     tasks_client.lock().await.load().await?;
 
     // TODO: Figure out best interval here!
+    // TODO: Could actually clear this at THE block when we get expired
     let block_counter = AtomicIntervalCounter::new(10);
     let task_handle: tokio::task::JoinHandle<Result<(), Report>> = tokio::task::spawn(async move {
         while let Ok(_block) = block_stream_rx.recv().await {
@@ -490,7 +515,7 @@ pub async fn scheduled_tasks_loop(
                             Ok(pc_res) => {
                                 debug!("Result: {:?}", pc_res.res.log);
                                 info!(
-                                    "Finished task batch - TX: {}, Blk: {}, Evts: {}",
+                                    "Finished Scheduled Batch - TX: {}, Blk: {}, Evts: {}",
                                     pc_res.tx_hash,
                                     pc_res.height,
                                     pc_res.events.len()
@@ -500,6 +525,7 @@ pub async fn scheduled_tasks_loop(
                             }
                             Err(err) => {
                                 tasks_failed.store(true, SeqCst);
+                                // since we don't know the task hash, theres no cooldown/jail - handled onchain
                                 error!("Something went wrong during proxy_call_batch: {}", err);
                             }
                         }
@@ -551,6 +577,14 @@ pub async fn evented_tasks_loop(
                 let tasks_failed = Arc::new(AtomicBool::new(false));
                 let mut tasks_client = tasks_client_mut.lock().await;
 
+                // if we expired, quickly refresh the data
+                if tasks_client.store.is_expired() {
+                    debug!("FOUND EXPIRED TASKS -- reloading....");
+                    tasks_client.store.clear_all()?;
+                    tasks_client.load_all_evented_tasks().await?;
+                    debug!("FOUND EXPIRED TASKS -- RELOAD COMPLETE!!!!");
+                }
+
                 // Stack 0: Unbounded evented tasks
                 // - These will get queried every block
                 // - NOTE: These will be lower priority than ranged
@@ -599,17 +633,40 @@ pub async fn evented_tasks_loop(
                     tasks_with_queries.extend(ub);
                 }
 
+                // Filter out the jailed && cooldown tasks
+                tasks_with_queries.retain(|t| {
+                    !tasks_client.is_jailed_task(&t.task_hash)
+                        && !tasks_client.is_cooldown_task(&t.task_hash)
+                });
+
                 // Get the batch query generic contract, so we can have reproducible query test
                 let mod_generic_addr = factory_client
                     .lock()
                     .await
                     .get_contract_addr("mod_generic".to_string())
                     .await?;
+                // also get info about evented stats
+                let stats = tasks_client.get_stats().await?;
+
+                debug!(
+                    "[{}] Evented Tasks --, Block {}, H0: {}, HR: {}, T0: {}, TR: {}",
+                    chain_id,
+                    // task_hashes.len(),
+                    header.latest_block_height,
+                    stats.0,
+                    stats.1,
+                    stats.2,
+                    stats.3,
+                );
 
                 // Validate: get all
                 let mut task_hashes: Vec<String> = tasks_client
                     .validate_queries(tasks_with_queries, mod_generic_addr.as_ref())
                     .await?;
+                debug!(
+                    "--- validated: task_hashes {:?} {:?}",
+                    header.latest_block_height, task_hashes
+                );
 
                 // Based on end-boundary, skip validation of queries so we can cleanup tasks state, if any exist
                 // if we are bored, have our agent thumbs twiddling, attempt to do some cleanup for missed/passed evented taasks
@@ -628,24 +685,24 @@ pub async fn evented_tasks_loop(
                         .await?;
                 }
 
+                // Lastly, if we really really dont have any other things to do, attempt a cooldown task
+                if task_hashes.is_empty() {
+                    if let Some(task_hash) = tasks_client.get_cooldown_task() {
+                        task_hashes.push(task_hash);
+                    }
+                }
+
+                debug!(
+                    "--- task_hashes {:?} {:?}",
+                    header.latest_block_height, task_hashes
+                );
+
                 if !task_hashes.is_empty() {
-                    // also get info about evented stats
-                    let stats = tasks_client.get_stats().await?;
-
-                    info!(
-                        "[{}] Evented Tasks {}, Block {}, H0: {}, HR: {}, T0: {}, TR: {}",
-                        chain_id,
-                        task_hashes.len(),
-                        header.latest_block_height,
-                        stats.0,
-                        stats.1,
-                        stats.2,
-                        stats.3,
-                    );
-
                     // Batch proxy_call's for task_hashes
                     // TODO: Limit batches to max gas 3_000_000-6_000_000 (also could be set per-chain since stargaze has higher limits for example)
                     let tasks_failed = tasks_failed.clone();
+
+                    // // NOTE: Disabled since 1 item in batch causes whole batch to fail
                     match manager_client
                         .proxy_call_evented_batch(task_hashes.clone())
                         .await
@@ -653,7 +710,7 @@ pub async fn evented_tasks_loop(
                         Ok(pc_res) => {
                             debug!("Result: {:?}", pc_res.res.log);
                             info!(
-                                "Finished evented task batch - TX: {}, Blk: {}, Evts: {}",
+                                "Finished Evented Batch - TX: {}, Blk: {}, Evts: {}",
                                 pc_res.tx_hash,
                                 pc_res.height,
                                 pc_res.events.len()
@@ -663,7 +720,21 @@ pub async fn evented_tasks_loop(
                         }
                         Err(err) => {
                             tasks_failed.store(true, SeqCst);
-                            error!(
+                            let err_msg = err.to_string().to_lowercase();
+                            // Handle: "No tasks to be done in this slot" (just refresh task cache)
+                            if err_msg.contains("no tasks to be done in this slot") {
+                                tasks_client.store.clear_all()?;
+                                tasks_client.load_all_evented_tasks().await?;
+                            }
+                            if err_msg.contains("underflow") || err_msg.contains("overflow") {
+                                // unfortunately we need to add the WHOLE list to cooldown, so they get individually re-tried.
+                                // Hopefully a diff agent picks them up in another order so we execute it faster!
+                                for task_hash in task_hashes {
+                                    // Sending to cooldown forces a task to only be attempted a few times before being jailed.
+                                    tasks_client.set_cooldown_task(task_hash);
+                                }
+                            }
+                            debug!(
                                 "Something went wrong during proxy_call_evented_batch: {}",
                                 err
                             );

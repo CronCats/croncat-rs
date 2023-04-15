@@ -14,14 +14,28 @@ use super::get_storage_path;
 
 /// Where our [`LocalEventStorage`] will be stored.
 const LOCAL_STORAGE_FILENAME: &str = "events.json";
+const MAXIMUM_COOLDOWN_INDEX: u8 = 5;
 
-//
+#[derive(Serialize, Deserialize, Clone)]
+pub struct CooldownTask {
+    pub index: u8,
+    pub expires: i64,
+    pub task_hash: String,
+}
+
 #[derive(Serialize, Deserialize, Clone)]
 pub struct LocalEventsStorageEntry {
     pub expires: i64,
     // is sorted for ranged execution
     pub height_based: BTreeMap<u64, HashMap<String, TaskInfo>>,
     pub time_based: BTreeMap<u64, HashMap<String, TaskInfo>>,
+
+    // cooldown tasks allow us to encounter query/action errors safely and
+    // still let non-erroring tasks continue. Cooled tasks can be re-attempted after a time
+    pub cooldown_tasks: Vec<CooldownTask>,
+
+    // jailed tasks cannot resurrect. Owner must remove and fix.
+    pub jailed_tasks: Vec<String>,
 }
 
 impl std::fmt::Debug for LocalEventsStorageEntry {
@@ -112,6 +126,26 @@ impl LocalEventStorage {
     }
 
     /// Insert a items into the data set.
+    pub fn update_expiry(&mut self) -> Result<(), Report> {
+        // Expires after 1 hour, updates any time we get new data
+        let dt = Utc::now();
+        let expires = dt.timestamp().saturating_add(60); // 1 min
+        let prev = self.data.as_ref().unwrap();
+
+        self.data = Some(LocalEventsStorageEntry {
+            expires,
+            height_based: prev.height_based.clone(),
+            time_based: prev.time_based.clone(),
+            cooldown_tasks: prev.cooldown_tasks.clone(),
+            jailed_tasks: prev.jailed_tasks.clone(),
+        });
+
+        self.clear_empty_indexes()?;
+        self.write_to_disk()?;
+        Ok(())
+    }
+
+    /// Insert a items into the data set.
     pub fn insert(
         &mut self,
         kind: EventType,
@@ -120,7 +154,7 @@ impl LocalEventStorage {
     ) -> Result<(), Report> {
         // Expires after 1 hour, updates any time we get new data
         let dt = Utc::now();
-        let expires = dt.timestamp().saturating_add(10);
+        let expires = dt.timestamp().saturating_add(60); // 1 min
 
         if let Some(mut data) = self.data.clone() {
             match kind {
@@ -131,7 +165,9 @@ impl LocalEventStorage {
                         .unwrap_or(&HashMap::new())
                         .to_owned();
                     for (k, v) in events {
-                        event_range.insert(k, v);
+                        if !self.is_jailed_task(&k) {
+                            event_range.insert(k, v);
+                        }
                     }
                     data.height_based.insert(index, event_range);
                 }
@@ -142,16 +178,28 @@ impl LocalEventStorage {
                         .unwrap_or(&HashMap::new())
                         .to_owned();
                     for (k, v) in events {
-                        event_range.insert(k, v);
+                        if !self.is_jailed_task(&k) {
+                            event_range.insert(k, v);
+                        }
                     }
                     data.time_based.insert(index, event_range);
                 }
             }
+            data.expires = expires;
             self.data = Some(data);
         } else {
+            // dont ever clear cooldown or jailed tasks, those need to be longer living
+            let data = &self.data;
+            let (cooldown_tasks, jailed_tasks) = if let Some(data) = data {
+                (data.cooldown_tasks.clone(), data.jailed_tasks.clone())
+            } else {
+                (vec![], vec![])
+            };
+
             let mut height_based: BTreeMap<u64, HashMap<String, TaskInfo>> = BTreeMap::new();
             let mut time_based: BTreeMap<u64, HashMap<String, TaskInfo>> = BTreeMap::new();
             let mut items: HashMap<String, TaskInfo> = HashMap::new();
+
             for (k, v) in events {
                 items.insert(k, v);
             }
@@ -168,6 +216,8 @@ impl LocalEventStorage {
                 expires,
                 height_based,
                 time_based,
+                cooldown_tasks,
+                jailed_tasks,
             });
         }
 
@@ -178,15 +228,25 @@ impl LocalEventStorage {
 
     /// Clear all data, helpful for refreshing all data
     pub fn clear_all(&mut self) -> Result<(), Report> {
+        // dont ever clear cooldown or jailed tasks, those need to be longer living
+        let data = &self.data;
+        let (cooldown_tasks, jailed_tasks) = if let Some(data) = data {
+            (data.cooldown_tasks.clone(), data.jailed_tasks.clone())
+        } else {
+            (vec![], vec![])
+        };
+
         // Expires immediately, so we know to grab moar datazzzz
         let dt = Utc::now();
-        let expires = dt.timestamp();
+        let expires = dt.timestamp().saturating_add(30);
         let height_based: BTreeMap<u64, HashMap<String, TaskInfo>> = BTreeMap::new();
         let time_based: BTreeMap<u64, HashMap<String, TaskInfo>> = BTreeMap::new();
         self.data = Some(LocalEventsStorageEntry {
             expires,
             height_based,
             time_based,
+            cooldown_tasks,
+            jailed_tasks,
         });
         self.write_to_disk()?;
         Ok(())
@@ -272,20 +332,18 @@ impl LocalEventStorage {
     }
 
     /// Remove a task by task hash, dont care if wasn't there
-    pub fn remove_task_by_hash(&mut self, task_hash: &str) -> Result<(), Report> {
-        if let Some(data) = self.data.as_mut() {
-            for (_, indexed_set) in data.height_based.iter_mut() {
-                if indexed_set.contains_key(task_hash) {
-                    indexed_set.remove(task_hash);
-                }
+    pub fn remove_task_by_hash(&mut self, task_hash: String) -> Result<(), Report> {
+        if let Some(data) = &mut self.data {
+            for hb in data.height_based.values_mut() {
+                hb.remove(&task_hash);
             }
-            for (_, indexed_set) in data.time_based.iter_mut() {
-                if indexed_set.contains_key(task_hash) {
-                    indexed_set.remove(task_hash);
-                }
+
+            for tb in data.time_based.values_mut() {
+                tb.remove(&task_hash.to_owned());
             }
         }
 
+        self.write_to_disk()?;
         Ok(())
     }
 
@@ -371,6 +429,80 @@ impl LocalEventStorage {
         } else {
             None
         }
+    }
+
+    /// inserts a new or updated cooldown task
+    pub fn set_cooldown_task(&mut self, task_hash: String) {
+        let mut data = self.data.clone().expect("No local data found!");
+        let dt = Utc::now();
+
+        if let Some(task) = data
+            .cooldown_tasks
+            .iter_mut()
+            .find(|t| t.task_hash == task_hash)
+        {
+            // if index is too high, jail task!
+            if task.index >= MAXIMUM_COOLDOWN_INDEX {
+                data.jailed_tasks.push(task_hash.clone());
+
+                // remove from the cooldown set
+                data.cooldown_tasks
+                    .retain(|c| c.task_hash != task_hash.clone());
+
+                // Remove task item by task hash from cache in every occurrence
+                self.remove_task_by_hash(task_hash).unwrap();
+            } else {
+                task.index += 1;
+                let idx = i64::from(task.index);
+                task.expires = dt.timestamp().saturating_add(idx * idx * 30); // exponential backoff
+            }
+        } else {
+            let index = 0;
+            data.cooldown_tasks.push(CooldownTask {
+                index,
+                task_hash,
+                expires: dt.timestamp().saturating_add(30), // 30 secs,
+            });
+        }
+
+        self.data = Some(data);
+        self.write_to_disk().unwrap();
+    }
+
+    /// retrieves a ready cooldown task for re-evaluation
+    pub fn get_cooldown_task(&mut self) -> Option<String> {
+        let data = self.data.clone().expect("No local data found!");
+        let dt = Utc::now();
+        let now = dt.timestamp();
+        let mut hash: Option<String> = None;
+
+        // Loop the cooldowners, find one thats expired which is ready for a retry
+        for t in data.cooldown_tasks {
+            if t.expires < now {
+                hash = Some(t.task_hash);
+                break;
+            }
+        }
+
+        hash
+    }
+
+    /// quick check
+    pub fn is_cooldown_task(&self, task_hash: &String) -> bool {
+        if let Some(data) = &self.data {
+            data.cooldown_tasks
+                .iter()
+                .any(|t| &t.task_hash == task_hash)
+        } else {
+            false
+        }
+    }
+
+    /// quick check
+    pub fn is_jailed_task(&self, task_hash: &String) -> bool {
+        self.data
+            .as_ref()
+            .map_or(false, |data| data.jailed_tasks.contains(task_hash))
     }
 
     /// Totals for 0th and ranged task amounts

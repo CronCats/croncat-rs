@@ -20,7 +20,7 @@ pub const DERIVATION_PATH: &str = "m/44'/118'/0'/0/0";
 /// Count block received from the stream.
 ///
 pub struct AtomicIntervalCounter {
-    count: Arc<AtomicU64>,
+    pub count: Arc<AtomicU64>,
     check_interval: u64,
 }
 
@@ -164,6 +164,12 @@ pub fn is_error_fallible(e: &Report) -> bool {
     let msg = e.to_string().to_lowercase();
     msg.contains("agent not registered")
         || msg.contains("agent already registered")
+        || msg.contains("already registered")
         || msg.contains("agent not found")
         || msg.contains("account not found")
+}
+
+pub fn is_contract_error(e: &Report) -> bool {
+    let msg = e.to_string().to_lowercase();
+    msg.contains("execute wasm contract failed")
 }

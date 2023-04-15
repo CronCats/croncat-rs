@@ -1,11 +1,11 @@
 [package]
 name = "croncatd"
-version = "0.3.5"
+version = "0.3.7"
 edition = "2021"
 
 [dependencies]
 croncat = { path = "../croncat" }
-croncat-sdk-agents = "0.1.3"
+croncat-sdk-agents = "0.1.5"
 enum-display = "0.1.3"
 futures = "0.3"
 reqwest = { version = "0.11.11", features = ["json"] }

@@ -515,7 +515,7 @@ pub async fn scheduled_tasks_loop(
                             Ok(pc_res) => {
                                 debug!("Result: {:?}", pc_res.res.log);
                                 info!(
-                                    "Finished task batch - TX: {}, Blk: {}, Evts: {}",
+                                    "Finished Scheduled Batch - TX: {}, Blk: {}, Evts: {}",
                                     pc_res.tx_hash,
                                     pc_res.height,
                                     pc_res.events.len()
@@ -525,6 +525,7 @@ pub async fn scheduled_tasks_loop(
                             }
                             Err(err) => {
                                 tasks_failed.store(true, SeqCst);
+                                // since we don't know the task hash, theres no cooldown/jail - handled onchain
                                 error!("Something went wrong during proxy_call_batch: {}", err);
                             }
                         }
@@ -709,7 +710,7 @@ pub async fn evented_tasks_loop(
                         Ok(pc_res) => {
                             debug!("Result: {:?}", pc_res.res.log);
                             info!(
-                                "Finished evented task batch - TX: {}, Blk: {}, Evts: {}",
+                                "Finished Evented Batch - TX: {}, Blk: {}, Evts: {}",
                                 pc_res.tx_hash,
                                 pc_res.height,
                                 pc_res.events.len()

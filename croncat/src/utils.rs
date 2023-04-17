@@ -167,6 +167,7 @@ pub fn is_error_fallible(e: &Report) -> bool {
         || msg.contains("already registered")
         || msg.contains("agent not found")
         || msg.contains("account not found")
+        || msg.contains("failed to send funds")
 }
 
 pub fn is_contract_error(e: &Report) -> bool {

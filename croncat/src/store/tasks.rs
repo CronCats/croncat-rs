@@ -48,6 +48,26 @@ impl std::fmt::Debug for LocalEventsStorageEntry {
     }
 }
 
+pub fn load_data_from_path(
+    path: PathBuf,
+    path_prefix: &Option<String>,
+) -> Option<LocalEventsStorageEntry> {
+    let data_file = path
+        .join(path_prefix.clone().unwrap_or_default())
+        .join(LOCAL_STORAGE_FILENAME);
+
+    // Load from the agent data file if it exists
+    if data_file.exists() {
+        let json_data = fs::read_to_string(data_file).unwrap();
+        let data =
+            serde_json::from_str(json_data.as_str()).expect("Failed to parse agent JSON data");
+        data
+    } else {
+        // Otherwise create a new hashmap
+        None
+    }
+}
+
 pub enum EventType {
     Block,
     Time,
@@ -64,10 +84,11 @@ impl LocalEventStorage {
     /// Create a new [`LocalEventStorage`] instance with the default directory.
     pub fn new(path_prefix: Option<String>) -> Self {
         let p = get_storage_path();
+        let data = load_data_from_path(p.clone(), &path_prefix);
         Self {
             path: p,
             path_prefix,
-            data: None,
+            data,
         }
     }
 
@@ -325,6 +346,12 @@ impl LocalEventStorage {
 
             data.time_based.retain(|_, v| !v.is_empty());
 
+            for hash in &cleared {
+                // remove from the cooldown/jailed set
+                data.cooldown_tasks.retain(|c| &c.task_hash != hash);
+                data.jailed_tasks.retain(|th| th != hash);
+            }
+
             self.write_to_disk()?;
         }
 
@@ -336,10 +363,16 @@ impl LocalEventStorage {
         if let Some(data) = &mut self.data {
             for hb in data.height_based.values_mut() {
                 hb.remove(&task_hash);
+                // remove from the cooldown/jailed set
+                data.cooldown_tasks.retain(|c| c.task_hash != task_hash);
+                data.jailed_tasks.retain(|th| th != &task_hash);
             }
 
             for tb in data.time_based.values_mut() {
                 tb.remove(&task_hash.to_owned());
+                // remove from the cooldown/jailed set
+                data.cooldown_tasks.retain(|c| c.task_hash != task_hash);
+                data.jailed_tasks.retain(|th| th != &task_hash);
             }
         }
 
@@ -348,17 +381,19 @@ impl LocalEventStorage {
     }
 
     /// Clear all data less than or equal to an index, but NOT 0th index
-    /// TODO: Consider cleaning up empty indexs
+    /// cleans up empty indexes
     pub fn clear_lte_index(&mut self, index: &u64, kind: EventType) -> Result<(), Report> {
         if let Some(mut data) = self.data.clone() {
             // NOTE: use of unstable library feature 'btree_drain_filter' -- see issue #70530 <https://github.com/rust-lang/rust/issues/70530> for more information
             // data.events.drain_filter(|k, _v| k <= index && k != &0).collect();
             match kind {
                 EventType::Block => {
-                    data.height_based.retain(|k, _v| k > index && k != &0);
+                    data.height_based
+                        .retain(|k, v| k > index && k != &0 && !v.is_empty());
                 }
                 EventType::Time => {
-                    data.time_based.retain(|k, _v| k > index && k != &0);
+                    data.time_based
+                        .retain(|k, v| k > index && k != &0 && !v.is_empty());
                 }
             }
             self.data = Some(data);

@@ -437,7 +437,7 @@ pub async fn refresh_tasks_cache_loop(
     tasks_client: Arc<Mutex<Tasks>>,
 ) -> Result<(), Report> {
     // initialize previous cache ASAP first
-    tasks_client.lock().await.load().await?;
+    // tasks_client.lock().await.load().await?;
 
     // TODO: Figure out best interval here!
     // TODO: Could actually clear this at THE block when we get expired

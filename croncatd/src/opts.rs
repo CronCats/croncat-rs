@@ -32,6 +32,9 @@ pub struct Opts {
 #[derive(Debug, StructOpt, Clone, EnumDisplay)]
 #[enum_display(case = "Kebab")]
 pub enum Command {
+    /// Useful for clearing local cached chain tasks
+    ClearCache,
+
     /// Registers an agent, placing them in the pending queue unless it's the first agent.
     Register { payable_account_id: Option<String> },
 
@@ -91,7 +94,7 @@ pub enum Command {
         output: Option<String>,
     },
 
-    /// Send funds from the agent account to another account
+    /// Send funds from the agent account to another account (`cargo run send juno123abc... 1 ujuno`)
     #[structopt(name = "send")]
     SendFunds {
         /// The address to send funds to

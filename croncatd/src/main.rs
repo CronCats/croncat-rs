@@ -416,6 +416,16 @@ async fn run_command(opts: Opts, mut storage: LocalAgentStorage) -> Result<(), R
             )
             .await?
         }
+        opts::Command::ClearCache => {
+            let result = tasks.lock().await.clear_all().await;
+
+            if result.is_ok() {
+                info!("Cleared local cache");
+                return Ok(());
+            } else {
+                Err(eyre!("Failed to clear local cache"))?
+            }
+        }
         opts::Command::SetupService { output } => {
             for (chain_id, _) in config.chains {
                 system::DaemonService::create(output.clone(), &chain_id, opts.no_frills)?;

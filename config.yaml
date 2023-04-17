@@ -1,12 +1,12 @@
 chains:
     juno-1:
-        factory: juno1fg83ymlxj9lfdv6cx9hwdm5jt6nf3uzmgkfed4uh7efz4ffs0psslm25zm
+        factory: juno1pm0nejzjq506vamesj64ryqr3ycyz8h45h5kvxjl24snq0x8pzfqep4uqm
         gas_prices: 0.04
         gas_adjustment: 1.3
         threshold: 1000000
         include_evented_tasks: true
     uni-6:
-        factory: juno1rmnxvln8j0a76hskm0k0rpaehvz3uhj6fv3xqszf22l0lgjx8lqqga6yn3
+        factory: juno124vcmqsukhmuy6psm45a2tdg5354rnemdetqhjt72ynju666gf0qpxmlxz
         gas_prices: 0.04
         gas_adjustment: 1.3
         threshold: 1000000
@@ -20,7 +20,7 @@ chains:
     #     gas_prices: 0.04
     #     gas_adjustment: 1.3
     osmo-test-4:
-        factory: osmo1lg4yl42z56g8fw7j33ep29x5rmh5qyaeu03kyhvjtj4scyz8tvwsdtju04
+        factory: osmo1dy776gk8w9gpheuc6cmp7vjsu95emdjgzxjd0wa80qsmq4pfgjqqqqe8qg
         gas_prices: 0.04
         gas_adjustment: 1.3
         threshold: 1000000
@@ -34,7 +34,7 @@ chains:
     #     gas_prices: 0.04
     #     gas_adjustment: 1.3
     elgafar-1:
-        factory: stars1ahejlx0g8cz90a4jzcd8znmtrzncfrt0ckexrhtztmfcqm3nk4tsmunwn7
+        factory: stars1kauk24v3wkyy64kc7jn0r3ys0zqy9dxqvmy6ul76z7405ur2y9lq90yd8d
         gas_prices: 0.04
         gas_adjustment: 1.3
         threshold: 1000000

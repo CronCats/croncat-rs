@@ -48,7 +48,10 @@ impl std::fmt::Debug for LocalEventsStorageEntry {
     }
 }
 
-pub fn load_data_from_path(path: &PathBuf, path_prefix: &Option<String>) -> Option<LocalEventsStorageEntry> {
+pub fn load_data_from_path(
+    path: PathBuf,
+    path_prefix: &Option<String>,
+) -> Option<LocalEventsStorageEntry> {
     let data_file = path
         .join(path_prefix.clone().unwrap_or_default())
         .join(LOCAL_STORAGE_FILENAME);
@@ -81,7 +84,7 @@ impl LocalEventStorage {
     /// Create a new [`LocalEventStorage`] instance with the default directory.
     pub fn new(path_prefix: Option<String>) -> Self {
         let p = get_storage_path();
-        let data = load_data_from_path(&p, &path_prefix);
+        let data = load_data_from_path(p.clone(), &path_prefix);
         Self {
             path: p,
             path_prefix,
@@ -361,14 +364,14 @@ impl LocalEventStorage {
             for hb in data.height_based.values_mut() {
                 hb.remove(&task_hash);
                 // remove from the cooldown/jailed set
-                data.cooldown_tasks.retain(|c| &c.task_hash != &task_hash);
+                data.cooldown_tasks.retain(|c| c.task_hash != task_hash);
                 data.jailed_tasks.retain(|th| th != &task_hash);
             }
 
             for tb in data.time_based.values_mut() {
                 tb.remove(&task_hash.to_owned());
                 // remove from the cooldown/jailed set
-                data.cooldown_tasks.retain(|c| &c.task_hash != &task_hash);
+                data.cooldown_tasks.retain(|c| c.task_hash != task_hash);
                 data.jailed_tasks.retain(|th| th != &task_hash);
             }
         }
@@ -385,10 +388,12 @@ impl LocalEventStorage {
             // data.events.drain_filter(|k, _v| k <= index && k != &0).collect();
             match kind {
                 EventType::Block => {
-                    data.height_based.retain(|k, v| k > index && k != &0 && !v.is_empty());
+                    data.height_based
+                        .retain(|k, v| k > index && k != &0 && !v.is_empty());
                 }
                 EventType::Time => {
-                    data.time_based.retain(|k, v| k > index && k != &0 && !v.is_empty());
+                    data.time_based
+                        .retain(|k, v| k > index && k != &0 && !v.is_empty());
                 }
             }
             self.data = Some(data);

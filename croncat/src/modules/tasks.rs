@@ -536,11 +536,9 @@ pub async fn scheduled_tasks_loop(
                         chain_id, block.inner.sync_info.latest_block_height
                     );
                 }
-
-                if !tasks_failed.load(SeqCst) {
-                    ping_uptime_monitor().await;
-                }
             }
+
+            ping_uptime_monitor().await;
         }
 
         Ok(())
@@ -740,10 +738,6 @@ pub async fn evented_tasks_loop(
                             );
                         }
                     }
-                }
-
-                if !tasks_failed.load(SeqCst) {
-                    ping_uptime_monitor().await;
                 }
             }
         }

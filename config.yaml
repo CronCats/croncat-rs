@@ -71,7 +71,7 @@ chains:
         threshold: 1000000
         rpc_timeout: 9.0
         include_evented_tasks: true
-    migaloo-1:
+    narwhal-1:
         factory: migaloo1lzgf30h3x70zed40m3j2arvve5tzk7cdfknx7plp9wxwl8253kasmrprjh
         gas_prices: 0.04
         gas_adjustment: 1.5

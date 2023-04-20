@@ -169,6 +169,7 @@ pub fn is_error_fallible(e: &Report) -> bool {
         || msg.contains("account not found")
         || msg.contains("failed to send funds")
         || msg.contains("needs whitelist approval")
+        || msg.contains("Chain not found")
 }
 
 pub fn is_contract_error(e: &Report) -> bool {

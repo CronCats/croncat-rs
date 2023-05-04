@@ -1,12 +1,12 @@
 chains:
     juno-1:
-        factory: juno1pm0nejzjq506vamesj64ryqr3ycyz8h45h5kvxjl24snq0x8pzfqep4uqm
+        factory: juno16tzc6krytqxd7350ja4xqvzy522r3737fyaqm5xxn9n5damncx9qt884hn
         gas_prices: 0.04
         gas_adjustment: 1.3
         threshold: 1000000
         include_evented_tasks: true
     uni-6:
-        factory: juno124vcmqsukhmuy6psm45a2tdg5354rnemdetqhjt72ynju666gf0qpxmlxz
+        factory: juno1n7gsa2zf2qsa0rl526pqc6v2ljq45qw5df9tfm26fdm76tupv0fq38xpan
         gas_prices: 0.04
         gas_adjustment: 1.3
         threshold: 1000000

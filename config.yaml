@@ -1,6 +1,6 @@
 chains:
     juno-1:
-        factory: juno17hhmhgjku4h2ppru7et4kellnqz6qucnuzsj56ve2wv9urv7266q8enxdn
+        factory: juno10dtfwf3gtspz9ts0rpqslf4yx65rdr8j3wk33y87h92m43a5pt8qmfusxx
         gas_prices: 0.04
         gas_adjustment: 1.3
         threshold: 1000000
@@ -9,7 +9,7 @@ chains:
             "mikedotexe":
                 rpc: https://juno.csli.zone
     uni-6:
-        factory: juno17dlsh3wx4n0j87pw3nt87745t4vz2rxuyxlfnn4qy46k8yatvd7qzs788d
+        factory: juno1mc4wfy9unvy2mwx7dskjqhh6v7qta3vqsxmkayclg4c2jude76es0jcp38
         gas_prices: 0.04
         gas_adjustment: 1.3
         threshold: 1000000
@@ -19,17 +19,14 @@ chains:
             "mikedotexe":
                 rpc: https://junotestnet.csli.zone
     osmosis-1:
-        factory:
+        factory: osmo14yjyt057saxauzc7scc5e0qce7c2dmeuzuhgsul0lnyy25xtz7ksxfzf07
         gas_prices: 0.04
         gas_adjustment: 1.3
         threshold: 1000000
         rpc_timeout: 9.0
         include_evented_tasks: true
-        custom_sources:
-            "mikedotexe":
-                rpc: https://osmosis.csli.zone
     osmo-test-5:
-        factory: osmo12r3fm9rdhae5v68pn6dju39y4tp3qd5mwaqcku9een8fnm2pjv0sa0n4gm
+        factory: osmo105qu7ajcf9y5wgpj7kcqj2rmj6zn6d9ernw99efua7834xprvwkq3hfhaz
         gas_prices: 0.04
         gas_adjustment: 1.3
         threshold: 1000000
@@ -38,16 +35,6 @@ chains:
         custom_sources:
             "mikedotexe":
                 rpc: https://osmosistestnet5.csli.zone
-    osmo-test-4:
-        factory: osmo1dy776gk8w9gpheuc6cmp7vjsu95emdjgzxjd0wa80qsmq4pfgjqqqqe8qg
-        gas_prices: 0.04
-        gas_adjustment: 1.3
-        threshold: 1000000
-        rpc_timeout: 9.0
-        include_evented_tasks: true
-        # custom_sources:
-        #     "osmo":
-        #         rpc: https://rpc.testnet.osmosis.zone
     # stargaze-1:
     #     factory:
     #     gas_prices: 0.04
@@ -62,7 +49,7 @@ chains:
         custom_sources:
              "mikedotexe":
                  rpc: https://stargazetestnet.csli.zone
-    constantine-2:
+    constantine-3:
         factory: archway1fz8wlm2sygmf5zzg47xeznsmljyz0pkxefuugr44lyt58l2uertqnh87ts
         gas_prices: 0.04
         gas_adjustment: 1.3
@@ -70,23 +57,9 @@ chains:
         rpc_timeout: 9.0
         include_evented_tasks: true
     pion-1:
-        factory: neutron1sc3r0m8zxw34jfg5xtym8tuxg38n2efuazap8nzmcgrjfampc0vqp0lg55
+        factory: neutron1qdmeqpzlha2lgw7w90up895fu3a8p3g0gnfvd9yj04ks9z9p305qtpk
         gas_prices: 0.04
         gas_adjustment: 1.3
-        threshold: 1000000
-        rpc_timeout: 9.0
-        include_evented_tasks: true
-    nois-testnet-005:
-        factory: nois1hyl3hlhd9g3wecsr49tkm834cze002zyv3f8ljwhduh2yaa2lyvse6mxsn
-        gas_prices: 0.04
-        gas_adjustment: 1.5
-        threshold: 1000000
-        rpc_timeout: 9.0
-        include_evented_tasks: true
-    narwhal-1:
-        factory: migaloo1lzgf30h3x70zed40m3j2arvve5tzk7cdfknx7plp9wxwl8253kasmrprjh
-        gas_prices: 0.04
-        gas_adjustment: 1.5
         threshold: 1000000
         rpc_timeout: 9.0
         include_evented_tasks: true

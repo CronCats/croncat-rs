@@ -9,3 +9,5 @@ Cargo.lock
 .cosmos-chain-registry/
 flamegraph.svg
 cargo-flamegraph.stacks
+sysfiles
+logs

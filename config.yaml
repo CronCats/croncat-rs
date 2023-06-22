@@ -35,10 +35,16 @@ chains:
         custom_sources:
             "mikedotexe":
                 rpc: https://osmosistestnet5.csli.zone
-    # stargaze-1:
-    #     factory:
-    #     gas_prices: 0.04
-    #     gas_adjustment: 1.3
+    stargaze-1:
+         factory: stars10sgfde78kwhs4y45fh3w72qjt3f8tak0pck0hntm89wrmd223prsegggcg
+         gas_prices: 1
+         gas_adjustment: 1.7
+         threshold: 1000000
+         rpc_timeout: 9.0
+         include_evented_tasks: true
+         custom_sources:
+             "mikedotexe":
+                 rpc: https://stargaze.csli.zone
     elgafar-1:
         factory: stars1vxd9a2w4taqlv5cfjnqpqhwtl9va8k0jgs5u35s3g4cxhy44zv5q3upvx5
         gas_prices: 0.04

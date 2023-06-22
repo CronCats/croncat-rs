@@ -57,7 +57,7 @@ chains:
         rpc_timeout: 9.0
         include_evented_tasks: true
     pion-1:
-        factory: neutron1qdmeqpzlha2lgw7w90up895fu3a8p3g0gnfvd9yj04ks9z9p305qtpk
+        factory: neutron1qdmeqpzlha2lgw7w90up895fu3a8p3g0gnfvd9yj04ks9z9p305qtpkxdt
         gas_prices: 0.04
         gas_adjustment: 1.3
         threshold: 1000000

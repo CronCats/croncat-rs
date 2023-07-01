@@ -69,3 +69,13 @@ chains:
         threshold: 1000000
         rpc_timeout: 9.0
         include_evented_tasks: true
+    neutron-1:
+        factory: neutron12g9rc7uet8jqlhhjf72emd56ndk8rctfsmy30llekem4scsgd77sgnkvfa
+        gas_prices: 0.05
+        gas_adjustment: 1.7
+        threshold: 1000000
+        rpc_timeout: 9.0
+        include_evented_tasks: true
+        custom_sources:
+            "mikedotexe":
+                rpc: https://neutron.csli.zone

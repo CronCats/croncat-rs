@@ -310,10 +310,6 @@ pub async fn check_status_loop(
                                 error!("Stopping the agent");
                                 exit(1);
                             }
-                        } else {
-                            error!("Not enough balance to continue, the agent in required to have {} {}, current balance: {} {}", threshold, denom, agent_native_balance, denom);
-                            error!("Stopping the agent");
-                            exit(1);
                         }
                     }
                 }

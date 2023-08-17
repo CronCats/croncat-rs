@@ -111,12 +111,13 @@ pub enum Command {
 impl Command {
     // Determine if this action happens on-chain
     pub fn on_chain(&self) -> bool {
-        match self {
+        // It's reversed, because we have much less off-chain methods
+        !matches!(
+            self,
             Self::ListAccounts
-            | Self::GenerateMnemonic { .. }
-            | Self::GetAgentKeys { .. }
-            | Self::SetupService { .. } => false,
-            _ => true,
-        }
+                | Self::GenerateMnemonic { .. }
+                | Self::GetAgentKeys { .. }
+                | Self::SetupService { .. }
+        )
     }
 }

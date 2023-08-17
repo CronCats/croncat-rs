@@ -107,3 +107,16 @@ pub enum Command {
         denom: Option<String>,
     },
 }
+
+impl Command {
+    // Determine if this action happens on-chain
+    pub fn on_chain(&self) -> bool {
+        match self {
+            Self::ListAccounts
+            | Self::GenerateMnemonic { .. }
+            | Self::GetAgentKeys { .. }
+            | Self::SetupService { .. } => false,
+            _ => true,
+        }
+    }
+}

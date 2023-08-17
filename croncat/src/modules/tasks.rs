@@ -319,7 +319,7 @@ impl Tasks {
             from_index += limit;
         }
 
-        // Step 1: Get all the data from ids
+        // Step 2: Get all the data from ids
         for id in evented_ids {
             let mut height_tasks: Vec<(String, TaskInfo)> = Vec::new();
             let mut time_tasks: Vec<(String, TaskInfo)> = Vec::new();

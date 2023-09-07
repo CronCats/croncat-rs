@@ -89,12 +89,24 @@ fn main() -> Result<(), Report> {
     Ok(())
 }
 
-async fn run_command(opts: Opts, mut storage: LocalAgentStorage) -> Result<(), Report> {
-    // Get the key for the agent signing account
+async fn run_command(opts: Opts, storage: LocalAgentStorage) -> Result<(), Report> {
+    // Get the configs for the chains from the config.yaml
     let config = Config::from_pwd()?;
+    if opts.cmd.on_chain() {
+        process_on_chain_command(opts, storage, config).await
+    } else {
+        process_off_chain_command(opts, storage, config).await
+    }
+}
+
+async fn process_on_chain_command(
+    opts: Opts,
+    storage: LocalAgentStorage,
+    config: Config,
+) -> Result<(), Report> {
     // Make sure we have a chain id to run on
     if opts.chain_id.is_none() {
-        return Err(eyre!("chain-id is required for go command"));
+        return Err(eyre!("chain-id is required for on-chain commands"));
     }
     let chain_id = opts.chain_id.unwrap();
 
@@ -312,15 +324,6 @@ async fn run_command(opts: Opts, mut storage: LocalAgentStorage) -> Result<(), R
                 Err(err) => Err(eyre!("Failed to withdraw reward: {}", err))?,
             }
         }
-        opts::Command::ListAccounts => {
-            println!("Account addresses for agent: {}\n", &opts.agent);
-            // Get the chain config for the chain we're going to run on
-            for (chain_id, chain_config) in config.chains {
-                let account_addr = storage
-                    .get_agent_signing_account_addr(&opts.agent, chain_config.info.bech32_prefix)?;
-                println!("{chain_id}: {account_addr}");
-            }
-        }
         opts::Command::Status => {
             // Print info about the agent
             let account_addr = account_addr.clone();
@@ -372,12 +375,6 @@ async fn run_command(opts: Opts, mut storage: LocalAgentStorage) -> Result<(), R
                 Err(eyre!("Failed to get agent tasks"))?
             }
         }
-        opts::Command::GenerateMnemonic { new_name, mnemonic } => {
-            storage.generate_account(new_name.clone(), mnemonic).await?;
-            println!("Generated agent keys for '{new_name}'");
-            println!("Start using it by doing the command: `export CRONCAT_AGENT={new_name}`");
-            println!("View the account addresses with command: `cargo run list-accounts`");
-        }
         opts::Command::Update { payable_account_id } => {
             let res = agent.update(payable_account_id).await;
 
@@ -399,7 +396,6 @@ async fn run_command(opts: Opts, mut storage: LocalAgentStorage) -> Result<(), R
                 ))?,
             }
         }
-        opts::Command::GetAgentKeys { name } => storage.display_account(&name),
         opts::Command::Go {} => {
             // Create the global shutdown channel
             let (shutdown_tx, _shutdown_rx) = create_shutdown_channel();
@@ -426,11 +422,6 @@ async fn run_command(opts: Opts, mut storage: LocalAgentStorage) -> Result<(), R
                 Err(eyre!("Failed to clear local cache"))?
             }
         }
-        opts::Command::SetupService { output } => {
-            for (chain_id, _) in config.chains {
-                system::DaemonService::create(output.clone(), &chain_id, opts.no_frills)?;
-            }
-        }
         opts::Command::SendFunds { to, amount, denom } => {
             let amount = amount.parse::<u128>()?;
             let account_addr = account_addr.clone();
@@ -451,7 +442,40 @@ async fn run_command(opts: Opts, mut storage: LocalAgentStorage) -> Result<(), R
                 Err(err) => Err(err)?,
             }
         }
+        _ => unreachable!(),
     }
 
+    Ok(())
+}
+
+async fn process_off_chain_command(
+    opts: Opts,
+    mut storage: LocalAgentStorage,
+    config: Config,
+) -> Result<(), Report> {
+    match opts.cmd {
+        opts::Command::ListAccounts => {
+            println!("Account addresses for agent: {}\n", &opts.agent);
+            // Get the chain config for the chain we're going to run on
+            for (chain_id, chain_config) in config.chains {
+                let account_addr = storage
+                    .get_agent_signing_account_addr(&opts.agent, chain_config.info.bech32_prefix)?;
+                println!("{chain_id}: {account_addr}");
+            }
+        }
+        opts::Command::GenerateMnemonic { new_name, mnemonic } => {
+            storage.generate_account(new_name.clone(), mnemonic).await?;
+            println!("Generated agent keys for '{new_name}'");
+            println!("Start using it by doing the command: `export CRONCAT_AGENT={new_name}`");
+            println!("View the account addresses with command: `cargo run list-accounts`");
+        }
+        opts::Command::GetAgentKeys { name } => storage.display_account(&name),
+        opts::Command::SetupService { output } => {
+            for (chain_id, _) in config.chains {
+                system::DaemonService::create(output.clone(), &chain_id, opts.no_frills)?;
+            }
+        }
+        _ => unreachable!(),
+    }
     Ok(())
 }

@@ -9,7 +9,7 @@ chains:
             "mikedotexe":
                 rpc: https://juno.csli.zone
     uni-6:
-        factory: juno1mc4wfy9unvy2mwx7dskjqhh6v7qta3vqsxmkayclg4c2jude76es0jcp38
+        factory: juno1qqkhju520klvyj2d4te7nh7xahvq4ulhht3ayvy666lgr0vnpjfqnjayxz
         gas_prices: 0.075
         gas_adjustment: 1.3
         threshold: 1000000

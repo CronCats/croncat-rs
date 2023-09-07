@@ -2,34 +2,34 @@
 //! `croncatd` CLI option builder.
 //!
 
+use clap::Parser;
 use croncat::utils::DEFAULT_AGENT_ID;
 use enum_display::EnumDisplay;
-use structopt::StructOpt;
 
-#[derive(Debug, StructOpt, Clone)]
-#[structopt(name = "croncatd", about = "The croncat agent daemon.")]
+#[derive(Debug, Parser, Clone)]
+#[command(name = "croncatd", about = "The croncat agent daemon.")]
 pub struct Opts {
     /// Debug mode
-    #[structopt(short, long)]
+    #[clap(short, long)]
     pub debug: bool,
 
     /// Whether to print nice little things like the banner and a goodbye
-    #[structopt(long)]
+    #[clap(long)]
     pub no_frills: bool,
 
-    #[structopt(subcommand)] // Note that we mark a field as a subcommand
+    #[clap(subcommand)] // Note that we mark a field as a subcommand
     pub cmd: Command,
 
     /// Chain ID of the chain to connect to
-    #[structopt(long, global = true, env = "CRONCAT_CHAIN_ID")]
+    #[clap(long, global = true, env = "CRONCAT_CHAIN_ID")]
     pub chain_id: Option<String>,
 
     /// ID of the agent config to use
-    #[structopt(long, global = true, default_value = DEFAULT_AGENT_ID, env = "CRONCAT_AGENT")]
+    #[clap(long, global = true, default_value = DEFAULT_AGENT_ID, env = "CRONCAT_AGENT")]
     pub agent: String,
 }
 
-#[derive(Debug, StructOpt, Clone, EnumDisplay)]
+#[derive(Debug, Parser, Clone, EnumDisplay)]
 #[enum_display(case = "Kebab")]
 pub enum Command {
     /// Useful for clearing local cached chain tasks
@@ -106,4 +106,18 @@ pub enum Command {
         /// The denom of the funds to send
         denom: Option<String>,
     },
+}
+
+impl Command {
+    // Determine if this action happens on-chain
+    pub fn on_chain(&self) -> bool {
+        // It's reversed, because we have much less off-chain methods
+        !matches!(
+            self,
+            Self::ListAccounts
+                | Self::GenerateMnemonic { .. }
+                | Self::GetAgentKeys { .. }
+                | Self::SetupService { .. }
+        )
+    }
 }

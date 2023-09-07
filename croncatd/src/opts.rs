@@ -2,9 +2,9 @@
 //! `croncatd` CLI option builder.
 //!
 
+use clap::Parser;
 use croncat::utils::DEFAULT_AGENT_ID;
 use enum_display::EnumDisplay;
-use clap::Parser;
 
 #[derive(Debug, Parser, Clone)]
 #[command(name = "croncatd", about = "The croncat agent daemon.")]
@@ -21,11 +21,11 @@ pub struct Opts {
     pub cmd: Command,
 
     /// Chain ID of the chain to connect to
-    #[clap(long, env = "CRONCAT_CHAIN_ID")]
+    #[clap(long, global = true, env = "CRONCAT_CHAIN_ID")]
     pub chain_id: Option<String>,
 
     /// ID of the agent config to use
-    #[clap(long, default_value = DEFAULT_AGENT_ID, env = "CRONCAT_AGENT")]
+    #[clap(long, global = true, default_value = DEFAULT_AGENT_ID, env = "CRONCAT_AGENT")]
     pub agent: String,
 }
 

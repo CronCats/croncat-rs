@@ -4,7 +4,7 @@
 
 use crate::opts::Opts;
 use croncat::errors::Report;
-use structopt::StructOpt;
+use clap::Parser;
 
 /// Load the banner ascii art as a `&'static str`.
 const BANNER_STR: &str = include_str!("../banner.txt");
@@ -20,5 +20,5 @@ pub fn print_banner() {
 /// Get the command line options.
 ///
 pub fn get_opts() -> Result<Opts, Report> {
-    Ok(Opts::from_args_safe()?)
+    Ok(Opts::try_parse()?)
 }
